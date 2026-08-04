@@ -798,14 +798,14 @@ language sql stable as $$
   select id from profiles where user_id = auth.uid()
 $$;
 
-create or replace function current_role() returns text
+create or replace function current_user_role() returns text
 language sql stable as $$
   select role from profiles where user_id = auth.uid()
 $$;
 
 create or replace function is_super_admin() returns boolean
 language sql stable as $$
-  select current_role() = 'super_admin'
+  select current_user_role() = 'super_admin'
 $$;
 
 create or replace function is_admin_for_club(p_club_id uuid) returns boolean
