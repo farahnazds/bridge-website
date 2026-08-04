@@ -2,27 +2,77 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getUserRole, type Role } from "@/lib/auth";
+import { getCurrentProfile } from "@/lib/auth";
 
 export interface LoginState {
   error: string | null;
 }
 
-// Best-known dashboard entry point per role (see docs/03-site-map.md).
-// independent_practitioner and guided_athlete aren't in that doc yet (v4
-// roles, v3 site map) — routed to the closest existing analog for now.
-const ROLE_HOME: Record<Role, string> = {
-  super_admin: "/super-admin",
-  admin: "/admin",
-  club_manager: "/club/dashboard",
-  club_practitioner: "/staff/teams",
-  independent_practitioner: "/independent/home",
-  club_athlete: "/athlete/home",
-  guided_athlete: "/athlete/home",
-  independent_athlete: "/independent/home",
-  brand_partner: "/brand-partner",
-  partnerships_consultant: "/partner-consultant",
-};
+// Post-login redirect resolution — see docs/04-user-flows.md, Flow 0.
+async function resolveRedirect(): Promise<string> {
+  const profile = await getCurrentProfile();
+  if (!profile) return "/";
+
+  const supabase = await createClient();
+
+  switch (profile.role) {
+    case "super_admin":
+      return "/super-admin";
+    case "admin":
+      return "/admin";
+
+    case "club_manager": {
+      const { data } = await supabase
+        .from("club_staff")
+        .select("club_id")
+        .eq("profile_id", profile.id)
+        .eq("role", "club_manager");
+      const clubIds = new Set((data ?? []).map((row) => row.club_id));
+      return clubIds.size === 1 ? `/club/${[...clubIds][0]}` : "/club";
+    }
+
+    case "club_practitioner":
+      // Always the "My Teams" index — this role spans multiple
+      // clubs/teams by design, never assume just one.
+      return "/staff";
+
+    case "independent_practitioner":
+      // practitioner_id is always their own profile.id, no lookup needed.
+      return `/practice/${profile.id}`;
+
+    case "club_athlete":
+    case "guided_athlete":
+    case "independent_athlete": {
+      const { data } = await supabase
+        .from("athletes")
+        .select("id")
+        .eq("profile_id", profile.id)
+        .single();
+      if (!data) return "/";
+      return profile.role === "club_athlete"
+        ? `/athlete/${data.id}`
+        : `/independent/${data.id}`;
+    }
+
+    case "brand_partner": {
+      const { data } = await supabase
+        .from("brand_partners")
+        .select("id")
+        .eq("profile_id", profile.id)
+        .single();
+      return data ? `/brand-partner/${data.id}` : "/";
+    }
+
+    case "partnerships_consultant": {
+      const { data } = await supabase
+        .from("partnerships_consultants")
+        .select("id")
+        .eq("profile_id", profile.id)
+        .single();
+      return data ? `/partner-consultant/${data.id}` : "/";
+    }
+  }
+}
 
 export async function login(
   _prevState: LoginState,
@@ -45,6 +95,5 @@ export async function login(
     return { error: "Incorrect email or password." };
   }
 
-  const role = await getUserRole();
-  redirect(role ? ROLE_HOME[role] : "/");
+  redirect(await resolveRedirect());
 }
