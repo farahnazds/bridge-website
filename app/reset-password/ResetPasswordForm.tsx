@@ -1,0 +1,179 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { getPostResetPath } from "./actions";
+
+type Status = "checking" | "ready" | "invalid" | "submitting" | "done";
+
+const inputClass =
+  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
+const inputStyle = {
+  borderColor: "var(--border)",
+  backgroundColor: "var(--surface)",
+  color: "var(--text)",
+};
+
+export default function ResetPasswordForm() {
+  const router = useRouter();
+  const [status, setStatus] = useState<Status>("checking");
+  const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function establishSession() {
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+
+      const sessionError = accessToken && refreshToken
+        ? (
+            await createClient().auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            })
+          ).error
+        : new Error("Missing recovery tokens");
+
+      // Strip tokens from the URL/history regardless of outcome.
+      window.history.replaceState(null, "", window.location.pathname);
+      if (!cancelled) setStatus(sessionError ? "invalid" : "ready");
+    }
+
+    establishSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords don't match.");
+      return;
+    }
+
+    setStatus("submitting");
+    const supabase = createClient();
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+
+    if (updateError) {
+      setError(updateError.message);
+      setStatus("ready");
+      return;
+    }
+
+    setStatus("done");
+    const path = await getPostResetPath();
+    router.push(path);
+  }
+
+  if (status === "checking") {
+    return (
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        Verifying your reset link…
+      </p>
+    );
+  }
+
+  if (status === "invalid") {
+    return (
+      <p
+        role="alert"
+        className="rounded-lg border px-4 py-3 text-sm"
+        style={{
+          borderColor: "var(--danger)",
+          color: "var(--danger)",
+          backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+        }}
+      >
+        This reset link is invalid or has expired. Ask for a new password
+        reset email and try again.
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+      {error && (
+        <p
+          role="alert"
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{
+            borderColor: "var(--danger)",
+            color: "var(--danger)",
+            backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+          }}
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor="password"
+          className="text-sm font-medium"
+          style={{ color: "var(--text)" }}
+        >
+          New password
+        </label>
+        <input
+          id="password"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={8}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className={inputClass}
+          style={inputStyle}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor="confirm-password"
+          className="text-sm font-medium"
+          style={{ color: "var(--text)" }}
+        >
+          Confirm password
+        </label>
+        <input
+          id="confirm-password"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={8}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          className={inputClass}
+          style={inputStyle}
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={status === "submitting" || status === "done"}
+        className="w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        style={{ backgroundImage: "var(--brand-gradient)" }}
+      >
+        {status === "submitting" || status === "done"
+          ? "Setting password…"
+          : "Set new password"}
+      </button>
+    </form>
+  );
+}

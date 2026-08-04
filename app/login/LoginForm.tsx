@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import Link from "next/link";
 import { login, type LoginState } from "./actions";
 
 const initialState: LoginState = { error: null };
@@ -97,6 +98,13 @@ export default function LoginForm() {
             color: "var(--text)",
           }}
         />
+        <Link
+          href="/forgot-password"
+          className="self-end text-xs font-medium transition-colors duration-150 hover:opacity-80"
+          style={{ color: "var(--brand-blue)" }}
+        >
+          Forgot password?
+        </Link>
       </div>
 
       <SubmitButton />
