@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bridgetx
 
-## Getting Started
+Multi-sport nutrition intelligence platform connecting clubs, independent
+practitioners, and athletes. Bridging Potential to High Performance.
 
-First, run the development server:
+## What this is
+
+Bridgetx tracks athlete body composition, GPS/performance data, daily
+compliance, and injuries, and turns it into AI-generated nutrition and
+performance reports — with a clinical rules layer and a citation-backed
+research library. Three ways to join: clubs (invite-only staff cascade),
+independent practitioners (self-signup, run their own practice), and
+athletes (one unified signup, auto-attached to whichever relationship
+already exists for them).
+
+Full product context lives in `docs/` — see `CLAUDE.md` for where to
+start, and `docs/09-roadmap.md` for exactly what's in scope for the
+first (basketball) club launch versus built-later.
+
+## Tech stack
+
+- **Frontend:** Next.js (App Router), TypeScript
+- **Database / Auth / Storage:** Supabase
+- **Hosting:** Vercel
+- **Email:** Resend
+- **AI reports:** Claude API
+- **Payments (future):** Stripe
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open [http://localhost:3000](http://localhost:3000) in your browser
+to see it running locally.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Requires `.env.local` with Supabase and API keys (not committed).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Project structure
 
-## Learn More
+```
+app/          → Next.js pages and routes
+lib/          → Supabase client, auth helpers, shared utilities
+docs/         → Product, business, and design documentation (source of truth)
+database/     → Schema, table docs, RLS policy docs
+prompts/      → AI prompt templates
+public/       → Static assets, brand logos
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Start with `docs/09-roadmap.md` (what's actually being built right now)
+and `docs/02-roles-and-permissions.md` (the full access model) before
+touching any dashboard code.
