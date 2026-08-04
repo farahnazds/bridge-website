@@ -1,5 +1,31 @@
 # 04 — User Flows
 
+## Flow 0: Post-login redirect resolution
+
+After a successful sign-in, `getUserRole()` gives the role — but for
+some roles that alone isn't enough to know *where* to send them, since
+a person can be tied to more than one record. Resolution per role:
+
+- **Super Admin / Admin** — no lookup needed, static routes
+  (`/super-admin`, `/admin`)
+- **Club Manager** — look up their club(s) via `club_staff`. Exactly one
+  → redirect straight to `/club/[club-id]`. Zero or multiple → land on
+  `/club` (index/chooser), don't guess
+- **Club Practitioner** — always land on `/staff` (index, "My Teams")
+  first, regardless of how many teams they have — this role is
+  explicitly designed to span multiple clubs/teams, never assume just
+  one
+- **Independent Practitioner** — no lookup needed. `practitioner_id` is
+  always their own `profile.id`, so redirect straight to
+  `/practice/[their-profile-id]`
+- **Club / Guided / Independent Athlete** — one lookup
+  (`athletes.profile_id = their profile`) → redirect straight to
+  `/athlete/[athlete-id]` (club) or `/independent/[athlete-id]`
+  (guided/independent)
+- **Brand Partner / Partnerships Consultant** — one lookup on their
+  respective table (`profile_id` is unique on both) → redirect straight
+  to `/brand-partner/[id]` or `/partner-consultant/[id]`
+
 ## Flow 1: Club onboarding (Admin-led during pilot)
 
 1. Super Admin adds a person as Admin, grants them access
