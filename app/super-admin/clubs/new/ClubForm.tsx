@@ -2,89 +2,123 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { getAllCountries, getTimezonesForCountry } from "countries-and-timezones";
 import { createClub, type CreateClubState } from "./actions";
 
 const initialState: CreateClubState = { error: null };
 
-// Broad global fallback for environments without Intl.supportedValuesOf
-// (older browsers) — major cities across every continent, not just GCC.
-// Bridgetx targets UAE first but is built to work for clubs anywhere.
-const FALLBACK_TIMEZONES = [
-  "Africa/Cairo",
-  "Africa/Johannesburg",
-  "Africa/Lagos",
-  "Africa/Nairobi",
-  "America/Bogota",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Mexico_City",
-  "America/New_York",
-  "America/Sao_Paulo",
-  "America/Toronto",
-  "Asia/Bahrain",
-  "Asia/Bangkok",
-  "Asia/Dubai",
-  "Asia/Hong_Kong",
-  "Asia/Jakarta",
-  "Asia/Kolkata",
-  "Asia/Kuwait",
-  "Asia/Muscat",
-  "Asia/Qatar",
-  "Asia/Riyadh",
-  "Asia/Seoul",
-  "Asia/Shanghai",
-  "Asia/Singapore",
-  "Asia/Tokyo",
-  "Australia/Perth",
-  "Australia/Sydney",
-  "Europe/Berlin",
-  "Europe/Istanbul",
-  "Europe/London",
-  "Europe/Madrid",
-  "Europe/Moscow",
-  "Europe/Paris",
-  "Europe/Rome",
-  "Pacific/Auckland",
-  "Pacific/Honolulu",
-  "UTC",
-];
+// Country picker is friendlier than a raw tz list; the actual `timezone`
+// form field still resolves to a real IANA zone underneath (see
+// TimezoneField below) — clubs.timezone is unchanged, still free-form IANA
+// text, so no data-model or server-action change is needed for this.
+const COUNTRIES = Object.values(getAllCountries())
+  .map((c) => ({ code: c.id, name: c.name }))
+  .sort((a, b) => a.name.localeCompare(b.name));
 
-// Full canonical IANA tz database where the runtime supports it (all
-// current browsers + Node 18+); falls back to the curated list above
-// otherwise. See docs/09-roadmap.md — global rollout is a stated goal,
-// so this shouldn't be hardcoded to GCC-only.
-function getTimezones(): string[] {
-  if (typeof Intl.supportedValuesOf === "function") {
-    try {
-      return Intl.supportedValuesOf("timeZone");
-    } catch {
-      // fall through to the curated list
-    }
-  }
-  return FALLBACK_TIMEZONES;
+// Matches the previous default (Asia/Dubai) — UAE is a single-timezone
+// country, so this alone resolves the field with no second dropdown shown.
+const DEFAULT_COUNTRY = "AE";
+
+function formatZoneLabel(zone: { name: string; utcOffsetStr: string }): string {
+  const place = zone.name.split("/").pop()?.replace(/_/g, " ") ?? zone.name;
+  return `${place} (UTC${zone.utcOffsetStr})`;
 }
 
-function groupTimezonesByRegion(zones: string[]): [string, string[]][] {
-  const groups = new Map<string, string[]>();
-  for (const zone of zones) {
-    const region = zone.includes("/") ? zone.split("/")[0] : "Other";
-    const list = groups.get(region);
-    if (list) list.push(zone);
-    else groups.set(region, [zone]);
-  }
-  for (const list of groups.values()) list.sort();
-  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-}
+// Renders a Country select, plus a second Region select that only appears
+// for countries spanning more than one IANA zone (US, Russia, Australia,
+// etc.). Submits the resolved IANA zone under the same "timezone" field
+// name the server action already expects.
+function TimezoneField() {
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
+  const [region, setRegion] = useState("");
 
-const TIMEZONE_GROUPS = groupTimezonesByRegion(getTimezones());
+  const zones = getTimezonesForCountry(country) ?? [];
+  const sortedZones = [...zones].sort((a, b) => a.utcOffset - b.utcOffset);
+  const resolvedRegion = sortedZones.some((z) => z.name === region)
+    ? region
+    : (sortedZones[0]?.name ?? "");
+  const resolvedTimezone = sortedZones.length <= 1 ? (sortedZones[0]?.name ?? "") : resolvedRegion;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="country" className={labelClass} style={{ color: "var(--text)" }}>
+          Country
+        </label>
+        <select
+          id="country"
+          required
+          value={country}
+          onChange={(e) => {
+            setCountry(e.target.value);
+            setRegion("");
+          }}
+          className={inputClass}
+          style={inputStyle}
+        >
+          {COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {sortedZones.length > 1 && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="region" className={labelClass} style={{ color: "var(--text)" }}>
+            Region
+          </label>
+          <select
+            id="region"
+            required
+            value={resolvedRegion}
+            onChange={(e) => setRegion(e.target.value)}
+            className={inputClass}
+            style={inputStyle}
+          >
+            {sortedZones.map((z) => (
+              <option key={z.name} value={z.name}>
+                {formatZoneLabel(z)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <input type="hidden" name="timezone" value={resolvedTimezone} />
+    </div>
+  );
+}
 
 // Curated starting list, not a DB enum — `clubs.sport` is a free-text
 // column by design so new sports can onboard without a migration (see
 // docs/05-business-rules.md, "Multi-sport foundation"). "Other" below
 // keeps that open, extensible; the dropdown just replaces raw free typing
 // as the default entry path.
-const SPORTS = ["Basketball", "Football", "Rugby", "Motorsport / F1"];
+const SPORTS = [
+  "Football",
+  "Basketball",
+  "Rugby",
+  "Sprint",
+  "Distance Running",
+  "Swimming",
+  "Cycling",
+  "Tennis",
+  "Boxing",
+  "Weightlifting",
+  "Gymnastics",
+  "Cricket",
+  "Padel",
+  "Triathlon",
+  "Volleyball",
+  "Handball",
+  "Field Hockey",
+  "Golf",
+  "MMA/Wrestling",
+  "Rowing",
+  "Motorsport / F1",
+];
 const OTHER_SPORT = "__other__";
 
 const inputClass =
@@ -205,29 +239,7 @@ export default function ClubForm() {
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="timezone" className={labelClass} style={{ color: "var(--text)" }}>
-              Timezone
-            </label>
-            <select
-              id="timezone"
-              name="timezone"
-              required
-              defaultValue="Asia/Dubai"
-              className={inputClass}
-              style={inputStyle}
-            >
-              {TIMEZONE_GROUPS.map(([region, zones]) => (
-                <optgroup key={region} label={region}>
-                  {zones.map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
+          <TimezoneField />
         </div>
       </section>
 
