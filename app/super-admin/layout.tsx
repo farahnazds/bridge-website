@@ -25,7 +25,7 @@ export default async function SuperAdminLayout({
             alt="Bridgetx"
             width={130}
             height={28}
-            className="h-7 w-auto"
+            className="h-7 w-auto object-contain"
             priority
           />
           <span

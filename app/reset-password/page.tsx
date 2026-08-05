@@ -16,7 +16,7 @@ export default function ResetPasswordPage() {
             alt="Bridgetx"
             width={140}
             height={32}
-            className="h-8 w-auto"
+            className="h-8 w-auto object-contain"
             priority
           />
           <h1

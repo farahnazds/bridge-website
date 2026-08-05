@@ -23,7 +23,7 @@ export default function LoginPage() {
           alt="Bridgetx"
           width={160}
           height={36}
-          className="relative h-9 w-auto"
+          className="relative h-9 w-auto object-contain"
           priority
         />
         <p className="relative max-w-sm text-lg leading-relaxed text-white/90">
@@ -39,7 +39,7 @@ export default function LoginPage() {
               alt="Bridgetx"
               width={140}
               height={32}
-              className="h-8 w-auto lg:hidden"
+              className="h-8 w-auto object-contain lg:hidden"
               priority
             />
             <h1
