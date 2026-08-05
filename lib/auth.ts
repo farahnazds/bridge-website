@@ -81,7 +81,7 @@ export async function resolvePostLoginPath(): Promise<string> {
 
   switch (profile.role) {
     case "super_admin":
-      return "/super-admin";
+      return "/super-admin/clubs";
     case "admin":
       return "/admin";
 

@@ -68,7 +68,40 @@
 Every policy above must be a real Postgres RLS policy on the table
 itself — never enforced only in the frontend. Edit-window rules (7-day,
 2-day) should be enforced as actual row-level time comparisons in the
-policy, not just disabled buttons in the UI.# Database — Row Level Security Policies (v4, plain English pre-SQL)
+policy, not just disabled buttons in the UI.
+
+## Fixed: recursive RLS helper functions (2026-08-05)
+
+Four SQL helper functions in `database/schema.sql` Section 18 each queried
+a table that had an RLS policy calling that same helper back — infinite
+recursion, Postgres error `54001 stack depth limit exceeded`, on every
+non-service-role query touching the table. This broke `getCurrentProfile()`
+for every role (not just super_admin), which made
+`resolvePostLoginPath()` silently send everyone to `/`.
+
+| Helper | Queries | Recursive via policy |
+|---|---|---|
+| `current_user_role()` | `profiles` | `profiles`: `"super admin full access"` → `is_super_admin()` |
+| `is_club_manager_for_club()` / `is_club_staff_for_club()` | `club_staff` | `club_staff`: `"club manager manages own club staff"` |
+| `is_assigned_to_athlete_via_team()` | `athlete_teams` | `athlete_teams`: `"team-linked access"` |
+| `is_own_athlete_profile()` | `athletes` | `athletes`: `"athlete reads own row"` |
+
+Fix: `current_profile_id()`, `current_user_role()`,
+`is_club_staff_for_club()`, `is_club_manager_for_club()`,
+`is_assigned_to_athlete_via_team()`, and `is_own_athlete_profile()` are now
+`security definer` with a locked `search_path`, so their internal lookup
+runs as the function owner (bypassing RLS on that one internal query)
+instead of re-triggering the same policy. `auth.uid()` still resolves to
+the real caller, so results stay scoped to that user — no access semantics
+changed, the existing policies just evaluate instead of crashing. See
+`database/migrations/001_fix_rls_recursion.sql`.
+
+`is_admin_for_club()`, `is_assigned_to_team()`, and
+`has_independent_access_to_athlete()` were audited too — they query
+`admin_club_assignments` / `staff_team_assignments` / `practitioner_athletes`
+respectively, and none of those tables' policies call the function back, so
+they were left unchanged.
+# Database — Row Level Security Policies (v4, plain English pre-SQL)
 
 - **Super Admin** — full access, everything, no restrictions.
 - **Admin** — scoped to clubs in `admin_club_assignments`, further

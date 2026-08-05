@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 
@@ -11,12 +12,14 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col gap-2">
-          <span
-            className="text-lg font-semibold tracking-tight"
-            style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}
-          >
-            Bridgetx
-          </span>
+          <Image
+            src="/brand/logo-horizontal-light.png"
+            alt="Bridgetx"
+            width={140}
+            height={32}
+            className="h-8 w-auto"
+            priority
+          />
           <h1
             className="text-2xl font-semibold"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}

@@ -793,13 +793,26 @@ comment on table audit_log is
 -- SECTION 18 — HELPER FUNCTIONS FOR RLS
 -- ============================================================================
 
+-- NOTE on security definer below: these helpers are called from inside RLS
+-- policies on the very tables they query (e.g. current_user_role() is used
+-- by a policy on `profiles`, and it itself queries `profiles`). Without
+-- security definer, that inner query re-triggers the same policy evaluation
+-- and Postgres recurses until it hits "stack depth limit exceeded" — this
+-- previously broke EVERY RLS-scoped query on the affected tables for EVERY
+-- role, not just super_admin. security definer + a locked search_path makes
+-- the inner lookup run as the function owner (bypassing RLS on that single
+-- internal query) while auth.uid() still resolves to the real caller, so the
+-- result stays correctly scoped to the calling user. Any helper here that
+-- queries a table also protected by a policy calling that same helper needs
+-- this treatment — see database/rls-policies.md for the recursion audit.
+
 create or replace function current_profile_id() returns uuid
-language sql stable as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select id from profiles where user_id = auth.uid()
 $$;
 
 create or replace function current_user_role() returns text
-language sql stable as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select role from profiles where user_id = auth.uid()
 $$;
 
@@ -817,8 +830,11 @@ language sql stable as $$
   ) or is_super_admin()
 $$;
 
+-- security definer: queries club_staff, which has a policy ("club manager
+-- manages own club staff") that calls is_club_manager_for_club() — without
+-- this, any select on club_staff recurses into itself.
 create or replace function is_club_staff_for_club(p_club_id uuid) returns boolean
-language sql stable as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (
     select 1 from club_staff cs
     where cs.profile_id = current_profile_id()
@@ -826,8 +842,10 @@ language sql stable as $$
   )
 $$;
 
+-- security definer: see is_club_staff_for_club() above — this is the
+-- function the recursive club_staff policy actually calls.
 create or replace function is_club_manager_for_club(p_club_id uuid) returns boolean
-language sql stable as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (
     select 1 from club_staff cs
     where cs.profile_id = current_profile_id()
@@ -845,8 +863,10 @@ language sql stable as $$
   )
 $$;
 
+-- security definer: queries athlete_teams, which has a policy
+-- ("team-linked access") that calls is_assigned_to_athlete_via_team() itself.
 create or replace function is_assigned_to_athlete_via_team(p_athlete_id uuid) returns boolean
-language sql stable as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (
     select 1 from athlete_teams at
     join staff_team_assignments sta on sta.team_id = at.team_id
@@ -871,8 +891,10 @@ language sql stable as $$
   )
 $$;
 
+-- security definer: queries athletes, which has a policy ("athlete reads
+-- own row") that calls is_own_athlete_profile() itself.
 create or replace function is_own_athlete_profile(p_athlete_id uuid) returns boolean
-language sql stable as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (
     select 1 from athletes a
     where a.id = p_athlete_id and a.profile_id = current_profile_id()

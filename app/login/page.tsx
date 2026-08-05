@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import LoginForm from "./LoginForm";
 
@@ -17,12 +18,14 @@ export default function LoginPage() {
           className="pointer-events-none absolute inset-0 opacity-20"
           style={{ backgroundImage: "var(--brand-gradient)" }}
         />
-        <span
-          className="relative text-2xl font-semibold tracking-tight text-white"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          Bridgetx
-        </span>
+        <Image
+          src="/brand/logo-horizontal-dark.png"
+          alt="Bridgetx"
+          width={160}
+          height={36}
+          className="relative h-9 w-auto"
+          priority
+        />
         <p className="relative max-w-sm text-lg leading-relaxed text-white/90">
           Bridging Potential to High Performance.
         </p>
@@ -31,12 +34,14 @@ export default function LoginPage() {
       <div className="flex w-full flex-col items-center justify-center px-6 py-16 lg:w-1/2">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col gap-2">
-            <span
-              className="text-lg font-semibold tracking-tight lg:hidden"
-              style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}
-            >
-              Bridgetx
-            </span>
+            <Image
+              src="/brand/logo-horizontal-light.png"
+              alt="Bridgetx"
+              width={140}
+              height={32}
+              className="h-8 w-auto lg:hidden"
+              priority
+            />
             <h1
               className="text-2xl font-semibold"
               style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}

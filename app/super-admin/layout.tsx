@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 
@@ -18,12 +19,21 @@ export default async function SuperAdminLayout({
         className="flex items-center justify-between border-b px-6 py-4"
         style={{ borderColor: "var(--border)", backgroundColor: "var(--brand-navy)" }}
       >
-        <Link
-          href="/super-admin/clubs"
-          className="text-lg font-semibold text-white"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          Bridgetx <span className="font-normal text-white/60">· Super Admin</span>
+        <Link href="/super-admin/clubs" className="flex items-center gap-2">
+          <Image
+            src="/brand/logo-horizontal-dark.png"
+            alt="Bridgetx"
+            width={130}
+            height={28}
+            className="h-7 w-auto"
+            priority
+          />
+          <span
+            className="text-sm font-normal text-white/60"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            · Super Admin
+          </span>
         </Link>
         <span className="text-sm text-white/70">
           {profile.first_name ?? profile.email}
