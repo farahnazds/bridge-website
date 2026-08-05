@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { getAllCountries, getTimezonesForCountry } from "countries-and-timezones";
+import { SPORTS, OTHER_SPORT } from "@/lib/constants";
 import { createClub, type CreateClubState } from "./actions";
 
 const initialState: CreateClubState = { error: null };
@@ -90,36 +91,6 @@ function TimezoneField() {
     </div>
   );
 }
-
-// Curated starting list, not a DB enum — `clubs.sport` is a free-text
-// column by design so new sports can onboard without a migration (see
-// docs/05-business-rules.md, "Multi-sport foundation"). "Other" below
-// keeps that open, extensible; the dropdown just replaces raw free typing
-// as the default entry path.
-const SPORTS = [
-  "Football",
-  "Basketball",
-  "Rugby",
-  "Sprint",
-  "Distance Running",
-  "Swimming",
-  "Cycling",
-  "Tennis",
-  "Boxing",
-  "Weightlifting",
-  "Gymnastics",
-  "Cricket",
-  "Padel",
-  "Triathlon",
-  "Volleyball",
-  "Handball",
-  "Field Hockey",
-  "Golf",
-  "MMA/Wrestling",
-  "Rowing",
-  "Motorsport / F1",
-];
-const OTHER_SPORT = "__other__";
 
 const inputClass =
   "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";

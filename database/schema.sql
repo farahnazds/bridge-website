@@ -966,6 +966,33 @@ create policy "read own profile" on profiles for select
   using (user_id = auth.uid());
 create policy "update own profile basics" on profiles for update
   using (user_id = auth.uid());
+-- No club_id lives on `profiles` itself, so this can only be scoped by
+-- role, not by "which club" — the insert alone is harmless (an unlinked
+-- profile grants no access to anything); real scoping happens on the
+-- follow-up update below, via athletes.profile_id.
+create policy "club staff creates athlete profiles" on profiles for insert
+  with check (
+    current_user_role() in ('club_manager', 'club_practitioner')
+    and role = 'athlete'
+  );
+-- By the time this runs, athletes.profile_id already points at the
+-- profile (set right after insert), so this is scoped through that real
+-- relationship. WITH CHECK pins role='athlete' so this can't double as a
+-- role-elevation path disguised as a "link user_id" update.
+create policy "club staff updates linked athlete profiles" on profiles for update
+  using (
+    exists (
+      select 1 from athletes a
+      where a.profile_id = profiles.id and is_club_staff_for_club(a.club_id)
+    )
+  )
+  with check (
+    role = 'athlete'
+    and exists (
+      select 1 from athletes a
+      where a.profile_id = profiles.id and is_club_staff_for_club(a.club_id)
+    )
+  );
 
 -- ---- clubs ----
 create policy "super admin full access" on clubs for all
@@ -1284,6 +1311,44 @@ create policy "own overrides read" on role_permission_overrides for select using
 create policy "super admin full access" on audit_log for all using (is_super_admin());
 create policy "linked read access" on audit_log for select
   using (athlete_id is not null and (is_assigned_to_athlete_via_team(athlete_id) or has_independent_access_to_athlete(athlete_id) or is_own_athlete_profile(athlete_id)));
+
+-- ---- storage.objects: profile-photos bucket ----
+-- Upload path convention: `${athlete.id}/${filename}` — storage.foldername()
+-- returns everything but the filename, so (storage.foldername(name))[1]
+-- is the athlete id for every object in this bucket.
+-- RLS is already enabled on storage.objects by default in Supabase, and
+-- altering it requires table-owner privileges the SQL Editor role doesn't
+-- have ("must be owner of table objects") — creating policies on it is a
+-- normal, allowed operation regardless, so that line is dropped here.
+
+create policy "club staff manage own club athlete photos" on storage.objects for all
+  using (
+    bucket_id = 'profile-photos'
+    and exists (
+      select 1 from athletes a
+      where a.id::text = (storage.foldername(name))[1]
+        and a.club_id is not null
+        and is_club_staff_for_club(a.club_id)
+    )
+  );
+
+-- Same access pattern already used for every other athlete-linked table.
+create policy "linked practitioners and athlete read own photo" on storage.objects for select
+  using (
+    bucket_id = 'profile-photos'
+    and exists (
+      select 1 from athletes a
+      where a.id::text = (storage.foldername(name))[1]
+        and (
+          is_assigned_to_athlete_via_team(a.id)
+          or has_independent_access_to_athlete(a.id)
+          or is_own_athlete_profile(a.id)
+        )
+    )
+  );
+
+create policy "super admin full access to photos" on storage.objects for all
+  using (bucket_id = 'profile-photos' and is_super_admin());
 
 -- ============================================================================
 -- END OF SCHEMA

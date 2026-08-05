@@ -1,0 +1,583 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
+import { getAllCountries } from "countries-and-timezones";
+import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS } from "@/lib/constants";
+import { generateAthleteCode } from "@/lib/athleteCode";
+import { registerAthlete, type RegisterAthleteState } from "./actions";
+
+const initialState: RegisterAthleteState = { error: null };
+
+const COUNTRIES = Object.values(getAllCountries())
+  .map((c) => ({ code: c.id, name: c.name }))
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+const inputClass =
+  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
+const inputStyle = {
+  borderColor: "var(--border)",
+  backgroundColor: "var(--surface)",
+  color: "var(--text)",
+};
+const labelClass = "text-sm font-medium";
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="rounded-lg px-5 py-3 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      style={{ backgroundImage: "var(--brand-gradient)" }}
+    >
+      {pending ? "Registering…" : "Register athlete & send invite"}
+    </button>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h2
+      className="text-base font-semibold"
+      style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}
+    >
+      {children}
+    </h2>
+  );
+}
+
+function ChecklistField({
+  legend,
+  fieldName,
+  otherFieldName,
+  options,
+}: {
+  legend: string;
+  fieldName: string;
+  otherFieldName: string;
+  options: { code: string; label: string }[];
+}) {
+  const [otherChecked, setOtherChecked] = useState(false);
+  const nonOther = options.filter((o) => o.code !== "other");
+  const hasOther = options.some((o) => o.code === "other");
+
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className={labelClass} style={{ color: "var(--text)" }}>
+        {legend}
+      </legend>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+        {nonOther.map((opt) => (
+          <label
+            key={opt.code}
+            className="flex items-center gap-2 text-sm"
+            style={{ color: "var(--text)" }}
+          >
+            <input type="checkbox" name={fieldName} value={opt.code} />
+            {opt.label}
+          </label>
+        ))}
+        {hasOther && (
+          <label
+            className="flex items-center gap-2 text-sm"
+            style={{ color: "var(--text)" }}
+          >
+            <input
+              type="checkbox"
+              name={fieldName}
+              value="other"
+              checked={otherChecked}
+              onChange={(e) => setOtherChecked(e.target.checked)}
+            />
+            Other
+          </label>
+        )}
+      </div>
+      {otherChecked && (
+        <input
+          type="text"
+          name={otherFieldName}
+          required
+          placeholder="Specify…"
+          className={inputClass}
+          style={inputStyle}
+        />
+      )}
+    </fieldset>
+  );
+}
+
+export default function AthleteForm({
+  clubId,
+  teams,
+  conditions,
+  allergies,
+  intolerances,
+}: {
+  clubId: string;
+  teams: { id: string; name: string; category: string | null }[];
+  conditions: { code: string; label: string }[];
+  allergies: { code: string; label: string }[];
+  intolerances: { code: string; label: string }[];
+}) {
+  const [state, formAction] = useActionState(registerAthlete, initialState);
+
+  const [lastName, setLastName] = useState("");
+  const [code, setCode] = useState(() => generateAthleteCode(""));
+  const [codeTouched, setCodeTouched] = useState(false);
+  const [sportMode, setSportMode] = useState<"select" | "other">("select");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  function handleLastNameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setLastName(value);
+    if (!codeTouched) setCode(generateAthleteCode(value));
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    setPhotoPreview(file ? URL.createObjectURL(file) : null);
+  }
+
+  return (
+    <form action={formAction} className="flex flex-col gap-8" noValidate>
+      <input type="hidden" name="club_id" value={clubId} />
+
+      {state.error && (
+        <p
+          role="alert"
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{
+            borderColor: "var(--danger)",
+            color: "var(--danger)",
+            backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+          }}
+        >
+          {state.error}
+        </p>
+      )}
+
+      {/* ---- Photo ---- */}
+      <section className="flex flex-col gap-5">
+        <SectionHeading>Photo</SectionHeading>
+        <div className="flex items-center gap-4">
+          <div
+            className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border"
+            style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)" }}
+          >
+            {photoPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoPreview} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                No photo
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <input
+              id="photo"
+              name="photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handlePhotoChange}
+              className="text-sm"
+              style={{ color: "var(--text)" }}
+            />
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Club athletes have no self-editable fields — you&apos;re uploading this on their
+              behalf.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Personal information ---- */}
+      <section className="flex flex-col gap-5">
+        <SectionHeading>Personal information</SectionHeading>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="first_name" className={labelClass} style={{ color: "var(--text)" }}>
+              First name
+            </label>
+            <input
+              id="first_name"
+              name="first_name"
+              type="text"
+              required
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="last_name" className={labelClass} style={{ color: "var(--text)" }}>
+              Last name
+            </label>
+            <input
+              id="last_name"
+              name="last_name"
+              type="text"
+              required
+              value={lastName}
+              onChange={handleLastNameChange}
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="email" className={labelClass} style={{ color: "var(--text)" }}>
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              placeholder="athlete@example.com"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="dob" className={labelClass} style={{ color: "var(--text)" }}>
+              Date of birth
+            </label>
+            <input
+              id="dob"
+              name="dob"
+              type="date"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="gender" className={labelClass} style={{ color: "var(--text)" }}>
+              Gender
+            </label>
+            <select id="gender" name="gender" defaultValue="" className={inputClass} style={inputStyle}>
+              <option value="">Not specified</option>
+              {GENDERS.map((g) => (
+                <option key={g.value} value={g.value}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="country" className={labelClass} style={{ color: "var(--text)" }}>
+              Country
+            </label>
+            <select id="country" name="country" defaultValue="" className={inputClass} style={inputStyle}>
+              <option value="">Not specified</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="ethnicity" className={labelClass} style={{ color: "var(--text)" }}>
+            Ethnicity
+          </label>
+          <input
+            id="ethnicity"
+            name="ethnicity"
+            type="text"
+            className={inputClass}
+            style={inputStyle}
+          />
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Sensitive field — visibility is restricted to Medical staff, Admin, and Super Admin.
+          </p>
+        </div>
+      </section>
+
+      {/* ---- Body composition ---- */}
+      <section className="flex flex-col gap-5">
+        <SectionHeading>Body composition</SectionHeading>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="weight_kg" className={labelClass} style={{ color: "var(--text)" }}>
+              Weight (kg)
+            </label>
+            <input
+              id="weight_kg"
+              name="weight_kg"
+              type="number"
+              step="0.1"
+              min="0"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="height_cm" className={labelClass} style={{ color: "var(--text)" }}>
+              Height (cm)
+            </label>
+            <input
+              id="height_cm"
+              name="height_cm"
+              type="number"
+              step="0.1"
+              min="0"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="body_fat_pct" className={labelClass} style={{ color: "var(--text)" }}>
+              Body fat %
+            </label>
+            <input
+              id="body_fat_pct"
+              name="body_fat_pct"
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Lean mass is auto-calculated from weight × (1 − body fat %) once both are entered.
+        </p>
+      </section>
+
+      {/* ---- Diet / clinical profile ---- */}
+      <section className="flex flex-col gap-5">
+        <SectionHeading>Diet / clinical profile</SectionHeading>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="diet_preference" className={labelClass} style={{ color: "var(--text)" }}>
+            Diet / religion preference
+          </label>
+          <select
+            id="diet_preference"
+            name="diet_preference"
+            defaultValue="none"
+            className={inputClass}
+            style={inputStyle}
+          >
+            {DIET_PREFERENCES.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <ChecklistField
+          legend="Medical / operational conditions"
+          fieldName="conditions"
+          otherFieldName="conditions_other"
+          options={conditions}
+        />
+        <ChecklistField
+          legend="Allergies"
+          fieldName="allergies"
+          otherFieldName="allergies_other"
+          options={allergies}
+        />
+        <ChecklistField
+          legend="Intolerances / sensitivities"
+          fieldName="intolerances"
+          otherFieldName="intolerances_other"
+          options={intolerances}
+        />
+      </section>
+
+      {/* ---- Female athlete cycle ---- */}
+      <section className="flex flex-col gap-5">
+        <SectionHeading>Female athlete cycle (where tracked)</SectionHeading>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="menstrual_status"
+              className={labelClass}
+              style={{ color: "var(--text)" }}
+            >
+              Menstrual status
+            </label>
+            <input
+              id="menstrual_status"
+              name="menstrual_status"
+              type="text"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="iron_status" className={labelClass} style={{ color: "var(--text)" }}>
+              Iron status
+            </label>
+            <input
+              id="iron_status"
+              name="iron_status"
+              type="text"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Sport & classification ---- */}
+      <section className="flex flex-col gap-5">
+        <SectionHeading>Sport & classification</SectionHeading>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="sport" className={labelClass} style={{ color: "var(--text)" }}>
+              Sport
+            </label>
+            {sportMode === "select" ? (
+              <select
+                id="sport"
+                name="sport"
+                required
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value === OTHER_SPORT) setSportMode("other");
+                }}
+                className={inputClass}
+                style={inputStyle}
+              >
+                <option value="" disabled>
+                  Select a sport…
+                </option>
+                {SPORTS.map((sport) => (
+                  <option key={sport} value={sport}>
+                    {sport}
+                  </option>
+                ))}
+                <option value={OTHER_SPORT}>Other…</option>
+              </select>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <input
+                  id="sport"
+                  name="sport"
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="Enter sport name"
+                  className={inputClass}
+                  style={inputStyle}
+                />
+                <button
+                  type="button"
+                  onClick={() => setSportMode("select")}
+                  className="self-start text-xs font-medium underline-offset-2 hover:underline"
+                  style={{ color: "var(--brand-blue)" }}
+                >
+                  Choose from list instead
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="position" className={labelClass} style={{ color: "var(--text)" }}>
+              Position
+            </label>
+            <input
+              id="position"
+              name="position"
+              type="text"
+              placeholder="e.g. Point Guard"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="tier" className={labelClass} style={{ color: "var(--text)" }}>
+              Tier
+            </label>
+            <select id="tier" name="tier" defaultValue="" className={inputClass} style={inputStyle}>
+              <option value="">Not specified</option>
+              {TIERS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="team_id" className={labelClass} style={{ color: "var(--text)" }}>
+              Team
+            </label>
+            {teams.length > 0 ? (
+              <select
+                id="team_id"
+                name="team_id"
+                required
+                defaultValue=""
+                className={inputClass}
+                style={inputStyle}
+              >
+                <option value="" disabled>
+                  Select a team…
+                </option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p
+                className="rounded-lg border px-3.5 py-2.5 text-sm"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+              >
+                No teams yet — create one first.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="code" className={labelClass} style={{ color: "var(--text)" }}>
+            Athlete code
+          </label>
+          <input
+            id="code"
+            name="code"
+            type="text"
+            required
+            value={code}
+            onChange={(e) => {
+              setCodeTouched(true);
+              setCode(e.target.value);
+            }}
+            className={inputClass}
+            style={{ ...inputStyle, fontFamily: "var(--font-mono)" }}
+          />
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Auto-generated — edit if you&apos;d rather use your own numbering.
+          </p>
+        </div>
+      </section>
+
+      <div>
+        <SubmitButton />
+      </div>
+    </form>
+  );
+}

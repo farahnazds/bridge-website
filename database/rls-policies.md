@@ -101,6 +101,38 @@ changed, the existing policies just evaluate instead of crashing. See
 `admin_club_assignments` / `staff_team_assignments` / `practitioner_athletes`
 respectively, and none of those tables' policies call the function back, so
 they were left unchanged.
+
+## Added: club-staff athlete-registration policies (2026-08-05)
+
+Athlete registration (`app/club/[clubId]/athletes/new/actions.ts`) had three
+service-role admin-client bypasses: inviting the athlete by email, creating
+their `profiles` row, and uploading their photo. Only the latter two are
+actually RLS-fixable — `inviteUserByEmail` is a Supabase Auth Admin API
+call, not a table operation, and always requires `service_role` regardless
+of any policy. Added real policies for the other two so `club_manager` and
+`club_practitioner` can do them under their own session:
+
+- **`profiles` insert** (`"club staff creates athlete profiles"`) — scoped
+  by role only (`club_manager`/`club_practitioner`, `role = 'athlete'`),
+  not by club, since `profiles` has no `club_id` of its own to check at
+  insert time. An unlinked profile row grants no access to anything, so
+  this is safe; real scoping happens on the update below.
+- **`profiles` update** (`"club staff updates linked athlete profiles"`) —
+  scoped through `athletes.profile_id` (set immediately after insert) via
+  `is_club_staff_for_club()`, a real relationship check. `with check`
+  pins `role = 'athlete'` so this can't double as a role-elevation path
+  disguised as the "link `user_id` after invite" update.
+- **`storage.objects` on the `profile-photos` bucket** — three policies:
+  club staff manage (`for all`) photos for athletes in their own club,
+  scoped via `storage.foldername(name)` (the upload path is
+  `${athlete.id}/${filename}`, so the first folder segment is the athlete
+  id); anyone with legitimate linked access to the athlete can read the
+  photo (same pattern as every other athlete-linked table); Super Admin
+  has full access. RLS wasn't previously enabled on this table at all —
+  confirmed by testing an actual upload as the real Club Manager account
+  and watching it fail before this fix existed.
+
+See `database/migrations/002_club_staff_profile_and_photo_policies.sql`.
 # Database — Row Level Security Policies (v4, plain English pre-SQL)
 
 - **Super Admin** — full access, everything, no restrictions.
