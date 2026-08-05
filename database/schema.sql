@@ -993,6 +993,39 @@ create policy "club staff updates linked athlete profiles" on profiles for updat
       where a.profile_id = profiles.id and is_club_staff_for_club(a.club_id)
     )
   );
+-- Same shape, for club_practitioner instead of athlete — scoped to
+-- club_manager only, per docs/02-roles-and-permissions.md ("Club Manager
+-- ... invites/assigns Club Practitioners" is a manager capability, not
+-- something practitioners do to each other).
+create policy "club manager creates practitioner profiles" on profiles for insert
+  with check (
+    current_user_role() = 'club_manager'
+    and role = 'club_practitioner'
+  );
+create policy "club staff updates linked practitioner profiles" on profiles for update
+  using (
+    exists (
+      select 1 from club_staff cs
+      where cs.profile_id = profiles.id and is_club_manager_for_club(cs.club_id)
+    )
+  )
+  with check (
+    role = 'club_practitioner'
+    and exists (
+      select 1 from club_staff cs
+      where cs.profile_id = profiles.id and is_club_manager_for_club(cs.club_id)
+    )
+  );
+-- Needed for the Teams & Staff list — any club_staff can read another club
+-- staff member's profile (name/specialty/department) at a club they're
+-- both staff of. Same "linked access" shape used for athlete-linked tables.
+create policy "club staff reads linked staff profiles" on profiles for select
+  using (
+    exists (
+      select 1 from club_staff cs
+      where cs.profile_id = profiles.id and is_club_staff_for_club(cs.club_id)
+    )
+  );
 
 -- ---- clubs ----
 create policy "super admin full access" on clubs for all

@@ -133,6 +133,41 @@ of any policy. Added real policies for the other two so `club_manager` and
   and watching it fail before this fix existed.
 
 See `database/migrations/002_club_staff_profile_and_photo_policies.sql`.
+
+## Added: Teams & Staff practitioner-invite policies (2026-08-05)
+
+Same gap as the athlete-registration fix above, but for inviting a
+`club_practitioner` from `app/club/[clubId]/teams-staff/actions.ts`.
+`profiles` had no INSERT policy for creating a practitioner's login
+profile, no UPDATE policy for linking `user_id` after their invite is
+accepted, and no SELECT policy letting a manager see their own staff's
+profile rows (name/specialty/department) for the staff list.
+
+- **`profiles` insert** (`"club manager creates practitioner profiles"`)
+  and **update** (`"club staff updates linked practitioner profiles"`) —
+  same shape as the athlete-profile policies, but scoped to
+  `current_user_role() = 'club_manager'` specifically, not
+  `club_manager`/`club_practitioner` both. Per
+  `docs/02-roles-and-permissions.md`, inviting/assigning Club
+  Practitioners is explicitly a Club Manager capability, not something
+  practitioners do to each other. The update is scoped through
+  `club_staff.profile_id` (set right after the profile insert) via
+  `is_club_manager_for_club()`, and `with check` pins
+  `role = 'club_practitioner'` for the same role-elevation reason as the
+  athlete-profile update.
+- **`profiles` select** (`"club staff reads linked staff profiles"`) —
+  broader than the two above: any `club_staff` (manager *or*
+  practitioner) can read another club staff member's profile at a club
+  they're both staff of. Without this the Teams & Staff list can't show
+  names for anyone but yourself. Same "linked access" shape used
+  throughout the schema for athlete-linked tables.
+
+`teams` and `staff_team_assignments` needed no new policies — team
+creation and assignment were already covered by
+`"club staff access own club teams"` and
+`"club manager manages team assignments"` respectively.
+
+See `database/migrations/003_teams_staff_policies.sql`.
 # Database — Row Level Security Policies (v4, plain English pre-SQL)
 
 - **Super Admin** — full access, everything, no restrictions.

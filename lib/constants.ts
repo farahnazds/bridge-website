@@ -51,3 +51,29 @@ export const GENDERS = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
 ];
+
+// Curated starting list, not a DB enum — `teams.category` is free-text by
+// design (see database/schema.sql comment). "Other" keeps it open for
+// academies with different age-group conventions.
+export const TEAM_CATEGORIES = [
+  { value: "first_team", label: "First Team" },
+  { value: "academy_u15", label: "Academy U15" },
+  { value: "academy_u17", label: "Academy U17" },
+  { value: "academy_u20", label: "Academy U20" },
+  { value: "academy_u23", label: "Academy U23" },
+];
+export const OTHER_TEAM_CATEGORY = "__other__";
+
+// Matches docs/02-roles-and-permissions.md "Departments" — department is
+// derived from specialty by default, overridable per docs/05-business-rules
+// ("Club Manager can override within Super Admin ceiling"). Not a DB enum —
+// `profiles.specialty` is free text, open/extensible per the same docs
+// ("adding a new title later is a config change, not a rebuild").
+export const SPECIALTIES: { value: string; label: string; department: "medical" | "technical" }[] = [
+  { value: "coach", label: "Coach", department: "technical" },
+  { value: "performance_coach", label: "Performance Coach", department: "technical" },
+  { value: "nutritionist", label: "Nutritionist", department: "medical" },
+  { value: "physiotherapist", label: "Physiotherapist", department: "medical" },
+  { value: "doctor", label: "Doctor", department: "medical" },
+];
+export const OTHER_SPECIALTY = "__other__";
