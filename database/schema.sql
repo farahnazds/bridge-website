@@ -257,6 +257,29 @@ create table elite_benchmarks (
 comment on table elite_benchmarks is
   'Multi-sport structure from day one; only sports with a real onboarded club (currently basketball) have populated rows. See docs/09-roadmap.md.';
 
+-- STARTING REFERENCE VALUES — NOT CLINICALLY VALIDATED. Approximate figures
+-- based on commonly cited sports-science body-composition norms for
+-- basketball (NSCA/ACSM team-sport reference ranges). Unblocks the Body
+-- Composition report's benchmark-comparison feature; review with a
+-- qualified sports nutritionist before treating as clinically authoritative.
+-- See database/migrations/004_elite_benchmarks_basketball_seed.sql.
+insert into elite_benchmarks
+  (sport, gender, age_band, age_min, age_max, body_fat_pct, lean_mass_ratio, kcal_per_kg_lean_mass, source_note)
+values
+  ('Basketball', 'male',   'U18',    13, 17, 10.0, 0.90, 45,
+   'Starting reference value, not clinically validated — approximate range based on commonly cited sports-science norms for basketball (NSCA/ACSM team-sport guidelines). Adolescent band uses a higher kcal/kg lean mass to account for concurrent growth + training demand. Review with a qualified sports nutritionist before clinical/prescriptive use.'),
+  ('Basketball', 'male',   'U20',    18, 19, 9.0,  0.91, 44,
+   'Starting reference value, not clinically validated — approximate range based on commonly cited sports-science norms for basketball (NSCA/ACSM team-sport guidelines). Review with a qualified sports nutritionist before clinical/prescriptive use.'),
+  ('Basketball', 'male',   'Senior', 20, 99, 8.0,  0.92, 42,
+   'Starting reference value, not clinically validated — approximate range based on commonly cited sports-science norms for elite senior basketball (NSCA/ACSM team-sport guidelines). Review with a qualified sports nutritionist before clinical/prescriptive use.'),
+  ('Basketball', 'female', 'U18',    13, 17, 23.0, 0.77, 42,
+   'Starting reference value, not clinically validated — approximate range based on commonly cited sports-science norms for basketball (NSCA/ACSM team-sport guidelines); female essential fat baseline is naturally higher than male. Adolescent band uses a higher kcal/kg lean mass to account for concurrent growth + training demand. Review with a qualified sports nutritionist before clinical/prescriptive use.'),
+  ('Basketball', 'female', 'U20',    18, 19, 22.0, 0.78, 41,
+   'Starting reference value, not clinically validated — approximate range based on commonly cited sports-science norms for basketball (NSCA/ACSM team-sport guidelines). Review with a qualified sports nutritionist before clinical/prescriptive use.'),
+  ('Basketball', 'female', 'Senior', 20, 99, 21.0, 0.79, 40,
+   'Starting reference value, not clinically validated — approximate range based on commonly cited sports-science norms for elite senior basketball (NSCA/ACSM team-sport guidelines). Review with a qualified sports nutritionist before clinical/prescriptive use.')
+on conflict (sport, gender, age_band) do nothing;
+
 create table supplement_library (
   id uuid primary key default gen_random_uuid(),
   name text not null,

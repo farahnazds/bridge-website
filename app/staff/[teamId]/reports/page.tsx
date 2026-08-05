@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import ReportForm from "./ReportForm";
+import ReportsClient from "./ReportsClient";
 
 export const metadata: Metadata = { title: "Reports — Bridgetx" };
 
@@ -35,8 +35,8 @@ export default async function TeamReportsPage({
           Reports
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Compliance report — single athlete, generated for you as the practitioner. Combined
-          report types and sharing aren&apos;t built yet.
+          Single athlete, generated for you as the practitioner. Combined report types and sharing
+          aren&apos;t built yet.
         </p>
       </div>
 
@@ -45,7 +45,7 @@ export default async function TeamReportsPage({
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         {athletes.length > 0 ? (
-          <ReportForm teamId={teamId} athletes={athletes} />
+          <ReportsClient teamId={teamId} athletes={athletes} />
         ) : (
           <p style={{ color: "var(--text-muted)" }}>
             No athletes on this team yet — add one to the roster first.
