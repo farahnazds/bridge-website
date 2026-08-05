@@ -1,0 +1,9 @@
+# Prevent core.autocrlf (or any other line-ending normalization) from ever
+# touching binary assets. PNG/JPG/ICO can contain byte sequences that look
+# like CRLF/LF to a naive text filter; "-text" tells git these are never
+# text, so no conversion is applied on checkout or commit regardless of a
+# user's local core.autocrlf setting.
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.ico -text
