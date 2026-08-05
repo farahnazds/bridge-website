@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
           <Image
             src="/brand/logo-horizontal-light.png"
             alt="Bridgetx"
-            width={140}
+            width={48}
             height={32}
             className="h-8 w-auto object-contain"
             priority

@@ -21,7 +21,7 @@ export default function LoginPage() {
         <Image
           src="/brand/logo-horizontal-dark.png"
           alt="Bridgetx"
-          width={160}
+          width={36}
           height={36}
           className="relative h-9 w-auto object-contain"
           priority
@@ -37,7 +37,7 @@ export default function LoginPage() {
             <Image
               src="/brand/logo-horizontal-light.png"
               alt="Bridgetx"
-              width={140}
+              width={48}
               height={32}
               className="h-8 w-auto object-contain lg:hidden"
               priority

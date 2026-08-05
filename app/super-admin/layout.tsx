@@ -23,7 +23,7 @@ export default async function SuperAdminLayout({
           <Image
             src="/brand/logo-horizontal-dark.png"
             alt="Bridgetx"
-            width={130}
+            width={28}
             height={28}
             className="h-7 w-auto object-contain"
             priority
