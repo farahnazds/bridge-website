@@ -26,7 +26,15 @@ type InjuryRow = {
   rtp_phase: string | null;
   target_return_date: string | null;
   provider_id: string;
+  // Arrives via the FK embed on the query below — replaces a second
+  // round trip that fetched provider ids then looked up profiles.
+  provider: { first_name: string | null; last_name: string | null } | null;
 };
+
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
 
 // Read-only. Admin sits in the Medical/clinical data-sensitivity tier
 // (docs/02-roles-and-permissions.md), so full clinical detail is shown —
@@ -45,23 +53,13 @@ export default async function AdminInjuriesPage() {
   if (athleteIds.length > 0) {
     const { data, error } = await supabase
       .from("injuries")
-      .select("id, athlete_id, date, type, description, status, rtp_phase, target_return_date, provider_id")
+      .select(
+        "id, athlete_id, date, type, description, status, rtp_phase, target_return_date, provider_id, provider:profiles!provider_id(first_name, last_name)"
+      )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
-    rows = (data ?? []) as InjuryRow[];
+    rows = (data ?? []) as unknown as InjuryRow[];
     fetchError = error?.message ?? null;
-  }
-
-  const providerIds = [...new Set(rows.map((r) => r.provider_id))];
-  let providerById = new Map<string, string>();
-  if (providerIds.length > 0) {
-    const { data: providers } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", providerIds);
-    providerById = new Map(
-      (providers ?? []).map((p) => [p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—"])
-    );
   }
 
   const activeCount = rows.filter((r) => r.status === "active").length;
@@ -206,7 +204,7 @@ export default async function AdminInjuriesPage() {
                         {r.target_return_date ?? "—"}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
-                        {providerById.get(r.provider_id) ?? "—"}
+                        {personName(r.provider)}
                       </td>
                     </tr>
                   );

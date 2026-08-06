@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth";
+import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import ReportsClient from "./ReportsClient";
 import ReportHistory from "./ReportHistory";
 import type { RecipientCandidate } from "./ShareReportPanel";
@@ -11,6 +11,11 @@ type RosterAthlete = { id: string; first_name: string; last_name: string; code: 
 type PractitionerEmbed = { id: string; first_name: string | null; last_name: string | null };
 type AssignmentRow = { staff_profile_id: string; profiles: PractitionerEmbed | null };
 
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
+
 export default async function TeamReportsPage({
   params,
 }: {
@@ -18,7 +23,8 @@ export default async function TeamReportsPage({
 }) {
   const { teamId } = await params;
   const supabase = await createClient();
-  const profile = await getCurrentProfile();
+  // Reuses the layout's cached context query — no extra round trip.
+  const profile = (await getStaffTeamContext(teamId))?.profile ?? null;
 
   const { data: rosterRows } = await supabase
     .from("athlete_teams")
@@ -50,21 +56,11 @@ export default async function TeamReportsPage({
   // reports, reports shared with them, and official team reports.
   const { data: reportRows } = await supabase
     .from("reports")
-    .select("id, report_types, athlete_ids, report_period_start, report_period_end, is_official, shared_with, generated_by, ai_summary, created_at")
+    .select(
+      "id, report_types, athlete_ids, report_period_start, report_period_end, is_official, shared_with, generated_by, ai_summary, created_at, generator:profiles!generated_by(first_name, last_name)"
+    )
     .eq("team_id", teamId)
     .order("created_at", { ascending: false });
-
-  const generatorIds = [...new Set((reportRows ?? []).map((r) => r.generated_by))];
-  let generatorById = new Map<string, string>();
-  if (generatorIds.length > 0) {
-    const { data: generators } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", generatorIds);
-    generatorById = new Map(
-      (generators ?? []).map((g) => [g.id, `${g.first_name ?? ""} ${g.last_name ?? ""}`.trim() || "—"])
-    );
-  }
 
   const reports = (reportRows ?? []).map((r) => {
     const athlete = athleteById.get(r.athlete_ids?.[0] ?? "");
@@ -77,7 +73,7 @@ export default async function TeamReportsPage({
       periodEnd: r.report_period_end,
       isOfficial: r.is_official,
       sharedWith: (r.shared_with as string[]) ?? [],
-      generatedByName: generatorById.get(r.generated_by) ?? "—",
+      generatedByName: personName((r as unknown as { generator?: { first_name: string | null; last_name: string | null } | null }).generator ?? null),
       isOwnReport: r.generated_by === profile?.id,
       summary: r.ai_summary as string | null,
       createdAt: r.created_at,

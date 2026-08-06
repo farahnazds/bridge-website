@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth";
+import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import CommentsClient, { type CommentRecord } from "./CommentsClient";
 
 export const metadata: Metadata = { title: "Comments — Bridgetx" };
@@ -11,12 +11,20 @@ type CommentRow = {
   athlete_id: string | null;
   team_id: string | null;
   author_id: string;
+  // Arrives via the FK embed on the query below — replaces a second
+  // round trip that fetched author ids then looked up profiles.
+  author: { first_name: string | null; last_name: string | null } | null;
   comment_type: "private_note" | "official_comment";
   body: string;
   reflect_in_ai: boolean;
   ai_reflection_disabled_by: string | null;
   created_at: string;
 };
+
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
 
 export default async function TeamCommentsPage({
   params,
@@ -25,26 +33,14 @@ export default async function TeamCommentsPage({
 }) {
   const { teamId } = await params;
   const supabase = await createClient();
-  const profile = await getCurrentProfile();
-  if (!profile) return null;
-
-  const { data: teamRow } = await supabase.from("teams").select("id, name, club_id").eq("id", teamId).single();
-  const teamName = teamRow?.name ?? "Team";
-
-  // Same club_staff check as the layout — see
-  // app/staff/[teamId]/layout.tsx for why this is club-wide (club_staff)
-  // rather than per-team (staff_team_assignments) for managers.
-  let isManager = false;
-  if (profile.role === "club_manager" && teamRow) {
-    const { data: managerRow } = await supabase
-      .from("club_staff")
-      .select("id")
-      .eq("profile_id", profile.id)
-      .eq("club_id", teamRow.club_id)
-      .eq("staff_role", "club_manager")
-      .maybeSingle();
-    isManager = !!managerRow;
-  }
+  // Profile, team, and the club-wide manager check were all resolved by the
+  // layout's single context query. getStaffTeamContext is React-cached, so
+  // reading them here costs nothing — this used to repeat the layout's work
+  // with three more round trips (profiles, teams, club_staff).
+  const context = await getStaffTeamContext(teamId);
+  if (!context) return null;
+  const { profile, team, isManager } = context;
+  const teamName = team.name;
 
   const { data: rosterData } = await supabase
     .from("athlete_teams")
@@ -62,24 +58,19 @@ export default async function TeamCommentsPage({
 
   const { data: commentRows, error: fetchError } = await supabase
     .from("comments")
-    .select("id, athlete_id, team_id, author_id, comment_type, body, reflect_in_ai, ai_reflection_disabled_by, created_at")
+    .select(
+      "id, athlete_id, team_id, author_id, comment_type, body, reflect_in_ai, ai_reflection_disabled_by, created_at, author:profiles!author_id(first_name, last_name)"
+    )
     .or(orFilters.join(","))
     .order("created_at", { ascending: false });
 
-  const rows = (commentRows ?? []) as CommentRow[];
-  const authorIds = [...new Set(rows.map((r) => r.author_id))];
-  let authorById = new Map<string, string>();
-  if (authorIds.length > 0) {
-    const { data: authors } = await supabase.from("profiles").select("id, first_name, last_name").in("id", authorIds);
-    authorById = new Map((authors ?? []).map((a) => [a.id, `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim() || "—"]));
-  }
-
+  const rows = (commentRows ?? []) as unknown as CommentRow[];
   const comments: CommentRecord[] = rows.map((r) => {
     const athlete = r.athlete_id ? athleteById.get(r.athlete_id) : null;
     return {
       id: r.id,
       authorId: r.author_id,
-      authorName: authorById.get(r.author_id) ?? "—",
+      authorName: personName(r.author),
       commentType: r.comment_type,
       body: r.body,
       reflectInAi: r.reflect_in_ai,

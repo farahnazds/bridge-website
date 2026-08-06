@@ -2,6 +2,14 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import AssessmentsClient, { type AssessmentRecord } from "./AssessmentsClient";
 
+// Formats an embedded profile row into a display name. The provider name
+// used to require a second round trip (fetch ids, then fetch profiles);
+// it now arrives on the parent query via a PostgREST FK embed.
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
+
 export const metadata: Metadata = { title: "Assessments — Bridgetx" };
 
 const EDIT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -22,6 +30,9 @@ type AssessmentRow = {
   notes: string | null;
   provider_id: string;
   created_at: string;
+  // Arrives via the FK embed on the query below — replaces a second
+  // round trip that fetched provider ids then looked up profiles.
+  provider: { first_name: string | null; last_name: string | null } | null;
 };
 
 export default async function TeamAssessmentsPage({
@@ -51,25 +62,14 @@ export default async function TeamAssessmentsPage({
     const { data, error } = await supabase
       .from("assessments")
       .select(
-        "id, athlete_id, date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, provider_id, created_at"
+        "id, athlete_id, date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
       )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
     if (error) fetchError = error.message;
-    assessments = (data ?? []) as AssessmentRow[];
+    assessments = (data ?? []) as unknown as AssessmentRow[];
   }
 
-  const providerIds = [...new Set(assessments.map((a) => a.provider_id))];
-  let providerById = new Map<string, string>();
-  if (providerIds.length > 0) {
-    const { data: providers } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", providerIds);
-    providerById = new Map(
-      (providers ?? []).map((p) => [p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—"])
-    );
-  }
 
   const now = Date.now();
   const records: AssessmentRecord[] = assessments.map((a) => {
@@ -88,7 +88,7 @@ export default async function TeamAssessmentsPage({
       bmr: a.bmr,
       tdee: a.tdee,
       notes: a.notes,
-      providerName: providerById.get(a.provider_id) ?? "—",
+      providerName: personName(a.provider),
       isEditable: now <= new Date(a.created_at).getTime() + EDIT_WINDOW_MS,
     };
   });

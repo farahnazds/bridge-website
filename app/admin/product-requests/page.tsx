@@ -28,6 +28,10 @@ type RequestRow = {
   status: string;
   payment_method: string;
   fulfilled_by: string | null;
+  // Both arrive via FK embeds on the query below — they replace two
+  // extra round trips that looked up products and profiles by id.
+  product: { name: string } | null;
+  fulfiller: { first_name: string | null; last_name: string | null } | null;
   fulfilled_at: string | null;
   created_at: string;
 };
@@ -40,6 +44,11 @@ function money(v: number | null): string {
 // fulfilled/paid could be added later without another migration — but the
 // Admin's role here is oversight, and fulfilment lives on the club's own
 // Product Requests page (docs/03-site-map.md).
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
+
 export default async function AdminProductRequestsPage() {
   const clubs = await getAssignedClubs();
   const clubNameById = new Map(clubs.map((c) => [c.id, c.name]));
@@ -55,31 +64,12 @@ export default async function AdminProductRequestsPage() {
     const { data, error: fetchError } = await supabase
       .from("product_requests")
       .select(
-        "id, athlete_id, product_id, club_id, base_price, discount_applied, final_price, status, payment_method, fulfilled_by, fulfilled_at, created_at"
+        "id, athlete_id, product_id, club_id, base_price, discount_applied, final_price, status, payment_method, fulfilled_by, fulfilled_at, created_at, product:products!product_id(name), fulfiller:profiles!fulfilled_by(first_name, last_name)"
       )
       .in("club_id", clubIds)
       .order("created_at", { ascending: false });
-    rows = (data ?? []) as RequestRow[];
+    rows = (data ?? []) as unknown as RequestRow[];
     error = fetchError?.message ?? null;
-  }
-
-  const productIds = [...new Set(rows.map((r) => r.product_id))];
-  let productById = new Map<string, string>();
-  if (productIds.length > 0) {
-    const { data: products } = await supabase.from("products").select("id, name").in("id", productIds);
-    productById = new Map((products ?? []).map((p) => [p.id as string, p.name as string]));
-  }
-
-  const fulfillerIds = [...new Set(rows.map((r) => r.fulfilled_by).filter(Boolean))] as string[];
-  let fulfillerById = new Map<string, string>();
-  if (fulfillerIds.length > 0) {
-    const { data: people } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", fulfillerIds);
-    fulfillerById = new Map(
-      (people ?? []).map((p) => [p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—"])
-    );
   }
 
   const outstanding = rows.filter((r) => r.status !== "fulfilled_paid").length;
@@ -182,7 +172,7 @@ export default async function AdminProductRequestsPage() {
                         {r.club_id ? clubNameById.get(r.club_id) ?? "—" : "—"}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
-                        {productById.get(r.product_id) ?? "—"}
+                        {r.product?.name ?? "—"}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text-muted)" }}>
                         {money(r.base_price)}
@@ -206,7 +196,7 @@ export default async function AdminProductRequestsPage() {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
-                        {r.fulfilled_by ? fulfillerById.get(r.fulfilled_by) ?? "—" : "—"}
+                        {personName(r.fulfiller)}
                       </td>
                     </tr>
                   );

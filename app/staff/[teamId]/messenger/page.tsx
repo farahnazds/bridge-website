@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth";
+import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import { getThreadsForCurrentProfile } from "@/lib/messaging";
 import MessengerClient, { type ClientThread, type ClientContact } from "@/components/MessengerClient";
 
@@ -20,8 +20,10 @@ export default async function TeamMessengerPage({
   params: Promise<{ teamId: string }>;
 }) {
   const { teamId } = await params;
-  const profile = await getCurrentProfile();
-  if (!profile) return null;
+  // Reuses the layout's cached context query — no extra round trip.
+  const context = await getStaffTeamContext(teamId);
+  if (!context) return null;
+  const { profile } = context;
 
   const supabase = await createClient();
 

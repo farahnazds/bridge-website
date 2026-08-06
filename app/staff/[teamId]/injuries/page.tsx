@@ -2,6 +2,14 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import InjuriesClient, { type InjuryRecord } from "./InjuriesClient";
 
+// Formats an embedded profile row into a display name. The provider name
+// used to require a second round trip (fetch ids, then fetch profiles);
+// it now arrives on the parent query via a PostgREST FK embed.
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
+
 export const metadata: Metadata = { title: "Injury Log / RTP — Bridgetx" };
 
 const EDIT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -19,6 +27,9 @@ type InjuryRow = {
   cleared_date: string | null;
   provider_id: string;
   created_at: string;
+  // Arrives via the FK embed on the query below — replaces a second
+  // round trip that fetched provider ids then looked up profiles.
+  provider: { first_name: string | null; last_name: string | null } | null;
 };
 
 export default async function TeamInjuriesPage({
@@ -48,25 +59,14 @@ export default async function TeamInjuriesPage({
     const { data, error } = await supabase
       .from("injuries")
       .select(
-        "id, athlete_id, date, type, description, status, rtp_phase, target_return_date, cleared_date, provider_id, created_at"
+        "id, athlete_id, date, type, description, status, rtp_phase, target_return_date, cleared_date, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
       )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
     if (error) fetchError = error.message;
-    injuriesData = (data ?? []) as InjuryRow[];
+    injuriesData = (data ?? []) as unknown as InjuryRow[];
   }
 
-  const providerIds = [...new Set(injuriesData.map((i) => i.provider_id))];
-  let providerById = new Map<string, string>();
-  if (providerIds.length > 0) {
-    const { data: providers } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", providerIds);
-    providerById = new Map(
-      (providers ?? []).map((p) => [p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—"])
-    );
-  }
 
   const now = Date.now();
   const records: InjuryRecord[] = injuriesData.map((i) => {
@@ -82,7 +82,7 @@ export default async function TeamInjuriesPage({
       rtpPhase: i.rtp_phase,
       targetReturnDate: i.target_return_date,
       clearedDate: i.cleared_date,
-      providerName: providerById.get(i.provider_id) ?? "—",
+      providerName: personName(i.provider),
       isEditable: now <= new Date(i.created_at).getTime() + EDIT_WINDOW_MS,
     };
   });

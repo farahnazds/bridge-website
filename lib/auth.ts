@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
 // Matches the `role` check constraint on `profiles` in database/schema.sql.
@@ -26,15 +27,45 @@ export interface Profile {
 }
 
 // Server-side only: reads the caller's session, not a trusted client-supplied id.
-export async function getCurrentUser() {
+//
+// Wrapped in React cache() so both of these run AT MOST ONCE per request,
+// no matter how many components ask. Measured before this change: an
+// authenticated page took ~1.6-2.3s, and a large share of that was auth
+// work repeating — most routes call getCurrentProfile() in the layout AND
+// again in the page, and hasRole()/getUserRole() route through it too, so
+// a single navigation made 2-3 auth round trips plus 2-3 profiles queries
+// that all returned the same answer.
+//
+// cache() dedupes within one render pass only, so this changes no
+// semantics: a new request still re-reads the session, and a Server Action
+// gets its own cache scope. It is purely the repeat calls inside a single
+// render that collapse.
+// Only the id is ever read from this, so the fast path below can satisfy
+// callers without materialising a full Supabase User.
+export const getCurrentUser = cache(async (): Promise<{ id: string } | null> => {
+  // Fast path: proxy.ts middleware already validated this request's JWT with
+  // GoTrue and passed the user id along as a signed header, saving a second
+  // ~370ms round trip. verifyAuthContext() returns null for anything it
+  // cannot cryptographically vouch for — no secret, forged, expired,
+  // malformed — and null simply means we do the real call below. See
+  // lib/authContext.ts for the full threat model.
+  try {
+    const { headers } = await import("next/headers");
+    const { AUTH_CONTEXT_HEADER, verifyAuthContext } = await import("@/lib/authContext");
+    const userId = await verifyAuthContext((await headers()).get(AUTH_CONTEXT_HEADER));
+    if (userId) return { id: userId };
+  } catch {
+    // headers() is unavailable outside a request scope — fall through.
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user;
-}
+  return user ? { id: user.id } : null;
+});
 
-export async function getCurrentProfile(): Promise<Profile | null> {
+export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
   const user = await getCurrentUser();
   if (!user) return null;
@@ -49,7 +80,7 @@ export async function getCurrentProfile(): Promise<Profile | null> {
 
   if (error || !data) return null;
   return data as Profile;
-}
+});
 
 export async function getUserRole(): Promise<Role | null> {
   const profile = await getCurrentProfile();

@@ -14,18 +14,25 @@ export interface AssignedClub {
 export async function getAssignedClubs(): Promise<AssignedClub[]> {
   const supabase = await createClient();
 
+  // One round trip, not two. This previously fetched assignment rows and
+  // then fetched `clubs` by id — two sequential network hops to build one
+  // list. Embedding clubs on the assignment collapses it into a single
+  // request; RLS still applies to the embedded table independently, so
+  // scoping is unchanged.
+  //
   // Rows may carry a segment_id instead of a club_id (the table's check
   // constraint allows exactly one), so club_id nulls are filtered out.
-  const { data: assignmentRows } = await supabase
+  const { data } = await supabase
     .from("admin_club_assignments")
-    .select("club_id")
+    .select("club_id, clubs(id, name)")
     .not("club_id", "is", null);
 
-  const clubIds = [...new Set((assignmentRows ?? []).map((r) => r.club_id as string))];
-  if (clubIds.length === 0) return [];
-
-  const { data: clubs } = await supabase.from("clubs").select("id, name").in("id", clubIds).order("name");
-  return (clubs ?? []) as AssignedClub[];
+  const byId = new Map<string, AssignedClub>();
+  for (const row of data ?? []) {
+    const club = row.clubs as unknown as AssignedClub | null;
+    if (club) byId.set(club.id, club);
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export interface ScopedAthlete {

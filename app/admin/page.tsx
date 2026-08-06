@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getAssignedClubs } from "@/lib/adminScope";
 
 export const metadata: Metadata = { title: "Overview — Admin — Bridgetx" };
 
@@ -42,21 +43,28 @@ function StatCard({ label, value, hint }: { label: string; value: number | strin
 export default async function AdminOverviewPage() {
   const supabase = await createClient();
 
-  // Assigned clubs come from admin_club_assignments, scoped by the "admin
-  // reads own assignments" RLS policy (admin_profile_id = current_profile_id()).
-  // Rows may carry a segment_id instead of a club_id (check constraint on the
-  // table allows exactly one), so club_id nulls are filtered out here.
-  const { data: assignmentRows, error: assignmentError } = await supabase
-    .from("admin_club_assignments")
-    .select("club_id")
-    .not("club_id", "is", null);
-  const clubIds = [...new Set((assignmentRows ?? []).map((r) => r.club_id as string))];
+  // Uses the shared helper — this page previously carried its own inline
+  // copy of the scoping query, which duplicated the security boundary and
+  // meant it missed the single-round-trip fix made to getAssignedClubs.
+  const assignedClubs = await getAssignedClubs();
+  const clubIds = assignedClubs.map((c) => c.id);
+  const assignmentError = null;
 
   // Every query below is ALSO explicitly scoped to clubIds, not left to RLS
   // alone — defense in depth. RLS ("admin reads assigned clubs" /
   // "admin scoped access") is the real boundary and is verified separately;
   // this scoping means an RLS regression alone wouldn't leak another club.
-  const [clubsRes, athletesRes, teamsRes, staffRes] = clubIds.length
+  // "check-ins today" is joined through athletes with an INNER embed rather
+  // than fetched after the athlete list. That matters: it previously had to
+  // wait for `athletes` to resolve so it could pass athlete ids, which made
+  // it a third sequential round trip. Filtering on athletes.club_id inside
+  // the query lets it run in the same parallel batch instead.
+  //
+  // Every query is ALSO explicitly scoped to clubIds, not left to RLS alone
+  // — defense in depth. RLS ("admin reads assigned clubs" / "admin scoped
+  // access") is the real boundary and is verified separately.
+  const today = new Date().toISOString().slice(0, 10);
+  const [clubsRes, athletesRes, teamsRes, staffRes, checkinsRes] = clubIds.length
     ? await Promise.all([
         supabase
           .from("clubs")
@@ -66,8 +74,14 @@ export default async function AdminOverviewPage() {
         supabase.from("athletes").select("id, club_id, status").in("club_id", clubIds),
         supabase.from("teams").select("id").in("club_id", clubIds),
         supabase.from("club_staff").select("id").in("club_id", clubIds),
+        supabase
+          .from("checkins")
+          .select("athlete_id, status, athletes!inner(club_id)")
+          .eq("date", today)
+          .in("athletes.club_id", clubIds),
       ])
     : [
+        { data: [], error: null },
         { data: [], error: null },
         { data: [], error: null },
         { data: [], error: null },
@@ -76,24 +90,9 @@ export default async function AdminOverviewPage() {
 
   const clubs = clubsRes.data ?? [];
   const athletes = athletesRes.data ?? [];
-
-  // "check-ins today" per docs/03-site-map.md's Overview line. Only readable
-  // since migration 008 added "admin scoped access" on checkins — before
-  // that this would have rendered a permanent, misleading 0. Scoped by
-  // athlete ids drawn from the assigned clubs above, so it inherits that
-  // scoping rather than re-deriving it. Uses the same UTC-day convention as
-  // every other check-in surface in this app (athlete Home, club Compliance).
-  const athleteIds = athletes.map((a) => a.id);
-  const today = new Date().toISOString().slice(0, 10);
-  const { data: todayCheckins } = athleteIds.length
-    ? await supabase
-        .from("checkins")
-        .select("athlete_id, status")
-        .in("athlete_id", athleteIds)
-        .eq("date", today)
-    : { data: [] };
-  const completedToday = (todayCheckins ?? []).filter((c) => c.status === "completed").length;
-  const skippedToday = (todayCheckins ?? []).filter((c) => c.status === "skipped").length;
+  const todayCheckins = checkinsRes.data ?? [];
+  const completedToday = todayCheckins.filter((c) => c.status === "completed").length;
+  const skippedToday = todayCheckins.filter((c) => c.status === "skipped").length;
 
   const loadError = assignmentError ?? clubsRes.error ?? athletesRes.error;
 

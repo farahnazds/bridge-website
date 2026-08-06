@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getAssignedClubs } from "@/lib/adminScope";
 
 export const metadata: Metadata = { title: "Clubs — Admin — Bridgetx" };
 
@@ -31,11 +32,11 @@ type ClubRow = {
 export default async function AdminClubsPage() {
   const supabase = await createClient();
 
-  const { data: assignmentRows, error: assignmentError } = await supabase
-    .from("admin_club_assignments")
-    .select("club_id")
-    .not("club_id", "is", null);
-  const clubIds = [...new Set((assignmentRows ?? []).map((r) => r.club_id as string))];
+  // Uses the shared helper rather than an inline copy — this page had its
+  // own duplicate of the scoping query, which meant it silently missed the
+  // single-round-trip fix applied to getAssignedClubs, and duplicated the
+  // security boundary in a second place.
+  const clubIds = (await getAssignedClubs()).map((c) => c.id);
 
   // teams(...) is a nested embed — a one-to-many child read that PostgREST
   // resolves through its own RLS ("club staff access own club teams", which
@@ -63,7 +64,7 @@ export default async function AdminClubsPage() {
     }
   }
 
-  const error = assignmentError ?? clubsError;
+  const error = clubsError;
 
   return (
     <div className="flex flex-col gap-8">

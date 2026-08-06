@@ -8,6 +8,9 @@ export const metadata: Metadata = { title: "Content/Relay — Admin — Bridgetx
 type ContentRow = {
   id: string;
   created_by: string | null;
+  // Arrives via the FK embed on the query below — replaces a second
+  // round trip that fetched author ids then looked up profiles.
+  author: { first_name: string | null; last_name: string | null } | null;
   title: string;
   body: string | null;
   file_url: string | null;
@@ -29,6 +32,11 @@ type ContentRow = {
 // depth — removing it leaks other clubs' targeted content immediately.
 // Documented as a known gap in database/rls-policies.md.
 // ---------------------------------------------------------------------------
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
+
 export default async function AdminContentPage() {
   const clubs = await getAssignedClubs();
   const clubNameById = new Map(clubs.map((c) => [c.id, c.name]));
@@ -47,23 +55,13 @@ export default async function AdminContentPage() {
 
   const { data, error: fetchError } = await supabase
     .from("content")
-    .select("id, created_by, title, body, file_url, category, target_type, target_club_id, published_at, created_at")
+    .select(
+      "id, created_by, title, body, file_url, category, target_type, target_club_id, published_at, created_at, author:profiles!created_by(first_name, last_name)"
+    )
     .or(filters.join(","))
     .order("created_at", { ascending: false });
-  rows = (data ?? []) as ContentRow[];
+  rows = (data ?? []) as unknown as ContentRow[];
   error = fetchError?.message ?? null;
-
-  const authorIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[];
-  let authorById = new Map<string, string>();
-  if (authorIds.length > 0) {
-    const { data: authors } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", authorIds);
-    authorById = new Map(
-      (authors ?? []).map((a) => [a.id, `${a.first_name ?? ""} ${a.last_name ?? ""}`.trim() || "—"])
-    );
-  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -114,7 +112,7 @@ export default async function AdminContentPage() {
                           year: "numeric",
                         })}`
                       : "Not published"}
-                    {r.created_by ? ` · ${authorById.get(r.created_by) ?? "—"}` : ""}
+                    {r.author ? ` · ${personName(r.author)}` : ""}
                   </p>
                 </div>
                 <span

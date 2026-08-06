@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { getCurrentProfile } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
+import { getStaffTeamContext } from "@/lib/staffTeamContext";
 
 const NAV_SECTIONS: { label: string; slug: string }[] = [
   { label: "Roster", slug: "" },
@@ -16,8 +16,6 @@ const NAV_SECTIONS: { label: string; slug: string }[] = [
   { label: "Comments", slug: "comments" },
 ];
 
-type TeamHeader = { id: string; name: string; club_id: string; clubs: { name: string } | null };
-
 export default async function TeamLayout({
   children,
   params,
@@ -26,59 +24,21 @@ export default async function TeamLayout({
   params: Promise<{ teamId: string }>;
 }) {
   const { teamId } = await params;
-  const profile = await getCurrentProfile();
 
-  if (!profile) redirect("/login");
+  // Distinguishes "not signed in" (-> /login) from "signed in but has no
+  // claim on this team" (-> notFound), which a single context lookup can't.
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  // Profile, team, and the practitioner/manager authorisation check all
+  // arrive in one round trip. See lib/staffTeamContext.ts for why the two
+  // role branches are resolved in TypeScript rather than trusted from the
+  // query's embedded filters.
+  const context = await getStaffTeamContext(teamId);
+  if (!context) notFound();
+
+  const { profile, team, isManager } = context;
   if (profile.role !== "club_practitioner" && profile.role !== "club_manager") redirect("/");
-
-  const supabase = await createClient();
-  let team: TeamHeader | null = null;
-  let isManager = false;
-
-  if (profile.role === "club_practitioner") {
-    // "staff reads own assignments" RLS policy scopes this to teams the
-    // caller is actually assigned to — a practitioner not on this team
-    // gets no row here, not another team's data. Kept narrow on purpose:
-    // a practitioner's access stays scoped to their specific team
-    // assignments, not every team in a club they happen to work at.
-    const { data: assignment } = await supabase
-      .from("staff_team_assignments")
-      .select("team_id, teams(id, name, club_id, clubs(name))")
-      .eq("staff_profile_id", profile.id)
-      .eq("team_id", teamId)
-      .single();
-    // Single object at runtime (many-to-one FK), see app/staff/page.tsx.
-    team = (assignment?.teams as unknown as TeamHeader | null) ?? null;
-  } else {
-    // club_manager — "Everything a Club Practitioner can do -> Club
-    // Manager can do" (docs/02-roles-and-permissions.md). Unlike a
-    // practitioner, a manager's access is club-wide, not per-team, so this
-    // checks club_staff (staff_role = 'club_manager') rather than a
-    // personal staff_team_assignments row. "club staff access own club
-    // teams" RLS already scopes the teams read correctly for any club
-    // staff role; the club_staff check below confirms manager specifically
-    // (not just any staff) at that team's club.
-    const { data: teamRow } = await supabase
-      .from("teams")
-      .select("id, name, club_id, clubs(name)")
-      .eq("id", teamId)
-      .single();
-    if (teamRow) {
-      const { data: managerRow } = await supabase
-        .from("club_staff")
-        .select("id")
-        .eq("profile_id", profile.id)
-        .eq("club_id", teamRow.club_id)
-        .eq("staff_role", "club_manager")
-        .maybeSingle();
-      if (managerRow) {
-        team = teamRow as unknown as TeamHeader;
-        isManager = true;
-      }
-    }
-  }
-
-  if (!team) notFound();
 
   return (
     <div className="flex min-h-screen">

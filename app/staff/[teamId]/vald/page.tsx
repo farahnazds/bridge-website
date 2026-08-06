@@ -2,6 +2,14 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import ValdClient, { type ValdEntry, type Athlete } from "./ValdClient";
 
+// Formats an embedded profile row into a display name. The provider name
+// used to require a second round trip (fetch ids, then fetch profiles);
+// it now arrives on the parent query via a PostgREST FK embed.
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
+
 export const metadata: Metadata = { title: "VALD — Bridgetx" };
 
 const EDIT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -30,23 +38,13 @@ export default async function TeamValdPage({ params }: { params: Promise<{ teamI
   if (athleteIds.length > 0) {
     const { data, error: fetchError } = await supabase
       .from("vald_data")
-      .select("id, athlete_id, date, test_type, metric_json, asymmetry_pct, provider_id, created_at")
+      .select(
+        "id, athlete_id, date, test_type, metric_json, asymmetry_pct, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
+      )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false })
       .limit(100);
     error = fetchError?.message ?? null;
-
-    const providerIds = [...new Set((data ?? []).map((r) => r.provider_id as string))];
-    let providerById = new Map<string, string>();
-    if (providerIds.length > 0) {
-      const { data: providers } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name")
-        .in("id", providerIds);
-      providerById = new Map(
-        (providers ?? []).map((p) => [p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—"])
-      );
-    }
 
     const now = Date.now();
     entries = (data ?? []).map((r) => {
@@ -60,7 +58,7 @@ export default async function TeamValdPage({ params }: { params: Promise<{ teamI
           asymmetry_pct: r.asymmetry_pct as number | null,
           metric_json: (r.metric_json ?? {}) as Record<string, number | string>,
         },
-        providerName: providerById.get(r.provider_id as string) ?? "—",
+        providerName: personName((r as unknown as { provider: { first_name: string | null; last_name: string | null } | null }).provider),
         isEditable: now <= new Date(r.created_at as string).getTime() + EDIT_WINDOW_MS,
       };
     });

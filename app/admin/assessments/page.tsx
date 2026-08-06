@@ -28,7 +28,15 @@ type AssessmentRow = {
   tdee: number | null;
   validity_tier: string;
   provider_id: string;
+  // Arrives via the FK embed on the query below — replaces a second
+  // round trip that fetched provider ids then looked up profiles.
+  provider: { first_name: string | null; last_name: string | null } | null;
 };
+
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
 
 function fmt(v: number | null, unit = ""): string {
   return v === null ? "—" : `${v}${unit}`;
@@ -49,24 +57,12 @@ export default async function AdminAssessmentsPage() {
     const { data, error } = await supabase
       .from("assessments")
       .select(
-        "id, athlete_id, date, weight_kg, body_fat_pct, lean_mass_kg, muscle_mass_kg, bmr, tdee, validity_tier, provider_id"
+        "id, athlete_id, date, weight_kg, body_fat_pct, lean_mass_kg, muscle_mass_kg, bmr, tdee, validity_tier, provider_id, provider:profiles!provider_id(first_name, last_name)"
       )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
-    rows = (data ?? []) as AssessmentRow[];
+    rows = (data ?? []) as unknown as AssessmentRow[];
     fetchError = error?.message ?? null;
-  }
-
-  const providerIds = [...new Set(rows.map((r) => r.provider_id))];
-  let providerById = new Map<string, string>();
-  if (providerIds.length > 0) {
-    const { data: providers } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", providerIds);
-    providerById = new Map(
-      (providers ?? []).map((p) => [p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—"])
-    );
   }
 
   const error = athleteError ?? fetchError;
@@ -174,7 +170,7 @@ export default async function AdminAssessmentsPage() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
-                      {providerById.get(r.provider_id) ?? "—"}
+                      {personName(r.provider)}
                     </td>
                   </tr>
                 );

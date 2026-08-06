@@ -2,6 +2,14 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import GpsClient, { type GpsEntry, type Athlete } from "./GpsClient";
 
+// Formats an embedded profile row into a display name. The provider name
+// used to require a second round trip (fetch ids, then fetch profiles);
+// it now arrives on the parent query via a PostgREST FK embed.
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
+
 export const metadata: Metadata = { title: "GPS / Performance — Bridgetx" };
 
 const EDIT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -31,24 +39,12 @@ export default async function TeamGpsPage({ params }: { params: Promise<{ teamId
     const { data, error: fetchError } = await supabase
       .from("gps_logs")
       .select(
-        "id, athlete_id, date, total_distance_m, meters_per_min, high_speed_distance_m, sprint_distance_m, accel_count, decel_count, explosive_efforts, sprint_count, max_velocity, player_load, session_duration_min, provider_id, created_at"
+        "id, athlete_id, date, total_distance_m, meters_per_min, high_speed_distance_m, sprint_distance_m, accel_count, decel_count, explosive_efforts, sprint_count, max_velocity, player_load, session_duration_min, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
       )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false })
       .limit(100);
     error = fetchError?.message ?? null;
-
-    const providerIds = [...new Set((data ?? []).map((r) => r.provider_id as string))];
-    let providerById = new Map<string, string>();
-    if (providerIds.length > 0) {
-      const { data: providers } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name")
-        .in("id", providerIds);
-      providerById = new Map(
-        (providers ?? []).map((p) => [p.id, `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—"])
-      );
-    }
 
     const now = Date.now();
     entries = (data ?? []).map((r) => {
@@ -71,7 +67,7 @@ export default async function TeamGpsPage({ params }: { params: Promise<{ teamId
           player_load: r.player_load,
           session_duration_min: r.session_duration_min,
         },
-        providerName: providerById.get(r.provider_id as string) ?? "—",
+        providerName: personName((r as unknown as { provider: { first_name: string | null; last_name: string | null } | null }).provider),
         isEditable: now <= new Date(r.created_at as string).getTime() + EDIT_WINDOW_MS,
       };
     });

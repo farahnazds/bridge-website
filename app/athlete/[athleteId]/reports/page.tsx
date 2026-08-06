@@ -6,6 +6,11 @@ import MyReportsList, { type MyReportEntry } from "./MyReportsList";
 
 export const metadata: Metadata = { title: "My Reports — Bridgetx" };
 
+function personName(p: { first_name: string | null; last_name: string | null } | null): string {
+  if (!p) return "—";
+  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
+}
+
 export default async function MyReportsPage() {
   const supabase = await createClient();
   const profile = await getCurrentProfile();
@@ -17,28 +22,18 @@ export default async function MyReportsPage() {
   // explicit rather than relying on RLS alone.
   const { data: reportRows, error } = await supabase
     .from("reports")
-    .select("id, report_types, report_period_start, report_period_end, generated_by, ai_summary, created_at")
+    .select(
+      "id, report_types, report_period_start, report_period_end, generated_by, ai_summary, created_at, generator:profiles!generated_by(first_name, last_name)"
+    )
     .contains("shared_with", [profile.id])
     .order("created_at", { ascending: false });
-
-  const generatorIds = [...new Set((reportRows ?? []).map((r) => r.generated_by))];
-  let generatorById = new Map<string, string>();
-  if (generatorIds.length > 0) {
-    const { data: generators } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", generatorIds);
-    generatorById = new Map(
-      (generators ?? []).map((g) => [g.id, `${g.first_name ?? ""} ${g.last_name ?? ""}`.trim() || "—"])
-    );
-  }
 
   const reports: MyReportEntry[] = (reportRows ?? []).map((r) => ({
     id: r.id,
     typeLabel: (r.report_types as string[]).map((t) => REPORT_TYPE_LABELS[t] ?? t).join(" + "),
     periodStart: r.report_period_start,
     periodEnd: r.report_period_end,
-    sharedByName: generatorById.get(r.generated_by) ?? "—",
+    sharedByName: personName((r as unknown as { generator?: { first_name: string | null; last_name: string | null } | null }).generator ?? null),
     summary: r.ai_summary as string | null,
     createdAt: r.created_at,
   }));
