@@ -1,10 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { generateBodyCompositionReport, type GenerateReportState } from "./actions";
+import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 
-const initialState: GenerateReportState = { error: null, reportText: null, dataCheckNote: null };
+const initialState: GenerateReportState = {
+  error: null,
+  reportText: null,
+  dataCheckNote: null,
+  reportId: null,
+};
 
 const inputClass =
   "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
@@ -38,11 +44,19 @@ function SubmitButton() {
 export default function BodyCompositionReportForm({
   teamId,
   athletes,
+  practitioners,
 }: {
   teamId: string;
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
+  practitioners: RecipientCandidate[];
 }) {
   const [state, formAction] = useActionState(generateBodyCompositionReport, initialState);
+  const [athleteId, setAthleteId] = useState("");
+
+  const selectedAthlete = athletes.find((a) => a.id === athleteId);
+  const recipients: RecipientCandidate[] = selectedAthlete
+    ? [{ id: selectedAthlete.id, label: `${selectedAthlete.first_name} ${selectedAthlete.last_name} (athlete)` }, ...practitioners]
+    : practitioners;
 
   return (
     <div className="flex flex-col gap-6">
@@ -58,7 +72,8 @@ export default function BodyCompositionReportForm({
             id="bc_athlete_id"
             name="athlete_id"
             required
-            defaultValue=""
+            value={athleteId}
+            onChange={(e) => setAthleteId(e.target.value)}
             className={inputClass}
             style={inputStyle}
           >
@@ -154,6 +169,15 @@ export default function BodyCompositionReportForm({
         >
           {state.reportText}
         </div>
+      )}
+
+      {state.reportId && (
+        <ShareReportPanel
+          teamId={teamId}
+          reportId={state.reportId}
+          recipients={recipients}
+          alreadySharedWith={[]}
+        />
       )}
     </div>
   );

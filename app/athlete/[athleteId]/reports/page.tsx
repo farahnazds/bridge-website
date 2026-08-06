@@ -1,13 +1,81 @@
 import type { Metadata } from "next";
-import ComingSoon from "@/components/ComingSoon";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth";
+import { REPORT_TYPE_LABELS } from "@/lib/constants";
+import MyReportsList, { type MyReportEntry } from "./MyReportsList";
 
 export const metadata: Metadata = { title: "My Reports — Bridgetx" };
 
-export default function MyReportsPage() {
+export default async function MyReportsPage() {
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!profile) return null;
+
+  // "shared recipient reads" RLS policy already scopes this to reports
+  // where the caller's profile is in shared_with — the explicit .contains
+  // filter matches the convention used elsewhere in this app of being
+  // explicit rather than relying on RLS alone.
+  const { data: reportRows, error } = await supabase
+    .from("reports")
+    .select("id, report_types, report_period_start, report_period_end, generated_by, ai_summary, created_at")
+    .contains("shared_with", [profile.id])
+    .order("created_at", { ascending: false });
+
+  const generatorIds = [...new Set((reportRows ?? []).map((r) => r.generated_by))];
+  let generatorById = new Map<string, string>();
+  if (generatorIds.length > 0) {
+    const { data: generators } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", generatorIds);
+    generatorById = new Map(
+      (generators ?? []).map((g) => [g.id, `${g.first_name ?? ""} ${g.last_name ?? ""}`.trim() || "—"])
+    );
+  }
+
+  const reports: MyReportEntry[] = (reportRows ?? []).map((r) => ({
+    id: r.id,
+    typeLabel: (r.report_types as string[]).map((t) => REPORT_TYPE_LABELS[t] ?? t).join(" + "),
+    periodStart: r.report_period_start,
+    periodEnd: r.report_period_end,
+    sharedByName: generatorById.get(r.generated_by) ?? "—",
+    summary: r.ai_summary as string | null,
+    createdAt: r.created_at,
+  }));
+
   return (
-    <ComingSoon
-      title="My Reports"
-      description="Reports your practitioners have shared with you."
-    />
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1
+          className="text-2xl font-semibold"
+          style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}
+        >
+          My Reports
+        </h1>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+          Reports your practitioners have shared with you.
+        </p>
+      </div>
+
+      {error && (
+        <p
+          className="rounded-lg border px-4 py-3 text-sm"
+          style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
+        >
+          Couldn&apos;t load your reports: {error.message}
+        </p>
+      )}
+
+      {!error && reports.length === 0 && (
+        <div
+          className="rounded-xl border p-10 text-center"
+          style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
+        >
+          <p style={{ color: "var(--text-muted)" }}>No reports have been shared with you yet.</p>
+        </div>
+      )}
+
+      {!error && reports.length > 0 && <MyReportsList reports={reports} />}
+    </div>
   );
 }

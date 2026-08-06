@@ -1,8 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAnthropicClient } from "@/lib/anthropic";
 import { getCurrentProfile } from "@/lib/auth";
+import { sendReportSharedEmail } from "@/lib/resend";
+import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import {
   buildCompliancePrompt,
   COMPLIANCE_SYSTEM_PROMPT,
@@ -21,6 +24,7 @@ export interface GenerateReportState {
   error: string | null;
   reportText: string | null;
   dataCheckNote: string | null;
+  reportId: string | null;
 }
 
 export async function generateComplianceReport(
@@ -29,7 +33,7 @@ export async function generateComplianceReport(
 ): Promise<GenerateReportState> {
   const profile = await getCurrentProfile();
   if (!profile || profile.role !== "club_practitioner") {
-    return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null };
+    return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
   const teamId = String(formData.get("team_id") ?? "").trim();
@@ -44,6 +48,7 @@ export async function generateComplianceReport(
       error: "Athlete and report period are required.",
       reportText: null,
       dataCheckNote: null,
+      reportId: null,
     };
   }
 
@@ -56,7 +61,7 @@ export async function generateComplianceReport(
     .eq("id", athleteId)
     .single();
   if (athleteError || !athlete) {
-    return { error: "Couldn't load that athlete.", reportText: null, dataCheckNote: null };
+    return { error: "Couldn't load that athlete.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
   const [{ data: conditionRows }, { data: allergyRows }, { data: intoleranceRows }] = await Promise.all([
@@ -157,6 +162,7 @@ export async function generateComplianceReport(
       error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
       reportText: null,
       dataCheckNote,
+      reportId: null,
     };
   }
 
@@ -165,39 +171,53 @@ export async function generateComplianceReport(
       error: "The AI declined to generate this report. Try adjusting the additional instructions, or contact support if this persists.",
       reportText: null,
       dataCheckNote,
+      reportId: null,
     };
   }
 
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   if (!reportText) {
-    return { error: "The AI returned an empty response. Try again.", reportText: null, dataCheckNote };
+    return { error: "The AI returned an empty response. Try again.", reportText: null, dataCheckNote, reportId: null };
   }
 
   // ---- Store (reports table) ----
-  // audience: practitioner, since there's no sharing flow yet — the
-  // generating practitioner views their own report directly.
-  const { error: insertError } = await supabase.from("reports").insert({
-    generated_by: profile.id,
-    report_types: ["compliance"],
-    audience: "practitioner",
-    team_id: teamId,
-    athlete_ids: [athleteId],
-    report_period_start: periodStart,
-    report_period_end: periodEnd,
-    language,
-    additional_instructions: additionalInstructions,
-    ai_summary: reportText,
-  });
-  if (insertError) {
+  // audience stays "practitioner" — sharing (shared_with/is_official) is a
+  // separate concept from audience, which only governs how combined
+  // multi-athlete/multi-type documents get merged, a feature not built
+  // yet. .select().single() is safe here (unlike the profiles-insert
+  // gotcha elsewhere in this codebase): generated_by is set to profile.id
+  // in this same insert, which always equals current_profile_id() for the
+  // caller, so the RETURNING row always satisfies "generator manages own
+  // report" — no state the row is missing at insert time that a SELECT
+  // policy could reject.
+  const { data: insertedReport, error: insertError } = await supabase
+    .from("reports")
+    .insert({
+      generated_by: profile.id,
+      report_types: ["compliance"],
+      audience: "practitioner",
+      team_id: teamId,
+      athlete_ids: [athleteId],
+      report_period_start: periodStart,
+      report_period_end: periodEnd,
+      language,
+      additional_instructions: additionalInstructions,
+      ai_summary: reportText,
+    })
+    .select("id")
+    .single();
+  if (insertError || !insertedReport) {
     return {
-      error: `Report generated, but saving it failed: ${insertError.message}`,
+      error: `Report generated, but saving it failed: ${insertError?.message ?? "unknown error"}`,
       reportText,
       dataCheckNote,
+      reportId: null,
     };
   }
 
-  return { error: null, reportText, dataCheckNote };
+  revalidatePath(`/staff/${teamId}/reports`);
+  return { error: null, reportText, dataCheckNote, reportId: insertedReport.id };
 }
 
 // ---- Body Composition report — same pattern as generateComplianceReport ----
@@ -207,7 +227,7 @@ export async function generateBodyCompositionReport(
 ): Promise<GenerateReportState> {
   const profile = await getCurrentProfile();
   if (!profile || profile.role !== "club_practitioner") {
-    return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null };
+    return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
   const teamId = String(formData.get("team_id") ?? "").trim();
@@ -222,6 +242,7 @@ export async function generateBodyCompositionReport(
       error: "Athlete and report period are required.",
       reportText: null,
       dataCheckNote: null,
+      reportId: null,
     };
   }
 
@@ -234,7 +255,7 @@ export async function generateBodyCompositionReport(
     .eq("id", athleteId)
     .single();
   if (athleteError || !athlete) {
-    return { error: "Couldn't load that athlete.", reportText: null, dataCheckNote: null };
+    return { error: "Couldn't load that athlete.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
   const [{ data: conditionRows }, { data: allergyRows }, { data: intoleranceRows }] = await Promise.all([
@@ -374,6 +395,7 @@ export async function generateBodyCompositionReport(
       error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
       reportText: null,
       dataCheckNote,
+      reportId: null,
     };
   }
 
@@ -382,35 +404,150 @@ export async function generateBodyCompositionReport(
       error: "The AI declined to generate this report. Try adjusting the additional instructions, or contact support if this persists.",
       reportText: null,
       dataCheckNote,
+      reportId: null,
     };
   }
 
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   if (!reportText) {
-    return { error: "The AI returned an empty response. Try again.", reportText: null, dataCheckNote };
+    return { error: "The AI returned an empty response. Try again.", reportText: null, dataCheckNote, reportId: null };
   }
 
-  // ---- Store (reports table) ----
-  const { error: insertError } = await supabase.from("reports").insert({
-    generated_by: profile.id,
-    report_types: ["body_composition"],
-    audience: "practitioner",
-    team_id: teamId,
-    athlete_ids: [athleteId],
-    report_period_start: periodStart,
-    report_period_end: periodEnd,
-    language,
-    additional_instructions: additionalInstructions,
-    ai_summary: reportText,
-  });
-  if (insertError) {
+  // ---- Store (reports table) ---- (see generateComplianceReport for why
+  // .select().single() is safe here despite the RETURNING/SELECT-policy
+  // gotcha documented elsewhere in this codebase)
+  const { data: insertedReport, error: insertError } = await supabase
+    .from("reports")
+    .insert({
+      generated_by: profile.id,
+      report_types: ["body_composition"],
+      audience: "practitioner",
+      team_id: teamId,
+      athlete_ids: [athleteId],
+      report_period_start: periodStart,
+      report_period_end: periodEnd,
+      language,
+      additional_instructions: additionalInstructions,
+      ai_summary: reportText,
+    })
+    .select("id")
+    .single();
+  if (insertError || !insertedReport) {
     return {
-      error: `Report generated, but saving it failed: ${insertError.message}`,
+      error: `Report generated, but saving it failed: ${insertError?.message ?? "unknown error"}`,
       reportText,
       dataCheckNote,
+      reportId: null,
     };
   }
 
-  return { error: null, reportText, dataCheckNote };
+  revalidatePath(`/staff/${teamId}/reports`);
+  return { error: null, reportText, dataCheckNote, reportId: insertedReport.id };
+}
+
+// ---- Share a report — docs/04-user-flows.md Flow 7, steps 7-9 ----
+export interface ShareState {
+  error: string | null;
+  warning: string | null;
+  success: boolean;
+}
+
+export async function shareReport(_prevState: ShareState, formData: FormData): Promise<ShareState> {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "club_practitioner") {
+    return { error: "You don't have permission to do this.", warning: null, success: false };
+  }
+
+  const teamId = String(formData.get("team_id") ?? "").trim();
+  const reportId = String(formData.get("report_id") ?? "").trim();
+  const recipientIds = formData.getAll("recipient_ids").map(String).filter(Boolean);
+
+  if (!teamId || !reportId || recipientIds.length === 0) {
+    return { error: "Select at least one recipient.", warning: null, success: false };
+  }
+
+  const supabase = await createClient();
+
+  const { data: report, error: reportError } = await supabase
+    .from("reports")
+    .select("id, report_types, shared_with, generated_by")
+    .eq("id", reportId)
+    .single();
+  if (reportError || !report) {
+    return { error: "Couldn't load that report.", warning: null, success: false };
+  }
+  // Redundant with RLS ("generator manages own report"), but gives a clear
+  // message instead of a silent RLS no-op on the update below.
+  if (report.generated_by !== profile.id) {
+    return { error: "You can only share reports you generated.", warning: null, success: false };
+  }
+
+  // Append, don't overwrite — a report can be shared again later with
+  // additional recipients without dropping who already has access.
+  const mergedSharedWith = [...new Set([...(report.shared_with ?? []), ...recipientIds])];
+
+  const { error: updateError } = await supabase
+    .from("reports")
+    .update({ shared_with: mergedSharedWith, is_official: true })
+    .eq("id", reportId);
+  if (updateError) {
+    return { error: `Couldn't share the report: ${updateError.message}`, warning: null, success: false };
+  }
+
+  const { data: recipients } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, email")
+    .in("id", recipientIds);
+
+  const reportTypeLabel = ((report.report_types as string[]) ?? [])
+    .map((t) => REPORT_TYPE_LABELS[t] ?? t)
+    .join(" + ");
+  const practitionerName = `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email;
+
+  // ---- In-app notifications (docs/04-user-flows.md Flow 7, step 8) ----
+  // RLS-scoped via "report generator notifies recipients"
+  // (database/migrations/005_report_share_notification_policy.sql).
+  const notifRows = (recipients ?? []).map((r) => ({
+    profile_id: r.id,
+    type: "report_shared",
+    title: `New ${reportTypeLabel} report shared with you`,
+    body: `${practitionerName} shared a ${reportTypeLabel} report with you.`,
+    related_id: reportId,
+  }));
+  if (notifRows.length > 0) {
+    const { error: notifError } = await supabase.from("notifications").insert(notifRows);
+    if (notifError) {
+      return {
+        error: null,
+        warning: `Report shared, but in-app notifications failed: ${notifError.message}`,
+        success: true,
+      };
+    }
+  }
+
+  // ---- Email via Resend — best-effort; a failed email never undoes the share ----
+  let emailWarning: string | null = null;
+  if (recipients && recipients.length > 0) {
+    const results = await Promise.allSettled(
+      recipients.map((r) =>
+        sendReportSharedEmail({
+          to: r.email,
+          recipientName: r.first_name ?? "there",
+          practitionerName,
+          reportTypeLabel,
+        })
+      )
+    );
+    const failures = results.filter((r) => r.status === "rejected").length;
+    if (failures > 0) {
+      emailWarning = `Report shared and notified in-app, but ${failures} of ${recipients.length} email${
+        recipients.length === 1 ? "" : "s"
+      } failed to send${!process.env.RESEND_API_KEY ? " (RESEND_API_KEY isn't configured yet)" : ""}.`;
+    }
+  }
+
+  revalidatePath(`/staff/${teamId}/reports`);
+  revalidatePath(`/staff/${teamId}`);
+  return { error: null, warning: emailWarning, success: true };
 }

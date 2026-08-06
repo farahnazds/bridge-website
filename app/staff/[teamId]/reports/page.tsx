@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth";
 import ReportsClient from "./ReportsClient";
+import ReportHistory from "./ReportHistory";
+import type { RecipientCandidate } from "./ShareReportPanel";
 
 export const metadata: Metadata = { title: "Reports — Bridgetx" };
+
+type RosterAthlete = { id: string; first_name: string; last_name: string; code: string };
+type PractitionerEmbed = { id: string; first_name: string | null; last_name: string | null };
+type AssignmentRow = { staff_profile_id: string; profiles: PractitionerEmbed | null };
 
 export default async function TeamReportsPage({
   params,
@@ -11,6 +18,7 @@ export default async function TeamReportsPage({
 }) {
   const { teamId } = await params;
   const supabase = await createClient();
+  const profile = await getCurrentProfile();
 
   const { data: rosterRows } = await supabase
     .from("athlete_teams")
@@ -19,11 +27,62 @@ export default async function TeamReportsPage({
 
   // Single object, not array — many-to-one FK, same verified pattern as
   // app/staff/[teamId]/page.tsx (roster).
-  type RosterAthlete = { id: string; first_name: string; last_name: string; code: string };
   const athletes = ((rosterRows ?? []) as unknown as { athletes: RosterAthlete | null }[])
     .map((r) => r.athletes)
     .filter((a): a is RosterAthlete => a !== null)
     .sort((a, b) => a.last_name.localeCompare(b.last_name));
+  const athleteById = new Map(athletes.map((a) => [a.id, a]));
+
+  // Fellow practitioners assigned to this team — recipient candidates for
+  // sharing, excluding the caller themselves.
+  const { data: assignmentRows } = await supabase
+    .from("staff_team_assignments")
+    .select("staff_profile_id, profiles(id, first_name, last_name)")
+    .eq("team_id", teamId);
+  const practitioners: RecipientCandidate[] = ((assignmentRows ?? []) as unknown as AssignmentRow[])
+    .map((row) => row.profiles)
+    .filter((p): p is PractitionerEmbed => p !== null && p.id !== profile?.id)
+    .map((p) => ({ id: p.id, label: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Practitioner" }));
+
+  // Report history — RLS ("generator manages own report" /
+  // "shared recipient reads" / "team practitioners read official reports")
+  // already scopes this to exactly what the caller should see: their own
+  // reports, reports shared with them, and official team reports.
+  const { data: reportRows } = await supabase
+    .from("reports")
+    .select("id, report_types, athlete_ids, report_period_start, report_period_end, is_official, shared_with, generated_by, ai_summary, created_at")
+    .eq("team_id", teamId)
+    .order("created_at", { ascending: false });
+
+  const generatorIds = [...new Set((reportRows ?? []).map((r) => r.generated_by))];
+  let generatorById = new Map<string, string>();
+  if (generatorIds.length > 0) {
+    const { data: generators } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .in("id", generatorIds);
+    generatorById = new Map(
+      (generators ?? []).map((g) => [g.id, `${g.first_name ?? ""} ${g.last_name ?? ""}`.trim() || "—"])
+    );
+  }
+
+  const reports = (reportRows ?? []).map((r) => {
+    const athlete = athleteById.get(r.athlete_ids?.[0] ?? "");
+    return {
+      id: r.id,
+      reportTypes: r.report_types as string[],
+      athleteId: r.athlete_ids?.[0] ?? null,
+      athleteName: athlete ? `${athlete.first_name} ${athlete.last_name}` : "Unknown athlete",
+      periodStart: r.report_period_start,
+      periodEnd: r.report_period_end,
+      isOfficial: r.is_official,
+      sharedWith: (r.shared_with as string[]) ?? [],
+      generatedByName: generatorById.get(r.generated_by) ?? "—",
+      isOwnReport: r.generated_by === profile?.id,
+      summary: r.ai_summary as string | null,
+      createdAt: r.created_at,
+    };
+  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -35,7 +94,7 @@ export default async function TeamReportsPage({
           Reports
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Single athlete, generated for you as the practitioner. Combined report types and sharing
+          Single athlete, generated for you as the practitioner. Combined report types
           aren&apos;t built yet.
         </p>
       </div>
@@ -45,12 +104,19 @@ export default async function TeamReportsPage({
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         {athletes.length > 0 ? (
-          <ReportsClient teamId={teamId} athletes={athletes} />
+          <ReportsClient teamId={teamId} athletes={athletes} practitioners={practitioners} />
         ) : (
           <p style={{ color: "var(--text-muted)" }}>
             No athletes on this team yet — add one to the roster first.
           </p>
         )}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
+          Report History
+        </h2>
+        <ReportHistory teamId={teamId} reports={reports} athletes={athletes} practitioners={practitioners} />
       </div>
     </div>
   );

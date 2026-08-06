@@ -3,6 +3,7 @@
 import { useState } from "react";
 import ReportForm from "./ReportForm";
 import BodyCompositionReportForm from "./BodyCompositionReportForm";
+import type { RecipientCandidate } from "./ShareReportPanel";
 
 type ReportType = "compliance" | "body_composition";
 
@@ -14,9 +15,11 @@ const TABS: { value: ReportType; label: string }[] = [
 export default function ReportsClient({
   teamId,
   athletes,
+  practitioners,
 }: {
   teamId: string;
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
+  practitioners: RecipientCandidate[];
 }) {
   const [activeTab, setActiveTab] = useState<ReportType>("compliance");
 
@@ -41,9 +44,9 @@ export default function ReportsClient({
       </div>
 
       {activeTab === "compliance" ? (
-        <ReportForm teamId={teamId} athletes={athletes} />
+        <ReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
       ) : (
-        <BodyCompositionReportForm teamId={teamId} athletes={athletes} />
+        <BodyCompositionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
       )}
     </div>
   );

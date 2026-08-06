@@ -1319,6 +1319,16 @@ create policy "recipient updates read status" on message_recipients for update u
 
 create policy "super admin full access" on notifications for all using (is_super_admin());
 create policy "own notifications" on notifications for all using (profile_id = current_profile_id());
+-- Lets a report's generator create a notification row for someone else
+-- (the recipient) specifically when sharing that report — see
+-- database/migrations/005_report_share_notification_policy.sql.
+create policy "report generator notifies recipients" on notifications for insert
+  with check (
+    exists (
+      select 1 from reports r
+      where r.id = related_id and r.generated_by = current_profile_id()
+    )
+  );
 
 -- ---- leads / content / articles ----
 create policy "super admin full access" on leads for all using (is_super_admin());

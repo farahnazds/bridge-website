@@ -168,6 +168,33 @@ creation and assignment were already covered by
 `"club manager manages team assignments"` respectively.
 
 See `database/migrations/003_teams_staff_policies.sql`.
+
+## Added: report-sharing notification policy (2026-08-06)
+
+Built the report-sharing flow (`docs/04-user-flows.md` Flow 7) on top of
+the `reports` table's existing policies, which already anticipated this
+exact feature with zero changes needed:
+
+- `"generator manages own report"` (`for all`, `generated_by =
+  current_profile_id()`) already lets the generating practitioner update
+  `shared_with`/`is_official` on their own report.
+- `"shared recipient reads"` (`current_profile_id() = any(shared_with)`)
+  already grants any recipient — athlete or fellow practitioner — read
+  access the moment they're added to `shared_with`, regardless of the
+  report's `audience` value.
+- `"team practitioners read official reports"` already covers "visible to
+  every practitioner on that team, even if not an explicit recipient"
+  once `is_official = true`.
+
+The one real gap: **`notifications`** only had `"own notifications"`
+(`profile_id = current_profile_id()`), which blocks a practitioner from
+inserting a notification row for someone else — exactly what's needed to
+notify a recipient in-app that a report was shared with them. Added
+`"report generator notifies recipients"`, scoped narrowly to inserts
+where `related_id` points at a `reports` row the caller generated — not
+a general "notify anyone" ability.
+
+See `database/migrations/005_report_share_notification_policy.sql`.
 # Database — Row Level Security Policies (v4, plain English pre-SQL)
 
 - **Super Admin** — full access, everything, no restrictions.
