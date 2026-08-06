@@ -497,7 +497,9 @@ create table vald_data (
   asymmetry_pct numeric,
   validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported')),
   provider_id uuid not null references profiles(id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_by uuid references profiles(id),
+  updated_at timestamptz
 );
 
 create table injuries (
@@ -1355,6 +1357,10 @@ create policy "admin scoped access" on vald_data for all
   );
 create policy "club staff read" on vald_data for select using (is_assigned_to_athlete_via_team(athlete_id));
 create policy "club staff insert" on vald_data for insert with check (is_assigned_to_athlete_via_team(athlete_id));
+create policy "club staff edit within 7 days" on vald_data for update
+  using (is_assigned_to_athlete_via_team(athlete_id) and within_edit_window(created_at, 7));
+create policy "independent practitioner edit own within 2 days" on vald_data for update
+  using (provider_id = current_profile_id() and within_edit_window(created_at, 2));
 create policy "independent practitioner read" on vald_data for select using (has_independent_access_to_athlete(athlete_id));
 create policy "independent practitioner insert" on vald_data for insert with check (has_independent_access_to_athlete(athlete_id));
 

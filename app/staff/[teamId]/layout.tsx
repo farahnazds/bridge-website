@@ -8,6 +8,8 @@ const NAV_SECTIONS: { label: string; slug: string }[] = [
   { label: "Roster", slug: "" },
   { label: "Assessments", slug: "assessments" },
   { label: "Injury Log / RTP", slug: "injuries" },
+  { label: "GPS / Performance", slug: "gps-performance" },
+  { label: "VALD", slug: "vald" },
   { label: "Training Load Plan", slug: "training-load" },
   { label: "Reports", slug: "reports" },
   { label: "Messenger", slug: "messenger" },

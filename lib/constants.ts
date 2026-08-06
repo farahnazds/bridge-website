@@ -86,6 +86,22 @@ export const REPORT_TYPE_LABELS: Record<string, string> = {
   body_composition: "Body Composition",
 };
 
+// `vald_data.test_type` is free text (schema.sql comments it "e.g. cmj,
+// nordic_curl"), so this is an open list with an "Other" escape hatch —
+// same pattern as SPORTS / SPECIALTIES. VALD's own device lineup changes
+// over time, and adding a test shouldn't need a migration.
+export const VALD_TEST_TYPES = [
+  { value: "cmj", label: "Countermovement Jump (CMJ)" },
+  { value: "nordic_curl", label: "Nordic Curl" },
+  { value: "imtp", label: "Isometric Mid-Thigh Pull (IMTP)" },
+  { value: "squat_jump", label: "Squat Jump" },
+  { value: "drop_jump", label: "Drop Jump" },
+  { value: "hop_test", label: "Hop Test" },
+  { value: "groin_squeeze", label: "Groin Squeeze" },
+  { value: "shoulder_isometric", label: "Shoulder Isometric" },
+];
+export const OTHER_VALD_TEST_TYPE = "__other__";
+
 // Matches the `training_load_plans.intensity` check constraint in
 // database/schema.sql — a fixed DB enum, so no "Other" escape hatch.
 export const INTENSITIES = [
