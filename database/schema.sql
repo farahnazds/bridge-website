@@ -1787,6 +1787,26 @@ create policy "linked practitioners and athlete read own photo" on storage.objec
 create policy "super admin full access to photos" on storage.objects for all
   using (bucket_id = 'profile-photos' and is_super_admin());
 
+-- ---- storage.objects: club-branding bucket ----
+-- Upload path convention: `${club_id}/${filename}`. Mirrors the
+-- club_branding table's own RLS — Super Admin writes, club staff read their
+-- own. See database/migrations/016_club_branding_storage.sql.
+create policy "super admin manages club branding assets" on storage.objects for all
+  using (bucket_id = 'club-branding' and is_super_admin());
+
+-- Asks is_club_staff_for_club() directly rather than joining `clubs` — the
+-- join version was verified DENYING club staff their own logo. See
+-- database/migrations/017_fix_club_branding_read_policy.sql. The uuid-shape
+-- guard is required because casting a non-uuid folder name raises instead
+-- of returning false.
+create policy "club staff read own club branding assets" on storage.objects for select
+  using (
+    bucket_id = 'club-branding'
+    and (storage.foldername(name))[1] ~*
+        '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    and is_club_staff_for_club(((storage.foldername(name))[1])::uuid)
+  );
+
 -- ============================================================================
 -- END OF SCHEMA
 -- ============================================================================

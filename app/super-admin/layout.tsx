@@ -35,9 +35,23 @@ export default async function SuperAdminLayout({
             · Super Admin
           </span>
         </Link>
-        <span className="text-sm text-white/70">
-          {profile.first_name ?? profile.email}
-        </span>
+        <div className="flex items-center gap-6">
+          <nav className="flex items-center gap-4">
+            <Link
+              href="/super-admin/clubs"
+              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
+            >
+              Clubs
+            </Link>
+            <Link
+              href="/super-admin/branding"
+              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
+            >
+              Branding &amp; Templates
+            </Link>
+          </nav>
+          <span className="text-sm text-white/70">{profile.first_name ?? profile.email}</span>
+        </div>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
     </div>
