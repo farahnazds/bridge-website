@@ -894,6 +894,67 @@ language sql stable as $$
   ) or is_super_admin()
 $$;
 
+-- Messenger recursion breakers — see
+-- database/migrations/014_fix_messenger_policy_recursion.sql. messages and
+-- message_recipients policies referenced each other, producing 42P17
+-- infinite recursion; SECURITY DEFINER stops the inner lookup re-triggering
+-- the calling policy. Same fix shape as migration 001.
+create or replace function is_message_sender(p_message_id uuid) returns boolean
+language sql stable security definer set search_path = public, pg_temp as $
+  select exists (
+    select 1 from messages m
+    where m.id = p_message_id and m.sender_id = current_profile_id()
+  )
+$;
+
+create or replace function is_message_participant(p_message_id uuid) returns boolean
+language sql stable security definer set search_path = public, pg_temp as $
+  select exists (
+    select 1 from messages m
+    where m.id = p_message_id and m.sender_id = current_profile_id()
+  )
+  or exists (
+    select 1 from message_recipients mr
+    where mr.message_id = p_message_id and mr.recipient_id = current_profile_id()
+  )
+$;
+
+-- Messenger relationship guard — see
+-- database/migrations/013_messenger_policies.sql. SECURITY DEFINER is
+-- required: an athlete cannot read their own athlete_teams rows under the
+-- team-linked policy, so this would be false for every athlete otherwise.
+create or replace function can_message_profile(p_recipient_id uuid) returns boolean
+language sql stable security definer set search_path = public, pg_temp as $
+  select
+    exists (
+      select 1 from athletes a
+      join athlete_teams att on att.athlete_id = a.id
+      join staff_team_assignments sta on sta.team_id = att.team_id
+      where a.profile_id = current_profile_id()
+        and sta.staff_profile_id = p_recipient_id
+    )
+    or exists (
+      select 1 from athletes a
+      join club_staff cs on cs.club_id = a.club_id
+      where a.profile_id = current_profile_id()
+        and cs.profile_id = p_recipient_id
+        and cs.staff_role = 'club_manager'
+    )
+    or exists (
+      select 1 from athletes a
+      join practitioner_athletes pa on pa.athlete_id = a.id
+      where a.profile_id = current_profile_id()
+        and pa.practitioner_id = p_recipient_id
+        and pa.approval_status in ('approved', 'not_required')
+        and pa.ended_at is null
+    )
+    or exists (
+      select 1 from athletes a
+      where a.profile_id = p_recipient_id
+        and (is_assigned_to_athlete_via_team(a.id) or has_independent_access_to_athlete(a.id))
+    )
+$;
+
 create or replace function is_assigned_to_team(p_team_id uuid) returns boolean
 language sql stable as $$
   select exists (
@@ -1491,11 +1552,15 @@ create policy "super admin full access" on messages for all using (is_super_admi
 create policy "sender reads own messages" on messages for select using (sender_id = current_profile_id());
 create policy "sender inserts" on messages for insert with check (sender_id = current_profile_id());
 create policy "recipient reads message via join" on messages for select
-  using (exists (select 1 from message_recipients mr where mr.message_id = id and mr.recipient_id = current_profile_id()));
+  using (is_message_participant(id));
 
 create policy "super admin full access" on message_recipients for all using (is_super_admin());
 create policy "recipient reads own row" on message_recipients for select using (recipient_id = current_profile_id());
 create policy "recipient updates read status" on message_recipients for update using (recipient_id = current_profile_id());
+create policy "sender addresses own message" on message_recipients for insert
+  with check (is_message_sender(message_id) and can_message_profile(recipient_id));
+create policy "thread participants read recipient rows" on message_recipients for select
+  using (is_message_participant(message_id));
 
 create policy "super admin full access" on notifications for all using (is_super_admin());
 create policy "own notifications" on notifications for all using (profile_id = current_profile_id());
@@ -1509,6 +1574,8 @@ create policy "report generator notifies recipients" on notifications for insert
       where r.id = related_id and r.generated_by = current_profile_id()
     )
   );
+create policy "message sender notifies recipients" on notifications for insert
+  with check (is_message_sender(related_id));
 
 -- ---- leads / content / articles ----
 create policy "super admin full access" on leads for all using (is_super_admin());
@@ -1524,10 +1591,29 @@ create policy "public insert" on leads for insert with check (true);
 -- docs/02-roles-and-permissions.md.
 create policy "super admin full access" on content for all using (is_super_admin());
 
+-- WITH CHECK also guards target_athlete_id — see
+-- database/migrations/012_fix_content_athlete_scope_bypass.sql. content has
+-- THREE nullable scope columns; guarding only club/segment let a caller
+-- attach another club's athlete to a row scoped to their own club.
 create policy "admin manages assigned content" on content for all
   using (
     (target_club_id is not null and is_admin_for_club(target_club_id))
     or (target_segment_id is not null and is_admin_for_segment(target_segment_id))
+  )
+  with check (
+    (
+      (target_club_id is not null and is_admin_for_club(target_club_id))
+      or (target_segment_id is not null and is_admin_for_segment(target_segment_id))
+    )
+    and (
+      target_athlete_id is null
+      or exists (
+        select 1 from athletes a
+        where a.id = target_athlete_id
+          and a.club_id is not null
+          and is_admin_for_club(a.club_id)
+      )
+    )
   );
 create policy "admin reads athlete targeted content" on content for select
   using (
@@ -1541,7 +1627,21 @@ create policy "admin reads athlete targeted content" on content for select
   );
 
 create policy "club manager manages own club content" on content for all
-  using (target_club_id is not null and is_club_manager_for_club(target_club_id));
+  using (target_club_id is not null and is_club_manager_for_club(target_club_id))
+  with check (
+    target_club_id is not null
+    and is_club_manager_for_club(target_club_id)
+    and target_segment_id is null
+    and (
+      target_athlete_id is null
+      or exists (
+        select 1 from athletes a
+        where a.id = target_athlete_id
+          and a.club_id is not null
+          and is_club_manager_for_club(a.club_id)
+      )
+    )
+  );
 create policy "club staff reads own club content" on content for select
   using (
     published_at is not null

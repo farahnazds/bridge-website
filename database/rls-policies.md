@@ -329,6 +329,44 @@ club-staff policy on the same table.
 
 See `database/migrations/009_admin_product_requests.sql`.
 
+## SECURITY FIX: unchecked `target_athlete_id` on content (2026-08-06)
+
+Same class as the OR-branch bypass below, found in policies **added by
+migration 010** — caught by extending verification from reads to writes.
+
+`content` has **three** nullable scope columns (`target_club_id`,
+`target_segment_id`, `target_athlete_id`). Both manage policies validated
+only the first two; `target_athlete_id` was never checked. Both are
+`FOR ALL` with no `WITH CHECK`, so `USING` governed inserts.
+
+Proven live as the Club A-only Admin:
+
+```
+insert {target_club_id: ClubA, target_athlete_id: ClubB athlete} -> ACCEPTED
+```
+
+That row then becomes readable by Club B's staff via `"club staff reads
+athlete targeted content"` and by the athlete via `"athlete reads own
+targeted content"`.
+
+Fix adds an explicit `WITH CHECK` to `"admin manages assigned content"` and
+`"club manager manages own club content"` that reproduces the existing
+capability exactly, then additionally requires any non-null
+`target_athlete_id` to belong to a club the caller already controls. The
+Club Manager check also pins `target_segment_id` to null — managers have no
+segment authority anywhere in this schema, so permitting one would be the
+same unchecked-scope problem in a third column. `USING` untouched, so no
+existing row changes visibility, and neither role gains the ability to
+author purely athlete-targeted content.
+
+**Pattern worth remembering:** any table with more than one nullable scope
+column needs *every* one validated on write. Guarding a subset and OR-ing
+branches has now produced this same bug three times — `training_load_plans`
+and `comments` (migration 011), and `content` here. When adding a policy to
+such a table, enumerate the scope columns first.
+
+See `database/migrations/012_fix_content_athlete_scope_bypass.sql`.
+
 ## SECURITY FIX: OR-branch scope bypass (2026-08-06)
 
 Found by live-verifying the Training Load Plan build, then reproduced on

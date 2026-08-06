@@ -50,12 +50,12 @@ language sql stable as $$
 $$;
 
 -- ---- remove the blanket read ----
-drop policy "authenticated read targeted content" on content;
+drop policy if exists "authenticated read targeted content" on content;
 
 -- ---- Admin: manage content for assigned clubs AND assigned segments ----
 -- Replaces the club-only version; segment targeting was previously
 -- unreachable for an Admin even though assignments support it.
-drop policy "admin manages assigned club content" on content;
+drop policy if exists "admin manages assigned club content" on content;
 
 create policy "admin manages assigned content" on content for all
   using (

@@ -40,7 +40,7 @@
 -- ============================================================================
 
 -- ---- training_load_plans ----
-drop policy "club staff access" on training_load_plans;
+drop policy if exists "club staff access" on training_load_plans;
 
 create policy "club staff access" on training_load_plans for all
   using (
@@ -55,7 +55,7 @@ create policy "club staff access" on training_load_plans for all
 
 -- ---- comments: insert ----
 -- Added in migration 007 with the OR shape; this replaces it.
-drop policy "linked staff creates comments" on comments;
+drop policy if exists "linked staff creates comments" on comments;
 
 create policy "linked staff creates comments" on comments for insert
   with check (
@@ -73,7 +73,7 @@ create policy "linked staff creates comments" on comments for insert
 -- USING unchanged (same rows remain targetable); the added WITH CHECK stops
 -- an update from re-pointing a comment's scope at a club the caller doesn't
 -- manage.
-drop policy "club manager toggles ai reflection" on comments;
+drop policy if exists "club manager toggles ai reflection" on comments;
 
 create policy "club manager toggles ai reflection" on comments for update
   using (

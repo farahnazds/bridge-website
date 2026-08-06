@@ -46,7 +46,7 @@ $$;
 -- delete your own comment regardless of whether your access has since
 -- lapsed, matching "departed staff stay attributed" elsewhere in this
 -- schema) and give INSERT its own, properly scoped policy.
-drop policy "author manages own comment" on comments;
+drop policy if exists "author manages own comment" on comments;
 
 create policy "author reads own comment" on comments for select
   using (author_id = current_profile_id());
