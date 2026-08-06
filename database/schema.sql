@@ -877,12 +877,22 @@ language sql stable security definer set search_path = public, pg_temp as $$
   )
 $$;
 
+-- Includes the same Club Manager fallback as is_assigned_to_athlete_via_team()
+-- below — see database/migrations/007_comments_policies.sql for why this
+-- was missing and what it fixes (team-level official comments, plus
+-- training_load_plans and reports' "team practitioners read official
+-- reports", which share this helper).
 create or replace function is_assigned_to_team(p_team_id uuid) returns boolean
 language sql stable as $$
   select exists (
     select 1 from staff_team_assignments sta
     where sta.staff_profile_id = current_profile_id()
       and sta.team_id = p_team_id
+  )
+  or exists (
+    select 1 from teams t
+    where t.id = p_team_id
+      and is_club_manager_for_club(t.club_id)
   )
 $$;
 
@@ -1277,8 +1287,27 @@ create policy "linked practitioners read" on checkins for select
 
 -- ---- comments ----
 create policy "super admin full access" on comments for all using (is_super_admin());
-create policy "author manages own comment" on comments for all
+-- Split from a single FOR ALL policy — see
+-- database/migrations/007_comments_policies.sql: a combined FOR ALL USING
+-- (author_id = ...) with no separate WITH CHECK also governed INSERT,
+-- letting anyone post an "official comment" about any athlete/team
+-- regardless of actual access. SELECT/UPDATE/DELETE stay unrestricted by
+-- linked access on purpose — you can always see/edit/delete your own
+-- comment even if your access to that athlete/team has since lapsed.
+create policy "author reads own comment" on comments for select
   using (author_id = current_profile_id());
+create policy "author updates own comment" on comments for update
+  using (author_id = current_profile_id());
+create policy "author deletes own comment" on comments for delete
+  using (author_id = current_profile_id());
+create policy "linked staff creates comments" on comments for insert
+  with check (
+    author_id = current_profile_id()
+    and (
+      (athlete_id is not null and (is_assigned_to_athlete_via_team(athlete_id) or has_independent_access_to_athlete(athlete_id)))
+      or (team_id is not null and is_assigned_to_team(team_id))
+    )
+  );
 create policy "linked read official comments" on comments for select
   using (
     comment_type = 'official_comment'

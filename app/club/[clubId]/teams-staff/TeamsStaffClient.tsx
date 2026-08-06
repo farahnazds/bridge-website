@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { TEAM_CATEGORIES, OTHER_TEAM_CATEGORY, SPECIALTIES, OTHER_SPECIALTY } from "@/lib/constants";
@@ -390,6 +391,7 @@ export default function TeamsStaffClient({
                   <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>
                     Category
                   </th>
+                  <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }} />
                 </tr>
               </thead>
               <tbody>
@@ -400,6 +402,15 @@ export default function TeamsStaffClient({
                     </td>
                     <td className="px-5 py-3" style={{ color: "var(--text)" }}>
                       {t.category ? CATEGORY_LABEL[t.category] ?? t.category : "—"}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <Link
+                        href={`/staff/${t.id}/comments`}
+                        className="text-xs font-medium underline-offset-2 hover:underline"
+                        style={{ color: "var(--brand-blue)" }}
+                      >
+                        Comments →
+                      </Link>
                     </td>
                   </tr>
                 ))}

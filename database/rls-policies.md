@@ -227,6 +227,39 @@ this view instead of `injuries` directly, so the restriction holds even
 if a future edit to that page forgets the original convention.
 
 See `database/migrations/006_injuries_athlete_view.sql`.
+
+## Added: comments policies + `is_assigned_to_team()` fallback (2026-08-06)
+
+Building the Comments feature (`docs/04-user-flows.md` Flow 8) surfaced
+two real gaps in the existing, previously-unused `comments` RLS:
+
+- **`is_assigned_to_team()` had no Club Manager fallback**, unlike its
+  athlete-level sibling `is_assigned_to_athlete_via_team()`. A Club
+  Manager could reach a team's page (see below) but still fail to see
+  that team's official comments if they weren't personally in
+  `staff_team_assignments`. Fixed by adding the same
+  `is_club_manager_for_club()` fallback. This also correctly widens Club
+  Manager visibility on `training_load_plans` and reports' "team
+  practitioners read official reports," which share this helper — not a
+  new capability, just the same pre-existing gap in a shared function.
+- **`"author manages own comment"` was `FOR ALL USING (author_id =
+  current_profile_id())` with no separate `WITH CHECK`.** Per Postgres
+  RLS semantics, that USING clause also governed INSERT — meaning
+  nothing stopped a practitioner from posting an "official comment"
+  about an athlete or team they had zero relationship to. Split into
+  `"author reads/updates/deletes own comment"` (unchanged behavior —
+  always able to manage your own comment, even if your access to that
+  athlete/team has since lapsed) plus a new, properly scoped
+  `"linked staff creates comments"` INSERT policy requiring both
+  authorship and the same linked-access shape used for reads.
+
+Also widened `app/staff/[teamId]/layout.tsx` to admit `club_manager` (in
+addition to `club_practitioner`) for teams in a club they manage — no RLS
+change needed for that specifically, since `"club staff access own club
+teams"` already scoped `teams` reads correctly for any club staff role;
+only the page-level role gate needed updating.
+
+See `database/migrations/007_comments_policies.sql`.
 # Database — Row Level Security Policies (v4, plain English pre-SQL)
 
 - **Super Admin** — full access, everything, no restrictions.
