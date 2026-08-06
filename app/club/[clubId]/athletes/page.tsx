@@ -40,13 +40,22 @@ export default async function ClubAthletesPage({
             Everyone registered to this club.
           </p>
         </div>
-        <Link
-          href={`/club/${clubId}/athletes/new`}
-          className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 ease-out hover:opacity-90"
-          style={{ backgroundImage: "var(--brand-gradient)" }}
-        >
-          + Register Athlete
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/club/${clubId}/athletes/import`}
+            className="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors duration-150"
+            style={{ borderColor: "var(--border)", color: "var(--text)" }}
+          >
+            Import CSV
+          </Link>
+          <Link
+            href={`/club/${clubId}/athletes/new`}
+            className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 ease-out hover:opacity-90"
+            style={{ backgroundImage: "var(--brand-gradient)" }}
+          >
+            + Register Athlete
+          </Link>
+        </div>
       </div>
 
       {error && (
