@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAnthropicClient } from "@/lib/anthropic";
+import { createAnthropicClient, REPORT_MODEL, REPORT_EFFORT } from "@/lib/anthropic";
 import { getCurrentProfile } from "@/lib/auth";
 import { sendReportSharedEmail } from "@/lib/resend";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
@@ -157,10 +157,10 @@ export async function generateComplianceReport(
   try {
     response = await anthropic.messages
       .stream({
-        model: "claude-opus-5",
+        model: REPORT_MODEL,
         max_tokens: 8000,
         thinking: { type: "adaptive" },
-        output_config: { effort: "high" },
+        output_config: { effort: REPORT_EFFORT },
         system: COMPLIANCE_SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],
       })
@@ -390,10 +390,10 @@ export async function generateBodyCompositionReport(
   try {
     response = await anthropic.messages
       .stream({
-        model: "claude-opus-5",
+        model: REPORT_MODEL,
         max_tokens: 8000,
         thinking: { type: "adaptive" },
-        output_config: { effort: "high" },
+        output_config: { effort: REPORT_EFFORT },
         system: BODY_COMPOSITION_SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],
       })
@@ -787,10 +787,10 @@ export async function generateNutritionReport(
   try {
     response = await anthropic.messages
       .stream({
-        model: "claude-opus-5",
+        model: REPORT_MODEL,
         max_tokens: 8000,
         thinking: { type: "adaptive" },
-        output_config: { effort: "high" },
+        output_config: { effort: REPORT_EFFORT },
         system: NUTRITION_SYSTEM_PROMPT,
         messages: [{ role: "user", content: userPrompt }],
       })
