@@ -882,6 +882,18 @@ $$;
 -- was missing and what it fixes (team-level official comments, plus
 -- training_load_plans and reports' "team practitioners read official
 -- reports", which share this helper).
+-- Segment equivalent of is_admin_for_club — admin_club_assignments carries
+-- either a club_id or a segment_id. Added for content segment targeting;
+-- see database/migrations/010_content_scoping.sql.
+create or replace function is_admin_for_segment(p_segment_id uuid) returns boolean
+language sql stable as $$
+  select exists (
+    select 1 from admin_club_assignments aca
+    where aca.admin_profile_id = current_profile_id()
+      and aca.segment_id = p_segment_id
+  ) or is_super_admin()
+$$;
+
 create or replace function is_assigned_to_team(p_team_id uuid) returns boolean
 language sql stable as $$
   select exists (
@@ -1132,6 +1144,10 @@ create policy "club staff reads own club pairing" on club_brand_products for sel
 create policy "super admin full access" on product_requests for all using (is_super_admin());
 create policy "club staff manages own club requests" on product_requests for all
   using (club_id is not null and is_club_staff_for_club(club_id));
+-- See database/migrations/009_admin_product_requests.sql — same family of
+-- gap as migration 008; without this an Admin read returns zero rows.
+create policy "admin scoped access" on product_requests for all
+  using (club_id is not null and is_admin_for_club(club_id));
 create policy "athlete reads own requests" on product_requests for select
   using (is_own_athlete_profile(athlete_id));
 
@@ -1467,11 +1483,96 @@ create policy "report generator notifies recipients" on notifications for insert
 create policy "super admin full access" on leads for all using (is_super_admin());
 create policy "public insert" on leads for insert with check (true);
 
+-- Per-role scoping — see database/migrations/010_content_scoping.sql for the
+-- full rationale. Replaced a blanket "authenticated read targeted content"
+-- policy that let any logged-in account read every row, including
+-- athlete-targeted content. "Manage" policies are ungated so staff can
+-- draft; every consumer-side read requires published_at is not null.
+-- brand_partner / partnerships_consultant / anonymous match no policy here
+-- and are denied by default — deliberately, per
+-- docs/02-roles-and-permissions.md.
 create policy "super admin full access" on content for all using (is_super_admin());
-create policy "admin manages assigned club content" on content for all
-  using (target_club_id is not null and is_admin_for_club(target_club_id));
-create policy "authenticated read targeted content" on content for select
-  using (auth.uid() is not null);
+
+create policy "admin manages assigned content" on content for all
+  using (
+    (target_club_id is not null and is_admin_for_club(target_club_id))
+    or (target_segment_id is not null and is_admin_for_segment(target_segment_id))
+  );
+create policy "admin reads athlete targeted content" on content for select
+  using (
+    target_athlete_id is not null
+    and exists (
+      select 1 from athletes a
+      where a.id = content.target_athlete_id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
+
+create policy "club manager manages own club content" on content for all
+  using (target_club_id is not null and is_club_manager_for_club(target_club_id));
+create policy "club staff reads own club content" on content for select
+  using (
+    published_at is not null
+    and target_club_id is not null
+    and is_club_staff_for_club(target_club_id)
+  );
+create policy "club staff reads athlete targeted content" on content for select
+  using (
+    published_at is not null
+    and target_athlete_id is not null
+    and exists (
+      select 1 from athletes a
+      where a.id = content.target_athlete_id
+        and a.club_id is not null
+        and is_club_staff_for_club(a.club_id)
+    )
+  );
+
+create policy "independent practitioner reads athlete targeted content" on content for select
+  using (
+    published_at is not null
+    and target_athlete_id is not null
+    and has_independent_access_to_athlete(target_athlete_id)
+  );
+
+create policy "athlete reads own targeted content" on content for select
+  using (
+    published_at is not null
+    and target_athlete_id is not null
+    and is_own_athlete_profile(target_athlete_id)
+  );
+create policy "athlete reads own club content" on content for select
+  using (
+    published_at is not null
+    and target_club_id is not null
+    and exists (
+      select 1 from athletes a
+      where a.profile_id = current_profile_id()
+        and a.club_id = content.target_club_id
+    )
+  );
+create policy "athlete reads own segment content" on content for select
+  using (
+    published_at is not null
+    and target_segment_id is not null
+    and exists (
+      select 1 from athletes a
+      where a.profile_id = current_profile_id()
+        and a.segment_id = content.target_segment_id
+    )
+  );
+
+-- Role-listed rather than "any authenticated user" — that explicit list is
+-- what keeps brand_partner and partnerships_consultant out.
+create policy "platform wide content readable by staff and athletes" on content for select
+  using (
+    target_type = 'all'
+    and published_at is not null
+    and current_user_role() in (
+      'admin', 'club_manager', 'club_practitioner', 'independent_practitioner', 'athlete'
+    )
+  );
 
 create policy "super admin full access" on articles for all using (is_super_admin());
 create policy "public read published" on articles for select using (is_published = true);

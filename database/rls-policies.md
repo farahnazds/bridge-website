@@ -316,6 +316,89 @@ enforceable for an Admin. Left out of this migration deliberately — it's a
 Flow 8 concern, not a dashboard one.
 
 See `database/migrations/008_admin_scoped_data_access.sql`.
+
+## Added: Admin access to `product_requests` (2026-08-06)
+
+Last gap of the same family as migration 008, found while building the
+Admin Product Requests page. `product_requests` had policies for
+`super_admin`, club staff (`is_club_staff_for_club`) and the athlete's own
+rows, but never one for `admin` — so an Admin read returned zero rows even
+for their own assigned clubs. Added `"admin scoped access"` (`for all`,
+scoped by `is_admin_for_club(club_id)`), matching the shape of the existing
+club-staff policy on the same table.
+
+See `database/migrations/009_admin_product_requests.sql`.
+
+## Fixed: `content` per-role scoping (2026-08-06)
+
+Resolved the gap documented below. `content` now scopes per role instead of
+granting a blanket read. See
+`database/migrations/010_content_scoping.sql`.
+
+Shape: **manage** policies (`for all`) are ungated on `published_at` so
+staff can draft; **every consumer-side read** requires
+`published_at is not null`, so drafts are no longer visible to anyone who
+can't manage them — the old blanket policy leaked those too.
+
+| Role | `all` | `club` | `segment` | `athlete` |
+|---|---|---|---|---|
+| Super Admin | full | full | full | full |
+| Admin | read | assigned clubs (manage) | assigned segments (manage) | athletes at assigned clubs (read) |
+| Club Manager | read | own club (manage) | — | own club's athletes (read) |
+| Club Practitioner | read | own club (read) | — | own club's athletes (read) |
+| Independent Practitioner | read | — | — | own guided athletes (read) |
+| Athlete | read | own club | own segment | own row only |
+| Brand Partner | — | — | — | — |
+| Partnerships Consultant | — | — | — | — |
+| Anonymous | — | — | — | — |
+
+Three points the docs left open were confirmed explicitly before writing
+the migration rather than guessed:
+
+- **Athletes** read their own `target_athlete_id` rows plus
+  `target_type = 'all'`. The schema field is named *target*, so delivery to
+  that athlete is the natural reading — but no athlete-facing Content page
+  exists yet, so this grants a surface nothing consumes today.
+- **Practitioners** get the read **ceiling** now; `role_permissions` /
+  `role_permission_overrides` narrow it at the app layer, consistent with
+  how every other module in `docs/02-roles-and-permissions.md` works. This
+  reconciles `02` listing Content as a permission module against `03` not
+  giving practitioners a Content page.
+- **Brand Partner / Partnerships Consultant** are denied outright, with no
+  exception for `target_type = 'all'`, matching their "never
+  athlete-identifiable" / "no athlete data whatsoever" boundaries.
+
+Deny-by-default carries those two roles and anonymous callers: no policy
+matches them, and RLS denies when nothing matches. The platform-wide policy
+lists roles explicitly rather than checking `auth.uid() is not null` —
+a blanket auth check there would silently readmit them, which is exactly
+the bug being fixed.
+
+Also added helper `is_admin_for_segment()`, mirroring `is_admin_for_club()`
+— `admin_club_assignments` has always carried `segment_id`, but no policy
+anywhere used it, so segment-targeted content was unreachable for an Admin.
+
+### Original finding (now resolved)
+
+`content` carries `"authenticated read targeted content" for select using
+(auth.uid() is not null)` — **any** logged-in user can read **every** row,
+including content targeted at a different club (`target_club_id`), a
+different segment, or an individual athlete (`target_athlete_id`). RLS
+therefore provides no scoping on this table at all; the application query
+is currently the only boundary.
+
+The Admin Content/Relay page scopes explicitly in the query
+(`target_club_id` in assigned clubs, plus platform-wide `target_type =
+'all'`) precisely because RLS will not do it. Verified live: with the app
+filter removed, an Admin can read another club's targeted content.
+
+Left unfixed deliberately — tightening it is a product decision (what
+should `target_type = 'all'` mean for an athlete? does a practitioner see
+athlete-targeted content?) rather than a mechanical fix, and no
+athlete-facing Content page exists yet to regress. Worth resolving before
+any athlete-targeted content is created for real, since
+`target_athlete_id` rows are individually addressed material readable by
+every authenticated account on the platform.
 # Database — Row Level Security Policies (v4, plain English pre-SQL)
 
 - **Super Admin** — full access, everything, no restrictions.

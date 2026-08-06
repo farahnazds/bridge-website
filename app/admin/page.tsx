@@ -76,6 +76,25 @@ export default async function AdminOverviewPage() {
 
   const clubs = clubsRes.data ?? [];
   const athletes = athletesRes.data ?? [];
+
+  // "check-ins today" per docs/03-site-map.md's Overview line. Only readable
+  // since migration 008 added "admin scoped access" on checkins — before
+  // that this would have rendered a permanent, misleading 0. Scoped by
+  // athlete ids drawn from the assigned clubs above, so it inherits that
+  // scoping rather than re-deriving it. Uses the same UTC-day convention as
+  // every other check-in surface in this app (athlete Home, club Compliance).
+  const athleteIds = athletes.map((a) => a.id);
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: todayCheckins } = athleteIds.length
+    ? await supabase
+        .from("checkins")
+        .select("athlete_id, status")
+        .in("athlete_id", athleteIds)
+        .eq("date", today)
+    : { data: [] };
+  const completedToday = (todayCheckins ?? []).filter((c) => c.status === "completed").length;
+  const skippedToday = (todayCheckins ?? []).filter((c) => c.status === "skipped").length;
+
   const loadError = assignmentError ?? clubsRes.error ?? athletesRes.error;
 
   // "Alerts" per docs/03-site-map.md — surfaced from data an Admin can
@@ -120,9 +139,14 @@ export default async function AdminOverviewPage() {
 
       {!loadError && clubIds.length > 0 && (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard label="Assigned clubs" value={clubs.length} />
             <StatCard label="Athletes" value={athletes.length} hint="Across your clubs" />
+            <StatCard
+              label="Check-ins today"
+              value={`${completedToday} / ${athletes.length}`}
+              hint={skippedToday > 0 ? `Completed · ${skippedToday} skipped` : "Completed"}
+            />
             <StatCard label="Teams" value={(teamsRes.data ?? []).length} />
             <StatCard label="Staff" value={(staffRes.data ?? []).length} />
           </div>
