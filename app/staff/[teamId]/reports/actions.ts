@@ -19,6 +19,14 @@ import {
   type AssessmentRow,
   type EliteBenchmark,
 } from "./bodyCompositionPromptBuilder";
+import {
+  buildNutritionPrompt,
+  NUTRITION_SYSTEM_PROMPT,
+  type NutritionSubMode,
+  type TrainingLoadContext,
+  type PrescriptionContext,
+  type SupplementLibraryEntry,
+} from "./nutritionPromptBuilder";
 
 export interface GenerateReportState {
   error: string | null;
@@ -550,4 +558,279 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
   revalidatePath(`/staff/${teamId}/reports`);
   revalidatePath(`/staff/${teamId}`);
   return { error: null, warning: emailWarning, success: true };
+}
+
+// ---- Nutrition report — the one FORWARD-LOOKING report type ----
+// docs/07-ai-engine.md: two sub-modes, "next day plan" and "general".
+//
+// On the RPE rule: docs/07 and Flow 7 step 3 state RPE is a blocking input
+// for Nutrition reports. Scoped here to next-day mode only, per explicit
+// instruction — "general" is a standing prescription with no single session
+// to fuel, so a day's RPE has nothing to attach to. Worth reconciling in
+// docs/07 if that split should be the documented rule.
+export interface NutritionReportState extends GenerateReportState {
+  // Distinct from `error`: a missing-RPE block is an expected, actionable
+  // outcome the practitioner can fix, not a failure. Kept separate so the
+  // UI can present it as guidance rather than a red error banner.
+  rpeBlock: string | null;
+}
+
+export async function generateNutritionReport(
+  _prevState: NutritionReportState,
+  formData: FormData
+): Promise<NutritionReportState> {
+  const base: NutritionReportState = {
+    error: null,
+    reportText: null,
+    dataCheckNote: null,
+    reportId: null,
+    rpeBlock: null,
+  };
+  const profile = await getCurrentProfile();
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+    return { ...base, error: "You don't have permission to do this." };
+  }
+
+  const teamId = String(formData.get("team_id") ?? "").trim();
+  const athleteId = String(formData.get("athlete_id") ?? "").trim();
+  const subMode = String(formData.get("sub_mode") ?? "general").trim() as NutritionSubMode;
+  const targetDate = String(formData.get("target_date") ?? "").trim();
+  const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
+  const language = String(formData.get("language") ?? "english").trim();
+
+  if (!teamId || !athleteId) return { ...base, error: "Athlete is required." };
+  if (subMode !== "next_day" && subMode !== "general") return { ...base, error: "Invalid report mode." };
+  if (subMode === "next_day" && !targetDate) return { ...base, error: "Target date is required." };
+
+  const supabase = await createClient();
+
+  const { data: athlete, error: athleteError } = await supabase
+    .from("athletes")
+    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference, club_id, segment_id")
+    .eq("id", athleteId)
+    .single();
+  if (athleteError || !athlete) return { ...base, error: "Couldn't load that athlete." };
+
+  // ---- RPE gate (next-day mode only) ----
+  // Checked BEFORE any AI call so a blocked generation costs nothing.
+  let trainingLoad: TrainingLoadContext | null = null;
+  if (subMode === "next_day") {
+    const { data: planRows } = await supabase
+      .from("training_load_plans")
+      .select("date, intensity, rpe, season_phase, athlete_id, team_id")
+      .eq("date", targetDate)
+      .or(`athlete_id.eq.${athleteId},team_id.eq.${teamId}`);
+
+    // An athlete-specific entry beats a team-wide one for the same date —
+    // the more specific plan is the one that governs this athlete.
+    const rows = planRows ?? [];
+    const chosen = rows.find((r) => r.athlete_id === athleteId) ?? rows.find((r) => r.team_id === teamId);
+
+    if (!chosen) {
+      return {
+        ...base,
+        rpeBlock: `No Training Load Plan entry exists for ${targetDate}. Add one with an RPE on the Training Load Plan page, then generate this report.`,
+      };
+    }
+    if (chosen.rpe === null || chosen.rpe === undefined) {
+      return {
+        ...base,
+        rpeBlock: `The Training Load Plan entry for ${targetDate} has no RPE recorded. RPE is required for a next-day nutrition plan — add it on the Training Load Plan page, then generate this report.`,
+      };
+    }
+    trainingLoad = {
+      date: chosen.date as string,
+      intensity: chosen.intensity as string,
+      rpe: chosen.rpe as number,
+      seasonPhase: (chosen.season_phase as string | null) ?? null,
+      scope: chosen.athlete_id === athleteId ? "athlete" : "team",
+    };
+  }
+
+  // ---- Clinical profile ----
+  const [{ data: conditionRows }, { data: allergyRows }, { data: intoleranceRows }] = await Promise.all([
+    supabase.from("athlete_conditions").select("other_note, medical_conditions(label)").eq("athlete_id", athleteId),
+    supabase.from("athlete_allergies").select("other_note, allergies(label)").eq("athlete_id", athleteId),
+    supabase.from("athlete_intolerances").select("other_note, intolerances(label)").eq("athlete_id", athleteId),
+  ]);
+  type CondRow = { other_note: string | null; medical_conditions: { label: string } | null };
+  type AllRow = { other_note: string | null; allergies: { label: string } | null };
+  type IntRow = { other_note: string | null; intolerances: { label: string } | null };
+  const conditions = ((conditionRows ?? []) as unknown as CondRow[]).map((r) => r.other_note || r.medical_conditions?.label || "Other");
+  const allergies = ((allergyRows ?? []) as unknown as AllRow[]).map((r) => r.other_note || r.allergies?.label || "Other");
+  const intolerances = ((intoleranceRows ?? []) as unknown as IntRow[]).map((r) => r.other_note || r.intolerances?.label || "Other");
+
+  const { data: assessmentRow } = await supabase
+    .from("assessments")
+    .select("date, weight_kg, body_fat_pct, lean_mass_kg, bmr, tdee")
+    .eq("athlete_id", athleteId)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // ---- Commercial layer: prescription brand (club takes priority) ----
+  // docs/05-business-rules.md: "the athlete's club brand assignment always
+  // takes priority for report prescriptions" for hybrid athletes.
+  let prescription: PrescriptionContext | null = null;
+  const pairingFilter = athlete.club_id
+    ? { column: "club_id", value: athlete.club_id as string, source: "club" as const }
+    : athlete.segment_id
+      ? { column: "segment_id", value: athlete.segment_id as string, source: "segment" as const }
+      : null;
+
+  if (pairingFilter) {
+    const { data: pairing } = await supabase
+      .from("club_brand_products")
+      .select("brand_id, discount_percent, brands(name)")
+      .eq(pairingFilter.column, pairingFilter.value)
+      .eq("is_prescription_brand", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (pairing) {
+      const brand = pairing.brands as unknown as { name: string } | null;
+      const { data: products } = await supabase
+        .from("products")
+        .select("name, category, description, base_price, currency")
+        .eq("brand_id", pairing.brand_id as string);
+      prescription = {
+        brandName: brand?.name ?? "Assigned brand",
+        source: pairingFilter.source,
+        discountPercent: Number(pairing.discount_percent ?? 0),
+        products: (products ?? []).map((p) => ({
+          name: p.name as string,
+          category: (p.category as string | null) ?? null,
+          description: (p.description as string | null) ?? null,
+          basePrice: p.base_price === null ? null : Number(p.base_price),
+          currency: (p.currency as string) ?? "AED",
+        })),
+      };
+    }
+  }
+
+  const { data: supplementRows } = await supabase
+    .from("supplement_library")
+    .select("name, category, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, cultural_notes");
+  const supplementLibrary: SupplementLibraryEntry[] = (supplementRows ?? []).map((s) => ({
+    name: s.name as string,
+    category: s.category as string,
+    evidenceGrade: (s.evidence_grade as string | null) ?? null,
+    ageMin: (s.age_min as number | null) ?? null,
+    ageMax: (s.age_max as number | null) ?? null,
+    contraindicatedConditions: (s.contraindicated_conditions as string[] | null) ?? [],
+    dietCompatibility: (s.diet_compatibility as string[] | null) ?? [],
+    culturalNotes: (s.cultural_notes as string | null) ?? null,
+  }));
+
+  const { data: libraryData } = await supabase
+    .from("clinical_research_library")
+    .select("title, year, source, clinical_note")
+    .eq("topic_tag", "nutrition");
+
+  const { data: previousReport } = await supabase
+    .from("reports")
+    .select("ai_summary")
+    .contains("athlete_ids", [athleteId])
+    .contains("report_types", ["nutrition"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // Nutrition is forward-looking (docs/07: "Future dates only"), so the
+  // period runs from the target date rather than backwards from today.
+  const periodStart = subMode === "next_day" ? targetDate : new Date().toISOString().slice(0, 10);
+  const periodEnd =
+    subMode === "next_day"
+      ? targetDate
+      : new Date(Date.now() + 27 * 864e5).toISOString().slice(0, 10);
+
+  const dataCheckNote = [
+    assessmentRow ? `Latest assessment: ${assessmentRow.date}.` : "No assessment on record — targets will be described without body-composition figures.",
+    trainingLoad ? `Training load for ${trainingLoad.date}: ${trainingLoad.intensity}, RPE ${trainingLoad.rpe}.` : null,
+    prescription
+      ? `Prescription brand: ${prescription.brandName} (${prescription.products.length} product${prescription.products.length === 1 ? "" : "s"}).`
+      : "No prescription brand assigned — clinical recommendations will appear without product names.",
+    supplementLibrary.length === 0 ? "Supplement library is empty." : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const userPrompt = buildNutritionPrompt({
+    subMode,
+    athlete,
+    conditions,
+    allergies,
+    intolerances,
+    latestAssessment: assessmentRow
+      ? {
+          date: assessmentRow.date as string,
+          weight_kg: assessmentRow.weight_kg as number | null,
+          body_fat_pct: assessmentRow.body_fat_pct as number | null,
+          lean_mass_kg: assessmentRow.lean_mass_kg as number | null,
+          bmr: assessmentRow.bmr as number | null,
+          tdee: assessmentRow.tdee as number | null,
+        }
+      : null,
+    trainingLoad,
+    prescription,
+    supplementLibrary,
+    clinicalLibraryEntries: libraryData ?? [],
+    previousReportSummary: previousReport?.ai_summary ?? null,
+    periodStart,
+    periodEnd,
+    additionalInstructions,
+    language,
+  });
+
+  const anthropic = createAnthropicClient();
+  let response;
+  try {
+    response = await anthropic.messages
+      .stream({
+        model: "claude-opus-5",
+        max_tokens: 8000,
+        thinking: { type: "adaptive" },
+        output_config: { effort: "high" },
+        system: NUTRITION_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userPrompt }],
+      })
+      .finalMessage();
+  } catch (err) {
+    return {
+      ...base,
+      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      dataCheckNote,
+    };
+  }
+
+  if (response.stop_reason === "refusal") {
+    return { ...base, error: "The AI declined to generate this report.", dataCheckNote };
+  }
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
+  if (!reportText) return { ...base, error: "The AI returned an empty response. Try again.", dataCheckNote };
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("reports")
+    .insert({
+      generated_by: profile.id,
+      report_types: ["nutrition"],
+      audience: "practitioner",
+      team_id: teamId,
+      athlete_ids: [athleteId],
+      report_period_start: periodStart,
+      report_period_end: periodEnd,
+      language,
+      additional_instructions: additionalInstructions,
+      ai_summary: reportText,
+    })
+    .select("id")
+    .single();
+  if (insertError || !inserted) {
+    return { ...base, error: `Report generated, but saving it failed: ${insertError?.message}`, reportText, dataCheckNote };
+  }
+
+  revalidatePath(`/staff/${teamId}/reports`);
+  return { error: null, reportText, dataCheckNote, reportId: inserted.id, rpeBlock: null };
 }

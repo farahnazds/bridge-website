@@ -84,6 +84,7 @@ export const OTHER_SPECIALTY = "__other__";
 export const REPORT_TYPE_LABELS: Record<string, string> = {
   compliance: "Compliance",
   body_composition: "Body Composition",
+  nutrition: "Nutrition",
 };
 
 // `vald_data.test_type` is free text (schema.sql comments it "e.g. cmj,

@@ -4,7 +4,7 @@
 
 | Type | Audience options | Report Period | Notes |
 |---|---|---|---|
-| Nutrition | Athlete / Practitioner | **Future** dates only | Two sub-modes: "next day plan" and "general" (prescription + focus areas). RPE required as input. |
+| Nutrition | Athlete / Practitioner | **Future** dates only | Two sub-modes: "next day plan" and "general" (prescription + focus areas). RPE required for "next day plan" only — see below. |
 | Injury | Athlete / Practitioner | Past (last week/month/quarter/year) | |
 | Body Composition | Athlete / Practitioner | Past | |
 | Performance | Athlete / Practitioner | Past | Covers GPS and/or neuromuscular (VALD) |
@@ -97,13 +97,40 @@ athlete's assigned brand(s) fulfills that category — club assignment
 takes priority for hybrid athletes. If nothing fits, the clinical
 recommendation stays in the report without a product link.
 
-## RPE requirement — Nutrition reports only
+## RPE requirement — Nutrition "next day plan" sub-mode only
 
 RPE is optional at day-to-day data-entry time everywhere. It becomes a
-**required, blocking input specifically when generating a Nutrition
-report** (the one forward-looking report type) — generation is blocked
-with a prompt to enter it first if missing for the selected future
-period.
+**required, blocking input when generating a Nutrition report in "next
+day plan" mode** — generation is blocked with a prompt to enter it first
+if the Training Load Plan entry for the target date is missing or has no
+RPE.
+
+**"General" mode does not require RPE.** A general Nutrition report is a
+standing prescription plus focus areas — there is no single session for
+an RPE value to attach to, so requiring one would block a report that
+never needed it. RPE earns its blocking status precisely because
+"next day plan" fuels one specific session: the intensity and RPE of that
+session are what change the pre/during/post guidance, so generating
+without them would produce a plan that looks specific but isn't.
+
+Two distinct block cases, with different messages — both pointing the
+practitioner at the Training Load Plan page:
+
+1. **No Training Load Plan entry exists** for the target date.
+2. **An entry exists but its RPE is null.**
+
+Where both a team-wide and an athlete-specific entry exist for the same
+date, the athlete-specific one governs — the more specific plan is the
+one that applies to that athlete.
+
+The check runs **before any AI call**, so a blocked generation costs
+nothing. It is also surfaced as actionable guidance rather than an error:
+a missing RPE is something the practitioner can go and fix, not a
+failure of the report.
+
+*(Narrowed from "all Nutrition reports" during the Nutrition build — the
+original wording predated the two sub-modes being implemented. See also
+`docs/04-user-flows.md` Flow 7 step 3, which carries the older phrasing.)*
 
 ## Pre-generation "Data Check"
 
