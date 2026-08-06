@@ -85,3 +85,18 @@ export const REPORT_TYPE_LABELS: Record<string, string> = {
   compliance: "Compliance",
   body_composition: "Body Composition",
 };
+
+// Matches `injuries.status` / `injuries.rtp_phase` check constraints in
+// database/schema.sql — fixed enums, not an open list like sport/specialty,
+// so no "Other" escape hatch.
+export const INJURY_STATUSES = [
+  { value: "active", label: "Active" },
+  { value: "recovering", label: "Recovering" },
+  { value: "cleared", label: "Cleared" },
+];
+export const RTP_PHASES = [
+  { value: "acute", label: "Acute" },
+  { value: "sub_acute", label: "Sub-acute" },
+  { value: "return_to_training", label: "Return to Training" },
+  { value: "returned", label: "Returned" },
+];

@@ -12,6 +12,18 @@ const STATUS_STYLE: Record<string, { label: string; color: string }> = {
 };
 const NOT_LOGGED = { label: "Not yet logged", color: "var(--text-muted)" };
 
+const INJURY_STATUS_STYLE: Record<string, { label: string; color: string }> = {
+  active: { label: "Active", color: "var(--danger)" },
+  recovering: { label: "Recovering", color: "var(--brand-blue)" },
+  cleared: { label: "Cleared", color: "var(--success)" },
+};
+const RTP_PHASE_LABEL: Record<string, string> = {
+  acute: "Acute",
+  sub_acute: "Sub-acute",
+  return_to_training: "Return to Training",
+  returned: "Returned",
+};
+
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -90,6 +102,17 @@ export default async function AthleteHomePage({
         .maybeSingle()
     : { data: null };
 
+  // injuries_athlete_view exposes only athlete_id/status/rtp_phase (one row
+  // per athlete, their most recent) — the column restriction is enforced
+  // structurally by the view itself (security_invoker=true, so the
+  // underlying injuries RLS still applies), not by this query remembering
+  // to select only two columns. See database/migrations/006_injuries_athlete_view.sql.
+  const { data: latestInjury } = await supabase
+    .from("injuries_athlete_view")
+    .select("status, rtp_phase")
+    .eq("athlete_id", athleteId)
+    .maybeSingle();
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -155,6 +178,35 @@ export default async function AthleteHomePage({
           })}
         </div>
       </div>
+
+      {latestInjury && (
+        <div
+          className="rounded-xl border p-5"
+          style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
+        >
+          <p className="mb-2 text-sm" style={{ color: "var(--text-muted)" }}>
+            Injury status
+          </p>
+          <p
+            className="inline-flex items-center gap-1.5 text-lg font-semibold"
+            style={{
+              fontFamily: "var(--font-heading)",
+              color: INJURY_STATUS_STYLE[latestInjury.status]?.color ?? "var(--text)",
+            }}
+          >
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: INJURY_STATUS_STYLE[latestInjury.status]?.color ?? "var(--text-muted)" }}
+            />
+            {INJURY_STATUS_STYLE[latestInjury.status]?.label ?? latestInjury.status}
+          </p>
+          {latestInjury.rtp_phase && (
+            <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+              Return-to-play phase: {RTP_PHASE_LABEL[latestInjury.rtp_phase] ?? latestInjury.rtp_phase}
+            </p>
+          )}
+        </div>
+      )}
 
       <div
         className="rounded-xl border p-5"

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 const NAV_SECTIONS: { label: string; slug: string }[] = [
   { label: "Roster", slug: "" },
   { label: "Assessments", slug: "assessments" },
+  { label: "Injury Log / RTP", slug: "injuries" },
   { label: "Training Load Plan", slug: "training-load" },
   { label: "Reports", slug: "reports" },
   { label: "Messenger", slug: "messenger" },

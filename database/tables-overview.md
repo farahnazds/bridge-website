@@ -17,7 +17,7 @@ schema.sql matches this.
 | `athletes` | Every athlete — club, guided, or independent. `club_id` nullable. `account_type` derived live from the 3-fact model (see `02-roles-and-permissions.md`), not a stored fixed label. Includes diet preference, conditions/allergies/intolerances (arrays referencing the reference lists), ethnicity, tier, sport, position. |
 | `athlete_relationship_history` | Full timeline: which club/team/practitioner an athlete was under, joined/left dates, reason. Never deleted. |
 | `data_entries` (or per-domain tables: `assessments`, `gps_logs`, `body_composition`, `vald_data`, `injuries`) | Each row carries `validity_tier` (club_verified / practitioner_verified / self_reported), `provider_id`, `created_at`, and edit-window-aware `updated_by`/`updated_at`. Provenance is never overwritten by edits. |
-| `injuries` | Includes RTP phase (acute / sub_acute / return_to_training), target return date. |
+| `injuries` | Includes RTP phase (acute / sub_acute / return_to_training), target return date. Athlete-facing reads go through `injuries_athlete_view` (athlete_id/status/rtp_phase only, one row per athlete) — never the raw table — so `description`/`type` stay structurally hidden from athletes, not just by convention. |
 | `competitions` | Club's upcoming fixtures/events — date, opponent, location, home/away — feeds report context. |
 | `training_load_plans` | Forward-looking intensity/RPE-by-day, team-wide or per-athlete, season/phase (Periodization) settings. Separate concept from `checkins` and from the report-generation Report Period. |
 | `checkins` | Daily compliance. Always available regardless of subscription. Logged by athlete or (for club athletes only) by a club practitioner. |

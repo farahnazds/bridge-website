@@ -195,6 +195,38 @@ where `related_id` points at a `reports` row the caller generated — not
 a general "notify anyone" ability.
 
 See `database/migrations/005_report_share_notification_policy.sql`.
+
+## Added: `injuries_athlete_view` — structural column restriction (2026-08-06)
+
+`"athlete reads own status only"` on `injuries` grants row access
+(`is_own_athlete_profile(athlete_id)`), but the athlete-facing column
+restriction — status/rtp_phase only, never `description`/`type`/dates —
+was previously left to the application layer always remembering to
+select only those two columns. Live-verified the gap was real: an
+athlete's own session explicitly requesting the full row got it back
+untouched, since Postgres RLS is row-level, not column-level.
+
+Closed it the same way `clinical_research_library` stays fully hidden
+from every non-Super-Admin role — by making the restriction structural
+rather than conventional. Different mechanism (a narrow view here,
+service-role-only there), same principle: don't rely on every future
+query remembering the rule.
+
+`injuries_athlete_view` exposes exactly `athlete_id`, `status`,
+`rtp_phase` — one row per athlete (their most recent injury, via
+`distinct on (athlete_id) ... order by date desc`). Created with
+`security_invoker = true` (Postgres 15+), which is the load-bearing
+detail: without it, a view runs with its *creator's* privileges against
+the underlying table, which can silently bypass the querying role's RLS
+entirely — a well-documented Postgres/Supabase footgun. With it set, the
+view is transparent — `injuries`' existing RLS (including the policy
+above) applies exactly as if the caller queried the table directly.
+
+The athlete Home page (`app/athlete/[athleteId]/page.tsx`) now queries
+this view instead of `injuries` directly, so the restriction holds even
+if a future edit to that page forgets the original convention.
+
+See `database/migrations/006_injuries_athlete_view.sql`.
 # Database — Row Level Security Policies (v4, plain English pre-SQL)
 
 - **Super Admin** — full access, everything, no restrictions.

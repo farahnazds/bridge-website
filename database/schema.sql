@@ -1230,7 +1230,25 @@ create policy "independent practitioner insert" on injuries for insert with chec
 create policy "athlete reads own status only" on injuries for select
   using (is_own_athlete_profile(athlete_id));
 comment on policy "athlete reads own status only" on injuries is
-  'Application layer must strip description/clinical detail from the athlete-facing view — expose status/rtp_phase only. RLS grants row access; column filtering happens in the query layer.';
+  'Row access only — column-level restriction (status/rtp_phase, never description/type) is enforced structurally by injuries_athlete_view below, not left to application-layer discipline.';
+
+-- injuries_athlete_view: structural (not conventional) enforcement of the
+-- athlete-facing column restriction — see
+-- database/migrations/006_injuries_athlete_view.sql for the full rationale,
+-- including why security_invoker=true is essential here.
+create view injuries_athlete_view
+with (security_invoker = true) as
+select distinct on (athlete_id)
+  athlete_id,
+  status,
+  rtp_phase
+from injuries
+order by athlete_id, date desc, created_at desc;
+
+comment on view injuries_athlete_view is
+  'Athlete-facing simplified injury status — athlete_id, status, rtp_phase only, one row per athlete (their most recent). Never add description, type, or date columns to this view.';
+
+grant select on injuries_athlete_view to authenticated;
 
 -- ---- competitions ----
 create policy "super admin full access" on competitions for all using (is_super_admin());
