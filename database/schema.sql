@@ -1344,10 +1344,19 @@ create policy "club staff access own club" on competitions for all
 
 -- ---- training_load_plans ----
 create policy "super admin full access" on training_load_plans for all using (is_super_admin());
+-- WITH CHECK is strict where USING is permissive — see
+-- database/migrations/011_fix_or_branch_scope_bypass.sql. OR-ing the two
+-- scope branches let a caller satisfy one and attach the other to a club
+-- they do not own; every scope column that IS set must now be owned.
 create policy "club staff access" on training_load_plans for all
   using (
     (team_id is not null and is_assigned_to_team(team_id))
     or (athlete_id is not null and is_assigned_to_athlete_via_team(athlete_id))
+  )
+  with check (
+    (team_id is not null or athlete_id is not null)
+    and (team_id is null or is_assigned_to_team(team_id))
+    and (athlete_id is null or is_assigned_to_athlete_via_team(athlete_id))
   );
 
 -- ---- checkins ----
@@ -1386,13 +1395,20 @@ create policy "author updates own comment" on comments for update
   using (author_id = current_profile_id());
 create policy "author deletes own comment" on comments for delete
   using (author_id = current_profile_id());
+-- Strict AND across both scope columns, not OR across two branches — see
+-- database/migrations/011_fix_or_branch_scope_bypass.sql. The OR shape let
+-- an author satisfy the team branch with their own team while attaching
+-- athlete_id from another club entirely.
 create policy "linked staff creates comments" on comments for insert
   with check (
     author_id = current_profile_id()
+    and (athlete_id is not null or team_id is not null)
     and (
-      (athlete_id is not null and (is_assigned_to_athlete_via_team(athlete_id) or has_independent_access_to_athlete(athlete_id)))
-      or (team_id is not null and is_assigned_to_team(team_id))
+      athlete_id is null
+      or is_assigned_to_athlete_via_team(athlete_id)
+      or has_independent_access_to_athlete(athlete_id)
     )
+    and (team_id is null or is_assigned_to_team(team_id))
   );
 create policy "linked read official comments" on comments for select
   using (
@@ -1402,12 +1418,27 @@ create policy "linked read official comments" on comments for select
       or (team_id is not null and is_assigned_to_team(team_id))
     )
   );
+-- USING stays permissive (same rows remain targetable); the strict WITH
+-- CHECK stops an update re-pointing a comment's scope at a club the caller
+-- doesn't manage. See database/migrations/011_fix_or_branch_scope_bypass.sql.
 create policy "club manager toggles ai reflection" on comments for update
   using (
     comment_type = 'official_comment'
     and (
       (athlete_id is not null and exists (select 1 from athletes a where a.id = athlete_id and is_club_manager_for_club(a.club_id)))
       or (team_id is not null and exists (select 1 from teams t where t.id = team_id and is_club_manager_for_club(t.club_id)))
+    )
+  )
+  with check (
+    comment_type = 'official_comment'
+    and (athlete_id is not null or team_id is not null)
+    and (
+      athlete_id is null
+      or exists (select 1 from athletes a where a.id = athlete_id and is_club_manager_for_club(a.club_id))
+    )
+    and (
+      team_id is null
+      or exists (select 1 from teams t where t.id = team_id and is_club_manager_for_club(t.club_id))
     )
   );
 

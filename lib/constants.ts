@@ -86,6 +86,28 @@ export const REPORT_TYPE_LABELS: Record<string, string> = {
   body_composition: "Body Composition",
 };
 
+// Matches the `training_load_plans.intensity` check constraint in
+// database/schema.sql — a fixed DB enum, so no "Other" escape hatch.
+export const INTENSITIES = [
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+  { value: "rest", label: "Rest" },
+];
+
+// `training_load_plans.season_phase` is free text, and schema.sql's own
+// comment ends with "etc." — so this is an open list with an "Other"
+// escape hatch, same pattern as SPORTS / SPECIALTIES / TEAM_CATEGORIES.
+// Ramadan is included per docs/07-ai-engine.md's cultural/seasonal context.
+export const SEASON_PHASES = [
+  { value: "preseason", label: "Preseason" },
+  { value: "inseason", label: "In-season" },
+  { value: "competition", label: "Competition" },
+  { value: "offseason", label: "Off-season" },
+  { value: "ramadan", label: "Ramadan" },
+];
+export const OTHER_SEASON_PHASE = "__other__";
+
 // Matches `injuries.status` / `injuries.rtp_phase` check constraints in
 // database/schema.sql — fixed enums, not an open list like sport/specialty,
 // so no "Other" escape hatch.

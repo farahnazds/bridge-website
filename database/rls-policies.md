@@ -329,6 +329,56 @@ club-staff policy on the same table.
 
 See `database/migrations/009_admin_product_requests.sql`.
 
+## SECURITY FIX: OR-branch scope bypass (2026-08-06)
+
+Found by live-verifying the Training Load Plan build, then reproduced on
+`comments` with the same probe.
+
+`training_load_plans` and `comments` each have **two nullable scope
+columns** (`team_id`, `athlete_id`) and a check constraint requiring only
+that *at least one* is set — so a row may legitimately set **both**. Their
+policies tested those columns with `OR`:
+
+```
+(team_id is not null and is_assigned_to_team(team_id))
+or (athlete_id is not null and is_assigned_to_athlete_via_team(athlete_id))
+```
+
+Satisfying one branch short-circuits the whole expression. A caller could
+set `team_id` to a team they genuinely own and `athlete_id` to an athlete
+in a **different club** — the athlete reference was never checked. Both
+policies were `FOR ALL` / `INSERT` with no separate `WITH CHECK`, so
+`USING` governed inserts too, making this a **write** path.
+
+Proven live as a real Club A practitioner — both accepted:
+
+| Table | Attempted insert | Before |
+|---|---|---|
+| `training_load_plans` | `{team_id: TeamA, athlete_id: ClubB athlete}` | accepted |
+| `comments` | `{team_id: TeamA, athlete_id: ClubB athlete}` | accepted |
+
+The injected row is then visible to the *other* club's staff via their own
+athlete branch — cross-club data injection, not merely over-permissive
+reads.
+
+Fix is deliberately narrow: **`USING` unchanged, `WITH CHECK` strict.**
+Strict = "every scope column that *is* set must be one you own",
+`AND`-ed across both columns rather than `OR`-ing branches. Leaving
+`USING` permissive avoids regressing a legitimate both-set row (someone
+with access to either context should still read it) — and that stays safe
+precisely because writes can no longer attach an unowned scope.
+
+Note `"linked staff creates comments"` was introduced by migration 007 with
+this shape; migration 011 supersedes it.
+
+**Related, not changed:** `"admin reads reports at assigned clubs"`
+(migration 008) has the same OR shape across `team_id` / `athlete_ids`.
+Left as-is: it is SELECT-only and Admin has no insert policy on `reports`,
+so there is no path to create a mismatched row. Worth revisiting if
+`reports` ever gains an Admin write policy.
+
+See `database/migrations/011_fix_or_branch_scope_bypass.sql`.
+
 ## Fixed: `content` per-role scoping (2026-08-06)
 
 Resolved the gap documented below. `content` now scopes per role instead of
