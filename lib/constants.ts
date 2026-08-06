@@ -79,12 +79,13 @@ export const SPECIALTIES: { value: string; label: string; department: "medical" 
 export const OTHER_SPECIALTY = "__other__";
 
 // Matches the values ever written into `reports.report_types` by this
-// build (docs/07-ai-engine.md lists the full set; only these two are
-// actually generated so far — Nutrition/Injury/Performance are deferred).
+// build. docs/07-ai-engine.md lists five types; four are implemented —
+// Injury is the only one still unbuilt.
 export const REPORT_TYPE_LABELS: Record<string, string> = {
   compliance: "Compliance",
   body_composition: "Body Composition",
   nutrition: "Nutrition",
+  performance: "Performance",
 };
 
 // `vald_data.test_type` is free text (schema.sql comments it "e.g. cmj,

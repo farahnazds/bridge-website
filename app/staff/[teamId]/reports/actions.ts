@@ -6,6 +6,7 @@ import { createAnthropicClient, REPORT_MODEL, REPORT_EFFORT } from "@/lib/anthro
 import { getCurrentProfile } from "@/lib/auth";
 import { sendReportSharedEmail } from "@/lib/resend";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
+import { assertReportSafe } from "@/lib/reportSafetyCheck";
 import {
   buildCompliancePrompt,
   COMPLIANCE_SYSTEM_PROMPT,
@@ -27,6 +28,12 @@ import {
   type PrescriptionContext,
   type SupplementLibraryEntry,
 } from "./nutritionPromptBuilder";
+import {
+  buildPerformancePrompt,
+  PERFORMANCE_SYSTEM_PROMPT,
+  type GpsRow,
+  type ValdRow,
+} from "./performancePromptBuilder";
 
 export interface GenerateReportState {
   error: string | null;
@@ -189,6 +196,14 @@ export async function generateComplianceReport(
     return { error: "The AI returned an empty response. Try again.", reportText: null, dataCheckNote, reportId: null };
   }
 
+
+  // ---- Automatic pre-save safety assertion ----
+  // Runs before the insert so an unsafe report never reaches the database
+  // and therefore can never be listed or shared. Model-agnostic by design.
+  const safety = await assertReportSafe(athleteId, reportText);
+  if (!safety.ok) {
+    return { error: safety.message, reportText, dataCheckNote, reportId: null };
+  }
   // ---- Store (reports table) ----
   // audience stays "practitioner" — sharing (shared_with/is_official) is a
   // separate concept from audience, which only governs how combined
@@ -422,6 +437,14 @@ export async function generateBodyCompositionReport(
     return { error: "The AI returned an empty response. Try again.", reportText: null, dataCheckNote, reportId: null };
   }
 
+
+  // ---- Automatic pre-save safety assertion ----
+  // Runs before the insert so an unsafe report never reaches the database
+  // and therefore can never be listed or shared. Model-agnostic by design.
+  const safety = await assertReportSafe(athleteId, reportText);
+  if (!safety.ok) {
+    return { error: safety.message, reportText, dataCheckNote, reportId: null };
+  }
   // ---- Store (reports table) ---- (see generateComplianceReport for why
   // .select().single() is safe here despite the RETURNING/SELECT-policy
   // gotcha documented elsewhere in this codebase)
@@ -811,6 +834,14 @@ export async function generateNutritionReport(
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   if (!reportText) return { ...base, error: "The AI returned an empty response. Try again.", dataCheckNote };
 
+
+  // ---- Automatic pre-save safety assertion ----
+  // Runs before the insert so an unsafe report never reaches the database
+  // and therefore can never be listed or shared. Model-agnostic by design.
+  const safety = await assertReportSafe(athleteId, reportText);
+  if (!safety.ok) {
+    return { ...base, error: safety.message, reportText, dataCheckNote };
+  }
   const { data: inserted, error: insertError } = await supabase
     .from("reports")
     .insert({
@@ -833,4 +864,173 @@ export async function generateNutritionReport(
 
   revalidatePath(`/staff/${teamId}/reports`);
   return { error: null, reportText, dataCheckNote, reportId: inserted.id, rpeBlock: null };
+}
+
+// ---- Performance report — GPS and/or VALD, past dates only ----
+// docs/07-ai-engine.md: "Performance | Athlete / Practitioner | Past |
+// Covers GPS and/or neuromuscular (VALD)". The "and/or" is load-bearing:
+// a club may run one system and not the other, so a report with only one
+// source present is a normal outcome, not a degraded one.
+export async function generatePerformanceReport(
+  _prevState: GenerateReportState,
+  formData: FormData
+): Promise<GenerateReportState> {
+  const base = { reportText: null, dataCheckNote: null, reportId: null };
+  const profile = await getCurrentProfile();
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+    return { ...base, error: "You don't have permission to do this." };
+  }
+
+  const teamId = String(formData.get("team_id") ?? "").trim();
+  const athleteId = String(formData.get("athlete_id") ?? "").trim();
+  const periodStart = String(formData.get("period_start") ?? "").trim();
+  const periodEnd = String(formData.get("period_end") ?? "").trim();
+  const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
+  const language = String(formData.get("language") ?? "english").trim();
+
+  if (!teamId || !athleteId || !periodStart || !periodEnd) {
+    return { ...base, error: "Athlete and report period are required." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: athlete, error: athleteError } = await supabase
+    .from("athletes")
+    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference")
+    .eq("id", athleteId)
+    .single();
+  if (athleteError || !athlete) return { ...base, error: "Couldn't load that athlete." };
+
+  const [{ data: conditionRows }, { data: allergyRows }, { data: intoleranceRows }] = await Promise.all([
+    supabase.from("athlete_conditions").select("other_note, medical_conditions(label)").eq("athlete_id", athleteId),
+    supabase.from("athlete_allergies").select("other_note, allergies(label)").eq("athlete_id", athleteId),
+    supabase.from("athlete_intolerances").select("other_note, intolerances(label)").eq("athlete_id", athleteId),
+  ]);
+  type CondRow = { other_note: string | null; medical_conditions: { label: string } | null };
+  type AllRow = { other_note: string | null; allergies: { label: string } | null };
+  type IntRow = { other_note: string | null; intolerances: { label: string } | null };
+  const conditions = ((conditionRows ?? []) as unknown as CondRow[]).map((r) => r.other_note || r.medical_conditions?.label || "Other");
+  const allergies = ((allergyRows ?? []) as unknown as AllRow[]).map((r) => r.other_note || r.allergies?.label || "Other");
+  const intolerances = ((intoleranceRows ?? []) as unknown as IntRow[]).map((r) => r.other_note || r.intolerances?.label || "Other");
+
+  // Both sources fetched independently — neither is required, and an empty
+  // result from one is a supported state rather than a reason to bail.
+  const [{ data: gpsData }, { data: valdData }] = await Promise.all([
+    supabase
+      .from("gps_logs")
+      .select(
+        "date, total_distance_m, meters_per_min, high_speed_distance_m, sprint_distance_m, accel_count, decel_count, explosive_efforts, sprint_count, max_velocity, player_load, session_duration_min"
+      )
+      .eq("athlete_id", athleteId)
+      .gte("date", periodStart)
+      .lte("date", periodEnd)
+      .order("date", { ascending: true }),
+    supabase
+      .from("vald_data")
+      .select("date, test_type, asymmetry_pct, metric_json")
+      .eq("athlete_id", athleteId)
+      .gte("date", periodStart)
+      .lte("date", periodEnd)
+      .order("date", { ascending: true }),
+  ]);
+  const gpsRows = (gpsData ?? []) as GpsRow[];
+  const valdRows = (valdData ?? []) as ValdRow[];
+
+  const { data: previousReport } = await supabase
+    .from("reports")
+    .select("ai_summary")
+    .contains("athlete_ids", [athleteId])
+    .contains("report_types", ["performance"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: libraryData } = await supabase
+    .from("clinical_research_library")
+    .select("title, year, source, clinical_note")
+    .eq("topic_tag", "performance");
+
+  // Stated in the same plain register the report itself must use — a
+  // missing source is a fact about coverage, not a warning.
+  const dataCheckNote =
+    gpsRows.length > 0 && valdRows.length > 0
+      ? `${gpsRows.length} GPS session${gpsRows.length === 1 ? "" : "s"} and ${valdRows.length} VALD test${valdRows.length === 1 ? "" : "s"} found between ${periodStart} and ${periodEnd}.`
+      : gpsRows.length > 0
+        ? `${gpsRows.length} GPS session${gpsRows.length === 1 ? "" : "s"} found. No VALD tests logged for this period — the report will cover external load only and note the gap.`
+        : valdRows.length > 0
+          ? `${valdRows.length} VALD test${valdRows.length === 1 ? "" : "s"} found. No GPS sessions logged for this period — the report will cover neuromuscular data only and note the gap.`
+          : `No GPS or VALD data found for ${periodStart} to ${periodEnd} — the report will note both gaps rather than treating them as errors.`;
+
+  const userPrompt = buildPerformancePrompt({
+    athlete,
+    conditions,
+    allergies,
+    intolerances,
+    gpsRows,
+    valdRows,
+    periodStart,
+    periodEnd,
+    clinicalLibraryEntries: libraryData ?? [],
+    previousReportSummary: previousReport?.ai_summary ?? null,
+    additionalInstructions,
+    language,
+  });
+
+  const anthropic = createAnthropicClient();
+  let response;
+  try {
+    response = await anthropic.messages
+      .stream({
+        model: REPORT_MODEL,
+        max_tokens: 8000,
+        thinking: { type: "adaptive" },
+        output_config: { effort: REPORT_EFFORT },
+        system: PERFORMANCE_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userPrompt }],
+      })
+      .finalMessage();
+  } catch (err) {
+    return {
+      ...base,
+      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      dataCheckNote,
+    };
+  }
+
+  if (response.stop_reason === "refusal") {
+    return { ...base, error: "The AI declined to generate this report.", dataCheckNote };
+  }
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
+  if (!reportText) return { ...base, error: "The AI returned an empty response. Try again.", dataCheckNote };
+
+  // ---- Automatic pre-save safety assertion ----
+  const safety = await assertReportSafe(athleteId, reportText);
+  if (!safety.ok) {
+    return { error: safety.message, reportText, dataCheckNote, reportId: null };
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("reports")
+    .insert({
+      generated_by: profile.id,
+      report_types: ["performance"],
+      audience: "practitioner",
+      team_id: teamId,
+      athlete_ids: [athleteId],
+      report_period_start: periodStart,
+      report_period_end: periodEnd,
+      language,
+      additional_instructions: additionalInstructions,
+      ai_summary: reportText,
+    })
+    .select("id")
+    .single();
+  if (insertError || !inserted) {
+    return { ...base, error: `Report generated, but saving it failed: ${insertError?.message}`, reportText, dataCheckNote };
+  }
+
+  revalidatePath(`/staff/${teamId}/reports`);
+  return { error: null, reportText, dataCheckNote, reportId: inserted.id };
 }

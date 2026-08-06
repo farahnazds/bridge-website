@@ -4,14 +4,16 @@ import { useState } from "react";
 import ReportForm from "./ReportForm";
 import BodyCompositionReportForm from "./BodyCompositionReportForm";
 import NutritionReportForm from "./NutritionReportForm";
+import PerformanceReportForm from "./PerformanceReportForm";
 import type { RecipientCandidate } from "./ShareReportPanel";
 
-type ReportType = "compliance" | "body_composition" | "nutrition";
+type ReportType = "compliance" | "body_composition" | "nutrition" | "performance";
 
 const TABS: { value: ReportType; label: string }[] = [
   { value: "compliance", label: "Compliance" },
   { value: "body_composition", label: "Body Composition" },
   { value: "nutrition", label: "Nutrition" },
+  { value: "performance", label: "Performance" },
 ];
 
 export default function ReportsClient({
@@ -53,6 +55,9 @@ export default function ReportsClient({
       )}
       {activeTab === "nutrition" && (
         <NutritionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
+      )}
+      {activeTab === "performance" && (
+        <PerformanceReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
       )}
     </div>
   );
