@@ -260,6 +260,62 @@ teams"` already scoped `teams` reads correctly for any club staff role;
 only the page-level role gate needed updating.
 
 See `database/migrations/007_comments_policies.sql`.
+
+## Added: Admin scoped data access (2026-08-06)
+
+Building the Admin dashboard and live-verifying it surfaced that an Admin
+could read `clubs` / `teams` / `athletes` / `club_staff` / `competitions`
+for their assigned clubs, but got **zero rows** from `checkins`,
+`assessments`, `injuries`, and `reports` — even for their own assigned
+club — and could read no `profile` but their own. Those tables gate on
+`is_assigned_to_athlete_via_team()`, which has a `club_manager` fallback
+but never had an `admin` one, so nothing matched. `athlete_teams` had the
+same problem, so an Admin couldn't even see which team their own athletes
+were on.
+
+This failed **closed** (deny), so nothing ever leaked — but it
+contradicted `docs/02-roles-and-permissions.md`'s role cascade and
+`docs/03-site-map.md`, which lists Athletes / Assessments / Compliance /
+Reports / Injury Log as Admin sections. Those sections could not be built
+for real until this existed.
+
+Added `"admin scoped access"` (`for all`) on `athlete_teams`, `checkins`,
+`assessments`, `injuries`, `gps_logs`, and `vald_data`;
+`"admin reads profiles at assigned clubs"` (select) on `profiles`; and
+`"admin reads reports at assigned clubs"` (select) on `reports`. Every one
+is scoped through `is_admin_for_club()` — the same helper already
+governing the Admin's existing access — so a club absent from
+`admin_club_assignments` stays invisible.
+
+- **Write access**, not select-only, on the data-entry tables:
+  `docs/05-business-rules.md`'s edit-window table says "Club Practitioner /
+  Club Manager | ... | 7 days, then **Admin only**" — Admin is explicitly
+  the role that can still edit past the window. Matches the existing
+  `for all` shape of `"admin scoped access"` on `athletes`.
+- **`reports` is SELECT-only** on purpose: an Admin overseeing clubs needs
+  to read reports, not author or delete another practitioner's.
+- `gps_logs` / `vald_data` carried the identical gap and identical fix;
+  excluding them would only have guaranteed a repeat finding later.
+- No recursion risk: the new `profiles` policy queries `athletes` /
+  `club_staff`, whose own policies resolve through `current_profile_id()`
+  (`security definer`, locked `search_path`), so nothing cycles back into
+  `profiles`. Same proven shape as the existing
+  `"club staff updates linked athlete profiles"` policy.
+
+Verified after applying against a real second club seeded with its own
+athlete, check-ins, assessment, injury, report and staff profile: the
+Admin sees all of their own club's data and none of the other club's,
+including through nested/embedded queries, and a grant/revoke control test
+confirms visibility tracks `admin_club_assignments` rather than passing by
+accident.
+
+**Still outstanding:** `comments` has no Admin policy, so
+`docs/04-user-flows.md` Flow 8's "Club Manager (or Admin/Super Admin for
+non-club relationships) can toggle off AI reflection" is not yet
+enforceable for an Admin. Left out of this migration deliberately — it's a
+Flow 8 concern, not a dashboard one.
+
+See `database/migrations/008_admin_scoped_data_access.sql`.
 # Database — Row Level Security Policies (v4, plain English pre-SQL)
 
 - **Super Admin** — full access, everything, no restrictions.

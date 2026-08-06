@@ -1059,6 +1059,22 @@ create policy "club staff reads linked staff profiles" on profiles for select
       where cs.profile_id = profiles.id and is_club_staff_for_club(cs.club_id)
     )
   );
+-- Admin equivalent — without this an Admin sees no names at all, not even
+-- for their own assigned clubs' staff/athletes. See
+-- database/migrations/008_admin_scoped_data_access.sql.
+create policy "admin reads profiles at assigned clubs" on profiles for select
+  using (
+    exists (
+      select 1 from club_staff cs
+      where cs.profile_id = profiles.id and is_admin_for_club(cs.club_id)
+    )
+    or exists (
+      select 1 from athletes a
+      where a.profile_id = profiles.id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
 
 -- ---- clubs ----
 create policy "super admin full access" on clubs for all
@@ -1160,6 +1176,15 @@ comment on policy "athlete updates own row if independent/guided" on athletes is
 create policy "super admin full access" on athlete_teams for all using (is_super_admin());
 create policy "team-linked access" on athlete_teams for all
   using (is_assigned_to_athlete_via_team(athlete_id) or has_independent_access_to_athlete(athlete_id));
+create policy "admin scoped access" on athlete_teams for all
+  using (
+    exists (
+      select 1 from athletes a
+      where a.id = athlete_teams.athlete_id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
 
 create policy "super admin full access" on athlete_conditions for all using (is_super_admin());
 create policy "linked access" on athlete_conditions for all
@@ -1189,6 +1214,15 @@ create policy "linked read access" on athlete_relationship_history for select
 
 -- ---- assessments ----
 create policy "super admin full access" on assessments for all using (is_super_admin());
+create policy "admin scoped access" on assessments for all
+  using (
+    exists (
+      select 1 from athletes a
+      where a.id = assessments.athlete_id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
 create policy "club staff read" on assessments for select
   using (is_assigned_to_athlete_via_team(athlete_id));
 create policy "club staff insert" on assessments for insert
@@ -1213,6 +1247,15 @@ create policy "athlete self edit within 2 days" on assessments for update
 
 -- ---- gps_logs ----
 create policy "super admin full access" on gps_logs for all using (is_super_admin());
+create policy "admin scoped access" on gps_logs for all
+  using (
+    exists (
+      select 1 from athletes a
+      where a.id = gps_logs.athlete_id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
 create policy "club staff read" on gps_logs for select using (is_assigned_to_athlete_via_team(athlete_id));
 create policy "club staff insert" on gps_logs for insert with check (is_assigned_to_athlete_via_team(athlete_id));
 create policy "club staff edit within 7 days" on gps_logs for update
@@ -1224,6 +1267,15 @@ create policy "independent practitioner edit own within 2 days" on gps_logs for 
 
 -- ---- vald_data ----
 create policy "super admin full access" on vald_data for all using (is_super_admin());
+create policy "admin scoped access" on vald_data for all
+  using (
+    exists (
+      select 1 from athletes a
+      where a.id = vald_data.athlete_id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
 create policy "club staff read" on vald_data for select using (is_assigned_to_athlete_via_team(athlete_id));
 create policy "club staff insert" on vald_data for insert with check (is_assigned_to_athlete_via_team(athlete_id));
 create policy "independent practitioner read" on vald_data for select using (has_independent_access_to_athlete(athlete_id));
@@ -1231,6 +1283,15 @@ create policy "independent practitioner insert" on vald_data for insert with che
 
 -- ---- injuries ----
 create policy "super admin full access" on injuries for all using (is_super_admin());
+create policy "admin scoped access" on injuries for all
+  using (
+    exists (
+      select 1 from athletes a
+      where a.id = injuries.athlete_id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
 create policy "club staff read" on injuries for select using (is_assigned_to_athlete_via_team(athlete_id));
 create policy "club staff insert" on injuries for insert with check (is_assigned_to_athlete_via_team(athlete_id));
 create policy "club staff edit within 7 days" on injuries for update
@@ -1275,6 +1336,15 @@ create policy "club staff access" on training_load_plans for all
 
 -- ---- checkins ----
 create policy "super admin full access" on checkins for all using (is_super_admin());
+create policy "admin scoped access" on checkins for all
+  using (
+    exists (
+      select 1 from athletes a
+      where a.id = checkins.athlete_id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
 create policy "athlete manages own checkins" on checkins for all
   using (is_own_athlete_profile(athlete_id));
 create policy "club practitioner proxy entry for club athletes" on checkins for all
@@ -1327,6 +1397,22 @@ create policy "club manager toggles ai reflection" on comments for update
 
 -- ---- reports ----
 create policy "super admin full access" on reports for all using (is_super_admin());
+create policy "admin reads reports at assigned clubs" on reports for select
+  using (
+    (
+      team_id is not null
+      and exists (
+        select 1 from teams t
+        where t.id = reports.team_id and is_admin_for_club(t.club_id)
+      )
+    )
+    or exists (
+      select 1 from athletes a
+      where a.id = any(reports.athlete_ids)
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
 create policy "generator manages own report" on reports for all
   using (generated_by = current_profile_id());
 create policy "team practitioners read official reports" on reports for select
