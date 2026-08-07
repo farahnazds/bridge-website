@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ReportMarkdown from "@/components/ReportMarkdown";
+import ReportPdfLink from "@/components/ReportPdfLink";
 
 export interface MyReportEntry {
   id: string;
@@ -11,6 +12,7 @@ export interface MyReportEntry {
   sharedByName: string;
   summary: string | null;
   createdAt: string;
+  hasPdf: boolean;
 }
 
 function ReportCard({ report }: { report: MyReportEntry }) {
@@ -31,14 +33,17 @@ function ReportCard({ report }: { report: MyReportEntry }) {
             {new Date(report.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="text-xs font-medium underline-offset-2 hover:underline"
-          style={{ color: "var(--brand-blue)" }}
-        >
-          {expanded ? "Hide report" : "View report"}
-        </button>
+        <div className="flex items-center gap-3">
+          {report.hasPdf && <ReportPdfLink reportId={report.id} />}
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs font-medium underline-offset-2 hover:underline"
+            style={{ color: "var(--brand-blue)" }}
+          >
+            {expanded ? "Hide report" : "View report"}
+          </button>
+        </div>
       </div>
 
       {expanded && report.summary && (

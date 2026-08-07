@@ -4,6 +4,7 @@ import { useState } from "react";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import ReportMarkdown from "@/components/ReportMarkdown";
+import ReportPdfLink from "@/components/ReportPdfLink";
 
 export interface ReportHistoryEntry {
   id: string;
@@ -18,6 +19,7 @@ export interface ReportHistoryEntry {
   isOwnReport: boolean;
   summary: string | null;
   createdAt: string;
+  hasPdf: boolean;
 }
 
 function ReportRow({
@@ -47,7 +49,8 @@ function ReportRow({
             {new Date(report.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {report.hasPdf && <ReportPdfLink reportId={report.id} />}
           {report.isOfficial && (
             <span
               className="rounded-full px-2.5 py-0.5 text-xs font-medium"

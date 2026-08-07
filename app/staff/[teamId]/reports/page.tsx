@@ -57,7 +57,7 @@ export default async function TeamReportsPage({
   const { data: reportRows } = await supabase
     .from("reports")
     .select(
-      "id, report_types, athlete_ids, report_period_start, report_period_end, is_official, shared_with, generated_by, ai_summary, created_at, generator:profiles!generated_by(first_name, last_name)"
+      "id, report_types, athlete_ids, report_period_start, report_period_end, is_official, shared_with, generated_by, ai_summary, created_at, file_url, generator:profiles!generated_by(first_name, last_name)"
     )
     .eq("team_id", teamId)
     .order("created_at", { ascending: false });
@@ -77,6 +77,8 @@ export default async function TeamReportsPage({
       isOwnReport: r.generated_by === profile?.id,
       summary: r.ai_summary as string | null,
       createdAt: r.created_at,
+      // Only whether a PDF exists — the storage path stays server-side.
+      hasPdf: Boolean(r.file_url),
     };
   });
 

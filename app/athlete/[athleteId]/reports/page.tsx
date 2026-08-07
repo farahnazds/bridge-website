@@ -23,7 +23,7 @@ export default async function MyReportsPage() {
   const { data: reportRows, error } = await supabase
     .from("reports")
     .select(
-      "id, report_types, report_period_start, report_period_end, generated_by, ai_summary, created_at, generator:profiles!generated_by(first_name, last_name)"
+      "id, report_types, report_period_start, report_period_end, generated_by, ai_summary, created_at, file_url, generator:profiles!generated_by(first_name, last_name)"
     )
     .contains("shared_with", [profile.id])
     .order("created_at", { ascending: false });
@@ -36,6 +36,8 @@ export default async function MyReportsPage() {
     sharedByName: personName((r as unknown as { generator?: { first_name: string | null; last_name: string | null } | null }).generator ?? null),
     summary: r.ai_summary as string | null,
     createdAt: r.created_at,
+    // Only whether a PDF exists — the storage path stays server-side.
+    hasPdf: Boolean(r.file_url),
   }));
 
   return (
