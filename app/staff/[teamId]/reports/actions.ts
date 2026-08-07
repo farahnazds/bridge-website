@@ -34,6 +34,11 @@ import {
   type GpsRow,
   type ValdRow,
 } from "./performancePromptBuilder";
+import {
+  buildInjuryPrompt,
+  INJURY_SYSTEM_PROMPT,
+  type InjuryRow,
+} from "./injuryPromptBuilder";
 
 export interface GenerateReportState {
   error: string | null;
@@ -1016,6 +1021,180 @@ export async function generatePerformanceReport(
     .insert({
       generated_by: profile.id,
       report_types: ["performance"],
+      audience: "practitioner",
+      team_id: teamId,
+      athlete_ids: [athleteId],
+      report_period_start: periodStart,
+      report_period_end: periodEnd,
+      language,
+      additional_instructions: additionalInstructions,
+      ai_summary: reportText,
+    })
+    .select("id")
+    .single();
+  if (insertError || !inserted) {
+    return { ...base, error: `Report generated, but saving it failed: ${insertError?.message}`, reportText, dataCheckNote };
+  }
+
+  revalidatePath(`/staff/${teamId}/reports`);
+  return { error: null, reportText, dataCheckNote, reportId: inserted.id };
+}
+
+// Injury report — docs/07-ai-engine.md: "Injury | Athlete / Practitioner |
+// Past (last week/month/quarter/year)". Past dates only, same as Compliance,
+// Body Composition and Performance.
+//
+// Practitioner-facing, so injuries.description (full clinical detail) is read
+// directly here. The athlete-facing surface reads injuries_athlete_view
+// instead, which exposes status/rtp_phase only — see migration 006. These two
+// paths must not be collapsed into one.
+export async function generateInjuryReport(
+  _prevState: GenerateReportState,
+  formData: FormData
+): Promise<GenerateReportState> {
+  const base = { reportText: null, dataCheckNote: null, reportId: null };
+  const profile = await getCurrentProfile();
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+    return { ...base, error: "You don't have permission to do this." };
+  }
+
+  const teamId = String(formData.get("team_id") ?? "").trim();
+  const athleteId = String(formData.get("athlete_id") ?? "").trim();
+  const periodStart = String(formData.get("period_start") ?? "").trim();
+  const periodEnd = String(formData.get("period_end") ?? "").trim();
+  const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
+  const language = String(formData.get("language") ?? "english").trim();
+
+  if (!teamId || !athleteId || !periodStart || !periodEnd) {
+    return { ...base, error: "Athlete and report period are required." };
+  }
+
+  const supabase = await createClient();
+
+  const { data: athlete, error: athleteError } = await supabase
+    .from("athletes")
+    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference")
+    .eq("id", athleteId)
+    .single();
+  if (athleteError || !athlete) return { ...base, error: "Couldn't load that athlete." };
+
+  const [{ data: conditionRows }, { data: allergyRows }, { data: intoleranceRows }] = await Promise.all([
+    supabase.from("athlete_conditions").select("other_note, medical_conditions(label)").eq("athlete_id", athleteId),
+    supabase.from("athlete_allergies").select("other_note, allergies(label)").eq("athlete_id", athleteId),
+    supabase.from("athlete_intolerances").select("other_note, intolerances(label)").eq("athlete_id", athleteId),
+  ]);
+  type CondRow = { other_note: string | null; medical_conditions: { label: string } | null };
+  type AllRow = { other_note: string | null; allergies: { label: string } | null };
+  type IntRow = { other_note: string | null; intolerances: { label: string } | null };
+  const conditions = ((conditionRows ?? []) as unknown as CondRow[]).map((r) => r.other_note || r.medical_conditions?.label || "Other");
+  const allergies = ((allergyRows ?? []) as unknown as AllRow[]).map((r) => r.other_note || r.allergies?.label || "Other");
+  const intolerances = ((intoleranceRows ?? []) as unknown as IntRow[]).map((r) => r.other_note || r.intolerances?.label || "Other");
+
+  // Deliberately NOT a plain date-BETWEEN window. An injury sustained before
+  // the reporting period but still unresolved inside it is part of that
+  // period's clinical picture — excluding it would hide an athlete's ongoing
+  // problem from their own injury report. So: everything sustained on or
+  // before the period end, minus anything already cleared before it started.
+  const { data: injuryData, error: injuryError } = await supabase
+    .from("injuries")
+    .select("date, type, description, status, rtp_phase, target_return_date, cleared_date, validity_tier")
+    .eq("athlete_id", athleteId)
+    .lte("date", periodEnd)
+    .or(`cleared_date.is.null,cleared_date.gte.${periodStart}`)
+    .order("date", { ascending: true });
+  if (injuryError) return { ...base, error: `Couldn't load the injury log: ${injuryError.message}` };
+
+  const injuries: InjuryRow[] = (injuryData ?? []).map((i) => ({
+    date: i.date as string,
+    type: i.type as string,
+    description: i.description as string | null,
+    status: i.status as string,
+    rtp_phase: i.rtp_phase as string | null,
+    target_return_date: i.target_return_date as string | null,
+    cleared_date: i.cleared_date as string | null,
+    validity_tier: i.validity_tier as string,
+    carriedIn: (i.date as string) < periodStart,
+  }));
+
+  const { data: previousReport } = await supabase
+    .from("reports")
+    .select("ai_summary")
+    .contains("athlete_ids", [athleteId])
+    .contains("report_types", ["injury"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: libraryData } = await supabase
+    .from("clinical_research_library")
+    .select("title, year, source, clinical_note")
+    .eq("topic_tag", "injury");
+
+  const carried = injuries.filter((i) => i.carriedIn).length;
+  const unresolved = injuries.filter((i) => i.status !== "cleared").length;
+  const phases = [...new Set(injuries.map((i) => i.rtp_phase).filter(Boolean))];
+  const dataCheckNote =
+    injuries.length === 0
+      ? `No injuries recorded for this athlete overlapping ${periodStart} to ${periodEnd}. The report notes that an empty log can mean either none occurred or none were logged.`
+      : `${injuries.length} injur${injuries.length === 1 ? "y" : "ies"} overlapping ${periodStart} to ${periodEnd}` +
+        (carried > 0 ? `, ${carried} carried in from before the period` : "") +
+        `. ${unresolved} not yet cleared` +
+        (phases.length > 1 ? `, spanning ${phases.length} different RTP phases.` : ".");
+
+  const userPrompt = buildInjuryPrompt({
+    athlete,
+    conditions,
+    allergies,
+    intolerances,
+    injuries,
+    periodStart,
+    periodEnd,
+    clinicalLibraryEntries: libraryData ?? [],
+    previousReportSummary: previousReport?.ai_summary ?? null,
+    additionalInstructions,
+    language,
+  });
+
+  const anthropic = createAnthropicClient();
+  let response;
+  try {
+    response = await anthropic.messages
+      .stream({
+        model: REPORT_MODEL,
+        max_tokens: 8000,
+        thinking: { type: "adaptive" },
+        output_config: { effort: REPORT_EFFORT },
+        system: INJURY_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userPrompt }],
+      })
+      .finalMessage();
+  } catch (err) {
+    return {
+      ...base,
+      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      dataCheckNote,
+    };
+  }
+
+  if (response.stop_reason === "refusal") {
+    return { ...base, error: "The AI declined to generate this report.", dataCheckNote };
+  }
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
+  if (!reportText) return { ...base, error: "The AI returned an empty response. Try again.", dataCheckNote };
+
+  // ---- Automatic pre-save safety assertion ----
+  const safety = await assertReportSafe(athleteId, reportText);
+  if (!safety.ok) {
+    return { error: safety.message, reportText, dataCheckNote, reportId: null };
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("reports")
+    .insert({
+      generated_by: profile.id,
+      report_types: ["injury"],
       audience: "practitioner",
       team_id: teamId,
       athlete_ids: [athleteId],

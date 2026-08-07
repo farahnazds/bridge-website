@@ -228,6 +228,44 @@ if a future edit to that page forgets the original convention.
 
 See `database/migrations/006_injuries_athlete_view.sql`.
 
+> **Superseded by migration 018 (2026-08-07).** The paragraph above is
+> accurate about the *view*, but its claim that the gap was closed was too
+> strong. 006 fixed the application query path; it left
+> `"athlete reads own status only"` in place on the base table, so an
+> athlete querying `injuries` directly with their own JWT still received
+> `description` — full clinical detail. See the entry below.
+
+## Changed: `injuries` athlete access removed; view made SECURITY DEFINER (2026-08-07)
+
+`"athlete reads own status only"` on `injuries` is **dropped**. Athletes
+now have no SELECT policy on that table at all; `injuries_athlete_view` is
+their only path to injury status.
+
+Because the athlete has no underlying access, the view can no longer run as
+the invoker — it would inherit "no access" and return nothing. It is now
+`security_invoker = false` (SECURITY DEFINER) and carries its own
+`where is_own_athlete_profile(athlete_id)` predicate.
+
+This **deliberately inverts** 006's reasoning. A definer view bypasses RLS on
+`injuries` entirely, so that WHERE clause is the complete access-control
+boundary for the view. Two guards in the migration exist for that reason: it
+refuses to run unless `is_own_athlete_profile()` and `current_profile_id()`
+are still SECURITY DEFINER with a locked `search_path`, and it asserts the
+view exposes exactly `athlete_id,status,rtp_phase` afterwards. A view has no
+`search_path` setting of its own (it stores resolved OIDs at creation), which
+is why the lock is asserted on the helper functions instead.
+
+Non-athlete roles get zero rows from the view by construction and continue to
+read `injuries` under their own unchanged policies (super admin, admin scoped,
+club staff, independent practitioner).
+
+**Why 006 missed this:** its verification ran against a test athlete with zero
+injury rows, so "athlete requests the full row" returned nothing and read as a
+pass. It was vacuous. Any re-test of this restriction must use an athlete who
+genuinely has injury data.
+
+See `database/migrations/018_injuries_athlete_view_security_definer.sql`.
+
 ## Added: comments policies + `is_assigned_to_team()` fallback (2026-08-06)
 
 Building the Comments feature (`docs/04-user-flows.md` Flow 8) surfaced

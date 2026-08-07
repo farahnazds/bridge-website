@@ -104,9 +104,16 @@ export default async function AthleteHomePage({
 
   // injuries_athlete_view exposes only athlete_id/status/rtp_phase (one row
   // per athlete, their most recent) — the column restriction is enforced
-  // structurally by the view itself (security_invoker=true, so the
-  // underlying injuries RLS still applies), not by this query remembering
-  // to select only two columns. See database/migrations/006_injuries_athlete_view.sql.
+  // structurally by the view, not by this query remembering to select only
+  // two columns.
+  //
+  // As of migration 018 this is the athlete's ONLY route to injury data:
+  // they have no SELECT policy on `injuries` at all. The view is SECURITY
+  // DEFINER and carries its own `is_own_athlete_profile(athlete_id)` filter,
+  // which is what scopes this to the caller — not the underlying table's RLS,
+  // which the view bypasses by design. Do not switch this query to `injuries`;
+  // it would simply return nothing.
+  // See database/migrations/018_injuries_athlete_view_security_definer.sql.
   const { data: latestInjury } = await supabase
     .from("injuries_athlete_view")
     .select("status, rtp_phase")

@@ -5,15 +5,17 @@ import ReportForm from "./ReportForm";
 import BodyCompositionReportForm from "./BodyCompositionReportForm";
 import NutritionReportForm from "./NutritionReportForm";
 import PerformanceReportForm from "./PerformanceReportForm";
+import InjuryReportForm from "./InjuryReportForm";
 import type { RecipientCandidate } from "./ShareReportPanel";
 
-type ReportType = "compliance" | "body_composition" | "nutrition" | "performance";
+type ReportType = "compliance" | "body_composition" | "nutrition" | "performance" | "injury";
 
 const TABS: { value: ReportType; label: string }[] = [
   { value: "compliance", label: "Compliance" },
   { value: "body_composition", label: "Body Composition" },
   { value: "nutrition", label: "Nutrition" },
   { value: "performance", label: "Performance" },
+  { value: "injury", label: "Injury" },
 ];
 
 export default function ReportsClient({
@@ -58,6 +60,9 @@ export default function ReportsClient({
       )}
       {activeTab === "performance" && (
         <PerformanceReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
+      )}
+      {activeTab === "injury" && (
+        <InjuryReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
       )}
     </div>
   );

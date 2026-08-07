@@ -86,6 +86,7 @@ export const REPORT_TYPE_LABELS: Record<string, string> = {
   body_composition: "Body Composition",
   nutrition: "Nutrition",
   performance: "Performance",
+  injury: "Injury",
 };
 
 // `vald_data.test_type` is free text (schema.sql comments it "e.g. cmj,
