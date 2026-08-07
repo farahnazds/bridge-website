@@ -1,16 +1,18 @@
 import type { ReactNode } from "react";
+import { parseReportBlocks, type Block, type Inline } from "@/lib/reportContent";
 
-// Renders the markdown the report prompts produce (docs/07-ai-engine.md) as
-// real typography instead of raw ** and ## characters.
+// On-screen renderer for the markdown the report prompts produce.
 //
-// Deliberately hand-rolled rather than pulling in react-markdown: the input is
-// our OWN model output with a structure the system prompts pin down (headings,
-// bold, lists, tables, rules), so the supported subset is known rather than
-// open-ended. The security property matters more than the size saving — this
-// builds React elements and never touches dangerouslySetInnerHTML, so no
+// The parsing lives in lib/reportContent.ts, shared with the PDF renderer
+// (lib/reportPdf.ts) so the two can't drift into disagreeing about what a
+// report's structure is. This file is purely the React presentation of those
+// blocks.
+//
+// Builds React elements and never touches dangerouslySetInnerHTML, so no
 // amount of markup in a generated report can inject anything into the page.
-// If a future report type needs richer markdown than the subset below, swap
-// this for react-markdown + remark-gfm rather than growing it indefinitely.
+// If a future report type needs richer markdown than the block union in
+// lib/reportContent.ts, swap this for react-markdown + remark-gfm rather than
+// growing it indefinitely.
 //
 // Styling follows docs/06-design-system.md: General Sans for headings via
 // --font-heading, body text inherits Inter, --border for rules and table
@@ -19,60 +21,29 @@ import type { ReactNode } from "react";
 
 type Props = { children: string; className?: string; style?: React.CSSProperties };
 
-// Matched in one pass so ** binds before * and nothing nests ambiguously.
-const INLINE = /(\*\*[\s\S]+?\*\*|__[\s\S]+?__|`[^`\n]+`|\*[^*\n]+\*|(?<![a-zA-Z0-9])_[^_\n]+_(?![a-zA-Z0-9]))/g;
-
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  let last = 0;
-  let i = 0;
-  for (const m of text.matchAll(INLINE)) {
-    const start = m.index ?? 0;
-    if (start > last) out.push(text.slice(last, start));
-    const tok = m[0];
-    const key = `${keyPrefix}-i${i++}`;
-    if (tok.startsWith("**") || tok.startsWith("__")) {
-      out.push(
+function renderInlines(inlines: Inline[], keyPrefix: string): ReactNode[] {
+  return inlines.map((n, i) => {
+    const key = `${keyPrefix}-${i}`;
+    if (n.kind === "bold")
+      return (
         <strong key={key} style={{ fontWeight: 600, color: "var(--text)" }}>
-          {tok.slice(2, -2)}
+          {n.text}
         </strong>
       );
-    } else if (tok.startsWith("`")) {
-      out.push(
+    if (n.kind === "italic") return <em key={key}>{n.text}</em>;
+    if (n.kind === "code")
+      return (
         <code
           key={key}
           className="rounded px-1 py-0.5 text-[0.9em]"
           style={{ fontFamily: "var(--font-mono)", backgroundColor: "var(--bg)" }}
         >
-          {tok.slice(1, -1)}
+          {n.text}
         </code>
       );
-    } else {
-      out.push(<em key={key}>{tok.slice(1, -1)}</em>);
-    }
-    last = start + tok.length;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
-}
-
-// Single newlines inside a paragraph are meaningful in these reports — the
-// injury log writes "Status: … / Clinical description: …" as consecutive
-// lines — so they render as real breaks rather than being collapsed the way
-// strict markdown would.
-function renderParagraphLines(lines: string[], key: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  lines.forEach((line, idx) => {
-    if (idx > 0) out.push(<br key={`${key}-br${idx}`} />);
-    out.push(...renderInline(line, `${key}-l${idx}`));
+    return <span key={key}>{n.text}</span>;
   });
-  return out;
 }
-
-const isTableRow = (l: string) => /^\s*\|.*\|\s*$/.test(l);
-const isTableDivider = (l: string) => /^\s*\|[\s:|-]+\|\s*$/.test(l) && l.includes("-");
-const splitRow = (l: string) =>
-  l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
 
 const HEADING_STYLE: Record<number, React.CSSProperties> = {
   1: { fontSize: "1.15rem", fontWeight: 600, marginTop: "0.25rem" },
@@ -81,73 +52,62 @@ const HEADING_STYLE: Record<number, React.CSSProperties> = {
   4: { fontSize: "0.875rem", fontWeight: 600, marginTop: "1rem" },
 };
 
-export default function ReportMarkdown({ children, className, style }: Props) {
-  const lines = (children ?? "").replace(/\r\n/g, "\n").split("\n");
-  const blocks: ReactNode[] = [];
-  let para: string[] = [];
-  let k = 0;
-
-  const flushParagraph = () => {
-    if (para.length === 0) return;
-    const key = `p${k++}`;
-    blocks.push(
-      <p key={key} className="leading-relaxed" style={{ color: "var(--text)" }}>
-        {renderParagraphLines(para, key)}
-      </p>
-    );
-    para = [];
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.trim() === "") {
-      flushParagraph();
-      continue;
-    }
-
-    const heading = line.match(/^(#{1,4})\s+(.*)$/);
-    if (heading) {
-      flushParagraph();
-      const level = heading[1].length;
-      const Tag = (["h2", "h3", "h4", "h5"] as const)[level - 1];
-      const key = `h${k++}`;
-      blocks.push(
+function renderBlock(block: Block, key: string): ReactNode {
+  switch (block.kind) {
+    case "heading": {
+      const Tag = (["h2", "h3", "h4", "h5"] as const)[block.level - 1];
+      return (
         <Tag
           key={key}
           style={{
-            ...HEADING_STYLE[level],
+            ...HEADING_STYLE[block.level],
             fontFamily: "var(--font-heading)",
             color: "var(--text)",
             textWrap: "balance",
           }}
         >
-          {renderInline(heading[2], key)}
+          {renderInlines(block.inlines, key)}
         </Tag>
       );
-      continue;
     }
-
-    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
-      flushParagraph();
-      blocks.push(
-        <hr key={`hr${k++}`} style={{ border: 0, borderTop: "1px solid var(--border)", margin: "0.5rem 0" }} />
+    case "rule":
+      return (
+        <hr
+          key={key}
+          style={{ border: 0, borderTop: "1px solid var(--border)", margin: "0.5rem 0" }}
+        />
       );
-      continue;
+    case "paragraph":
+      // Single newlines inside a paragraph are meaningful in these reports —
+      // the injury log writes "Status: … / Clinical description: …" as
+      // consecutive lines — so they render as real breaks rather than being
+      // collapsed the way strict markdown would.
+      return (
+        <p key={key} className="leading-relaxed" style={{ color: "var(--text)" }}>
+          {block.lines.flatMap((line, li) => [
+            ...(li > 0 ? [<br key={`${key}-br${li}`} />] : []),
+            ...renderInlines(line, `${key}-l${li}`),
+          ])}
+        </p>
+      );
+    case "list": {
+      const ListTag = block.ordered ? "ol" : "ul";
+      return (
+        <ListTag
+          key={key}
+          className={`flex flex-col gap-1 ${block.ordered ? "list-decimal" : "list-disc"}`}
+          style={{ paddingLeft: "1.25rem", color: "var(--text)" }}
+        >
+          {block.items.map((item, ii) => (
+            <li key={ii} className="leading-relaxed">
+              {renderInlines(item, `${key}-${ii}`)}
+            </li>
+          ))}
+        </ListTag>
+      );
     }
-
-    // Table: a row followed by a |---|---| divider.
-    if (isTableRow(line) && i + 1 < lines.length && isTableDivider(lines[i + 1])) {
-      flushParagraph();
-      const header = splitRow(line);
-      const body: string[][] = [];
-      let j = i + 2;
-      while (j < lines.length && isTableRow(lines[j]) && !isTableDivider(lines[j])) {
-        body.push(splitRow(lines[j]));
-        j++;
-      }
-      const key = `t${k++}`;
-      blocks.push(
+    case "table":
+      return (
         <div key={key} className="overflow-x-auto" style={{ margin: "0.25rem 0" }}>
           <table
             className="w-full text-left text-[0.8125rem]"
@@ -155,27 +115,30 @@ export default function ReportMarkdown({ children, className, style }: Props) {
           >
             <thead>
               <tr>
-                {header.map((c, ci) => (
+                {block.header.map((c, ci) => (
                   <th
                     key={ci}
                     className="whitespace-nowrap px-3 py-2 font-medium"
                     style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}
                   >
-                    {renderInline(c, `${key}-h${ci}`)}
+                    {renderInlines(c, `${key}-h${ci}`)}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {body.map((row, ri) => (
+              {block.rows.map((row, ri) => (
                 <tr key={ri}>
                   {row.map((c, ci) => (
                     <td
                       key={ci}
                       className="px-3 py-2 align-top"
-                      style={{ color: "var(--text)", borderTop: ri > 0 ? "1px solid var(--border)" : undefined }}
+                      style={{
+                        color: "var(--text)",
+                        borderTop: ri > 0 ? "1px solid var(--border)" : undefined,
+                      }}
                     >
-                      {renderInline(c, `${key}-r${ri}c${ci}`)}
+                      {renderInlines(c, `${key}-r${ri}c${ci}`)}
                     </td>
                   ))}
                 </tr>
@@ -184,50 +147,16 @@ export default function ReportMarkdown({ children, className, style }: Props) {
           </table>
         </div>
       );
-      i = j - 1;
-      continue;
-    }
-
-    // Lists — consecutive items of the same kind collapse into one list.
-    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
-    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
-    if (bullet || numbered) {
-      flushParagraph();
-      const ordered = Boolean(numbered);
-      const items: string[] = [];
-      let j = i;
-      while (j < lines.length) {
-        const m = ordered ? lines[j].match(/^\s*\d+[.)]\s+(.*)$/) : lines[j].match(/^\s*[-*+]\s+(.*)$/);
-        if (!m) break;
-        items.push(m[1]);
-        j++;
-      }
-      const key = `l${k++}`;
-      const ListTag = ordered ? "ol" : "ul";
-      blocks.push(
-        <ListTag
-          key={key}
-          className={`flex flex-col gap-1 ${ordered ? "list-decimal" : "list-disc"}`}
-          style={{ paddingLeft: "1.25rem", color: "var(--text)" }}
-        >
-          {items.map((it, ii) => (
-            <li key={ii} className="leading-relaxed">
-              {renderInline(it, `${key}-${ii}`)}
-            </li>
-          ))}
-        </ListTag>
-      );
-      i = j - 1;
-      continue;
-    }
-
-    para.push(line);
   }
-  flushParagraph();
+}
 
+export default function ReportMarkdown({ children, className, style }: Props) {
+  const blocks = parseReportBlocks(children ?? "");
   return (
     <div className={className} style={style}>
-      <div className="flex flex-col gap-3 text-sm">{blocks}</div>
+      <div className="flex flex-col gap-3 text-sm">
+        {blocks.map((b, i) => renderBlock(b, `b${i}`))}
+      </div>
     </div>
   );
 }

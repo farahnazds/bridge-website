@@ -7,6 +7,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { sendReportSharedEmail } from "@/lib/resend";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
+import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
 import {
   buildCompliancePrompt,
   COMPLIANCE_SYSTEM_PROMPT,
@@ -244,8 +245,23 @@ export async function generateComplianceReport(
     };
   }
 
+  // Branded PDF: layout, logo placement and structure are fixed in
+  // lib/reportPdf.ts and cannot be influenced by the generated content.
+  // A PDF failure never discards a report that is already saved.
+  const pdf = await generateAndStoreReportPdf({
+    reportId: insertedReport.id,
+    athleteId,
+    markdown: reportText,
+    reportTypeLabel: REPORT_TYPE_LABELS["compliance"] ?? "Report",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    periodStart,
+    periodEnd,
+    generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+  });
+  const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
   revalidatePath(`/staff/${teamId}/reports`);
-  return { error: null, reportText, dataCheckNote, reportId: insertedReport.id };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id };
 }
 
 // ---- Body Composition report — same pattern as generateComplianceReport ----
@@ -478,8 +494,23 @@ export async function generateBodyCompositionReport(
     };
   }
 
+  // Branded PDF: layout, logo placement and structure are fixed in
+  // lib/reportPdf.ts and cannot be influenced by the generated content.
+  // A PDF failure never discards a report that is already saved.
+  const pdf = await generateAndStoreReportPdf({
+    reportId: insertedReport.id,
+    athleteId,
+    markdown: reportText,
+    reportTypeLabel: REPORT_TYPE_LABELS["body_composition"] ?? "Report",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    periodStart,
+    periodEnd,
+    generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+  });
+  const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
   revalidatePath(`/staff/${teamId}/reports`);
-  return { error: null, reportText, dataCheckNote, reportId: insertedReport.id };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id };
 }
 
 // ---- Share a report — docs/04-user-flows.md Flow 7, steps 7-9 ----
@@ -867,8 +898,23 @@ export async function generateNutritionReport(
     return { ...base, error: `Report generated, but saving it failed: ${insertError?.message}`, reportText, dataCheckNote };
   }
 
+  // Branded PDF: layout, logo placement and structure are fixed in
+  // lib/reportPdf.ts and cannot be influenced by the generated content.
+  // A PDF failure never discards a report that is already saved.
+  const pdf = await generateAndStoreReportPdf({
+    reportId: inserted.id,
+    athleteId,
+    markdown: reportText,
+    reportTypeLabel: REPORT_TYPE_LABELS["nutrition"] ?? "Report",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    periodStart,
+    periodEnd,
+    generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+  });
+  const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
   revalidatePath(`/staff/${teamId}/reports`);
-  return { error: null, reportText, dataCheckNote, reportId: inserted.id, rpeBlock: null };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id, rpeBlock: null };
 }
 
 // ---- Performance report — GPS and/or VALD, past dates only ----
@@ -1036,8 +1082,23 @@ export async function generatePerformanceReport(
     return { ...base, error: `Report generated, but saving it failed: ${insertError?.message}`, reportText, dataCheckNote };
   }
 
+  // Branded PDF: layout, logo placement and structure are fixed in
+  // lib/reportPdf.ts and cannot be influenced by the generated content.
+  // A PDF failure never discards a report that is already saved.
+  const pdf = await generateAndStoreReportPdf({
+    reportId: inserted.id,
+    athleteId,
+    markdown: reportText,
+    reportTypeLabel: REPORT_TYPE_LABELS["performance"] ?? "Report",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    periodStart,
+    periodEnd,
+    generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+  });
+  const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
   revalidatePath(`/staff/${teamId}/reports`);
-  return { error: null, reportText, dataCheckNote, reportId: inserted.id };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id };
 }
 
 // Injury report — docs/07-ai-engine.md: "Injury | Athlete / Practitioner |
@@ -1210,6 +1271,21 @@ export async function generateInjuryReport(
     return { ...base, error: `Report generated, but saving it failed: ${insertError?.message}`, reportText, dataCheckNote };
   }
 
+  // Branded PDF: layout, logo placement and structure are fixed in
+  // lib/reportPdf.ts and cannot be influenced by the generated content.
+  // A PDF failure never discards a report that is already saved.
+  const pdf = await generateAndStoreReportPdf({
+    reportId: inserted.id,
+    athleteId,
+    markdown: reportText,
+    reportTypeLabel: REPORT_TYPE_LABELS["injury"] ?? "Report",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    periodStart,
+    periodEnd,
+    generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+  });
+  const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
   revalidatePath(`/staff/${teamId}/reports`);
-  return { error: null, reportText, dataCheckNote, reportId: inserted.id };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id };
 }
