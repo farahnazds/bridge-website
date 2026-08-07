@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ReportMarkdown from "@/components/ReportMarkdown";
 
 export interface MyReportEntry {
   id: string;
@@ -41,12 +42,12 @@ function ReportCard({ report }: { report: MyReportEntry }) {
       </div>
 
       {expanded && report.summary && (
-        <div
-          className="mt-4 rounded-lg border p-4 whitespace-pre-wrap text-sm leading-relaxed"
+        <ReportMarkdown
+          className="mt-4 rounded-lg border p-4"
           style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
         >
           {report.summary}
-        </div>
+        </ReportMarkdown>
       )}
     </div>
   );

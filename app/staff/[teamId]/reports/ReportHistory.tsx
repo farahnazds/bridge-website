@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
+import ReportMarkdown from "@/components/ReportMarkdown";
 
 export interface ReportHistoryEntry {
   id: string;
@@ -67,12 +68,12 @@ function ReportRow({
       </div>
 
       {expanded && report.summary && (
-        <div
-          className="rounded-lg border p-4 whitespace-pre-wrap text-sm leading-relaxed"
+        <ReportMarkdown
+          className="rounded-lg border p-4"
           style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
         >
           {report.summary}
-        </div>
+        </ReportMarkdown>
       )}
 
       {report.isOwnReport ? (

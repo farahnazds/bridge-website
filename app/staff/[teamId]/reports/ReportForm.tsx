@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { generateComplianceReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
+import ReportMarkdown from "@/components/ReportMarkdown";
 
 const initialState: GenerateReportState = {
   error: null,
@@ -163,12 +164,12 @@ export default function ReportForm({
       )}
 
       {state.reportText && (
-        <div
-          className="rounded-xl border p-5 whitespace-pre-wrap text-sm leading-relaxed"
+        <ReportMarkdown
+          className="rounded-xl border p-5"
           style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
         >
           {state.reportText}
-        </div>
+        </ReportMarkdown>
       )}
 
       {state.reportId && (

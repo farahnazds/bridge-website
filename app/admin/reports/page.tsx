@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs, getScopedAthletes } from "@/lib/adminScope";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import EmptyState from "@/components/EmptyState";
+import ReportMarkdown from "@/components/ReportMarkdown";
 
 export const metadata: Metadata = { title: "Reports — Admin — Bridgetx" };
 
@@ -209,16 +210,16 @@ export default async function AdminReportsPage() {
                       >
                         View report
                       </summary>
-                      <div
-                        className="mt-3 rounded-lg border p-4 whitespace-pre-wrap text-sm leading-relaxed"
+                      <ReportMarkdown
+                        className="mt-3 rounded-lg border p-4"
                         style={{
                           borderColor: "var(--border)",
                           backgroundColor: "var(--bg)",
                           color: "var(--text)",
                         }}
                       >
-                        {r.ai_summary}
-                      </div>
+                        {r.ai_summary ?? ""}
+                      </ReportMarkdown>
                     </details>
                   )}
                 </div>

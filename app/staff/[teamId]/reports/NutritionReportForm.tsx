@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { generateNutritionReport, type NutritionReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
+import ReportMarkdown from "@/components/ReportMarkdown";
 
 const initialState: NutritionReportState = {
   error: null,
@@ -206,12 +207,12 @@ export default function NutritionReportForm({
       )}
 
       {state.reportText && (
-        <div
-          className="rounded-xl border p-5 whitespace-pre-wrap text-sm leading-relaxed"
+        <ReportMarkdown
+          className="rounded-xl border p-5"
           style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
         >
           {state.reportText}
-        </div>
+        </ReportMarkdown>
       )}
 
       {state.reportId && (
