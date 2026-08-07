@@ -42,10 +42,12 @@ export default function InjuryReportForm({
   teamId,
   athletes,
   practitioners,
+  defaultLanguage,
 }: {
   teamId: string;
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
   practitioners: RecipientCandidate[];
+  defaultLanguage: string;
 }) {
   const [state, formAction] = useActionState(generateInjuryReport, initialState);
   const [athleteId, setAthleteId] = useState("");
@@ -59,7 +61,24 @@ export default function InjuryReportForm({
     <div className="flex flex-col gap-6">
       <form action={formAction} className="flex flex-col gap-5" noValidate>
         <input type="hidden" name="team_id" value={teamId} />
-        <input type="hidden" name="language" value="english" />
+        <div className="flex max-w-xs flex-col gap-1.5">
+          <label htmlFor="InjuryReportForm_language" className={labelClass} style={{ color: "var(--text)" }}>
+            Report language
+          </label>
+          <select
+            id="InjuryReportForm_language"
+            name="language"
+            defaultValue={defaultLanguage}
+            className={inputClass}
+            style={inputStyle}
+          >
+            <option value="english">English</option>
+            <option value="arabic">Arabic</option>
+          </select>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Defaults to your club&apos;s setting. Changing it here affects this report only.
+          </p>
+        </div>
 
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Covers RTP phase progression and recovery timeline from the injury log, at full

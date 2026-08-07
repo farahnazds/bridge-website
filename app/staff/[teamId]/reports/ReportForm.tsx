@@ -46,10 +46,12 @@ export default function ReportForm({
   teamId,
   athletes,
   practitioners,
+  defaultLanguage,
 }: {
   teamId: string;
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
   practitioners: RecipientCandidate[];
+  defaultLanguage: string;
 }) {
   const [state, formAction] = useActionState(generateComplianceReport, initialState);
   const [athleteId, setAthleteId] = useState("");
@@ -63,7 +65,24 @@ export default function ReportForm({
     <div className="flex flex-col gap-6">
       <form action={formAction} className="flex flex-col gap-5" noValidate>
         <input type="hidden" name="team_id" value={teamId} />
-        <input type="hidden" name="language" value="english" />
+        <div className="flex max-w-xs flex-col gap-1.5">
+          <label htmlFor="ReportForm_language" className={labelClass} style={{ color: "var(--text)" }}>
+            Report language
+          </label>
+          <select
+            id="ReportForm_language"
+            name="language"
+            defaultValue={defaultLanguage}
+            className={inputClass}
+            style={inputStyle}
+          >
+            <option value="english">English</option>
+            <option value="arabic">Arabic</option>
+          </select>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Defaults to your club&apos;s setting. Changing it here affects this report only.
+          </p>
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="athlete_id" className={labelClass} style={{ color: "var(--text)" }}>

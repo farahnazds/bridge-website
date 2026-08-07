@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { clubDefaultLanguage, clubIdForTeam } from "@/lib/reportLanguage";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import ReportsClient from "./ReportsClient";
 import ReportHistory from "./ReportHistory";
@@ -25,6 +26,9 @@ export default async function TeamReportsPage({
   const supabase = await createClient();
   // Reuses the layout's cached context query — no extra round trip.
   const profile = (await getStaffTeamContext(teamId))?.profile ?? null;
+
+  // Club-wide default report language; each form seeds its selector from it.
+  const defaultLanguage = await clubDefaultLanguage(await clubIdForTeam(teamId));
 
   const { data: rosterRows } = await supabase
     .from("athlete_teams")
@@ -102,7 +106,12 @@ export default async function TeamReportsPage({
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         {athletes.length > 0 ? (
-          <ReportsClient teamId={teamId} athletes={athletes} practitioners={practitioners} />
+          <ReportsClient
+            teamId={teamId}
+            athletes={athletes}
+            practitioners={practitioners}
+            defaultLanguage={defaultLanguage}
+          />
         ) : (
           <p style={{ color: "var(--text-muted)" }}>
             No athletes on this team yet — add one to the roster first.

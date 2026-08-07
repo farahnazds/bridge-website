@@ -22,10 +22,12 @@ export default function ReportsClient({
   teamId,
   athletes,
   practitioners,
+  defaultLanguage,
 }: {
   teamId: string;
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
   practitioners: RecipientCandidate[];
+  defaultLanguage: string;
 }) {
   const [activeTab, setActiveTab] = useState<ReportType>("compliance");
 
@@ -50,19 +52,19 @@ export default function ReportsClient({
       </div>
 
       {activeTab === "compliance" && (
-        <ReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
+        <ReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
       )}
       {activeTab === "body_composition" && (
-        <BodyCompositionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
+        <BodyCompositionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
       )}
       {activeTab === "nutrition" && (
-        <NutritionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
+        <NutritionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
       )}
       {activeTab === "performance" && (
-        <PerformanceReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
+        <PerformanceReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
       )}
       {activeTab === "injury" && (
-        <InjuryReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} />
+        <InjuryReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
       )}
     </div>
   );

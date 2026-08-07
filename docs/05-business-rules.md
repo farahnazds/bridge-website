@@ -115,12 +115,36 @@ Instructions can request (e.g., no negative language toward athletes).
 
 - **Website UI:** English only for launch, built on a translation-key
   system so more languages are additive later, not a rewrite
-- **Reports:** practitioner sets a default report language in Settings;
-  can override per generation. Bilingual reports are supported as
-  **one PDF with separate pages per language** (e.g., English pages
-  first, Arabic pages after) rather than two separate documents or a
-  single mixed-language layout. Arabic reports need proper RTL layout
-  handling; "Bridgetx" brand name stays LTR even inside an RTL document.
+- **Reports — default language (correction from earlier assumption):**
+  the default is set at **club level by the Club Manager**, in Club
+  Settings, not per practitioner. An earlier draft of this section said
+  "practitioner sets a default report language in Settings"; that
+  conflicted with `03-site-map.md`, which has always listed default
+  report language under the Club Manager's Settings page, and the
+  club-level reading is the one that was built.
+  - **Club Manager** sets the club-wide default (`club_settings.
+    default_report_language`, English or Arabic for launch — see
+    `database/migrations/022_club_settings.sql`).
+  - **Club Practitioners inherit** that default and can still **override
+    it per generation** on any individual report, so a per-practitioner
+    default would add a second stored preference without enabling
+    anything the override doesn't already cover.
+  - **Independent Practitioners** have no club to inherit from, so they
+    keep their own default in their own Settings
+    (`/practice/[practitioner-id]`) — unchanged by this correction.
+  - **[NOT YET WIRED — as of 2026-08-07]** The setting is stored and
+    editable, but nothing consumes it: every report form still submits a
+    hidden `language="english"`, and no generator reads
+    `club_settings.default_report_language`. So today all reports are
+    English regardless of what a Club Manager selects, and the
+    per-generation override does not exist as a control yet. Wiring it
+    means seeding the form's language field from the club default and
+    exposing it as a real selector on the report forms.
+- **Reports — bilingual output:** supported as **one PDF with separate
+  pages per language** (e.g., English pages first, Arabic pages after)
+  rather than two separate documents or a single mixed-language layout.
+  Arabic reports need proper RTL layout handling; "Bridgetx" brand name
+  stays LTR even inside an RTL document.
 
 ## Multi-sport foundation
 

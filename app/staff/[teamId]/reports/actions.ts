@@ -8,6 +8,7 @@ import { sendReportSharedEmail } from "@/lib/resend";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
 import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
+import { resolveReportLanguage } from "@/lib/reportLanguage";
 import {
   buildCompliancePrompt,
   COMPLIANCE_SYSTEM_PROMPT,
@@ -62,7 +63,9 @@ export async function generateComplianceReport(
   const periodStart = String(formData.get("period_start") ?? "").trim();
   const periodEnd = String(formData.get("period_end") ?? "").trim();
   const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
-  const language = String(formData.get("language") ?? "english").trim();
+  // Falls back to the club's default_report_language when the practitioner
+  // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
+  const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
 
   if (!teamId || !athleteId || !periodStart || !periodEnd) {
     return {
@@ -279,7 +282,9 @@ export async function generateBodyCompositionReport(
   const periodStart = String(formData.get("period_start") ?? "").trim();
   const periodEnd = String(formData.get("period_end") ?? "").trim();
   const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
-  const language = String(formData.get("language") ?? "english").trim();
+  // Falls back to the club's default_report_language when the practitioner
+  // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
+  const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
 
   if (!teamId || !athleteId || !periodStart || !periodEnd) {
     return {
@@ -655,7 +660,9 @@ export async function generateNutritionReport(
   const subMode = String(formData.get("sub_mode") ?? "general").trim() as NutritionSubMode;
   const targetDate = String(formData.get("target_date") ?? "").trim();
   const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
-  const language = String(formData.get("language") ?? "english").trim();
+  // Falls back to the club's default_report_language when the practitioner
+  // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
+  const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
 
   if (!teamId || !athleteId) return { ...base, error: "Athlete is required." };
   if (subMode !== "next_day" && subMode !== "general") return { ...base, error: "Invalid report mode." };
@@ -937,7 +944,9 @@ export async function generatePerformanceReport(
   const periodStart = String(formData.get("period_start") ?? "").trim();
   const periodEnd = String(formData.get("period_end") ?? "").trim();
   const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
-  const language = String(formData.get("language") ?? "english").trim();
+  // Falls back to the club's default_report_language when the practitioner
+  // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
+  const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
 
   if (!teamId || !athleteId || !periodStart || !periodEnd) {
     return { ...base, error: "Athlete and report period are required." };
@@ -1124,7 +1133,9 @@ export async function generateInjuryReport(
   const periodStart = String(formData.get("period_start") ?? "").trim();
   const periodEnd = String(formData.get("period_end") ?? "").trim();
   const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
-  const language = String(formData.get("language") ?? "english").trim();
+  // Falls back to the club's default_report_language when the practitioner
+  // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
+  const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
 
   if (!teamId || !athleteId || !periodStart || !periodEnd) {
     return { ...base, error: "Athlete and report period are required." };

@@ -46,10 +46,12 @@ export default function NutritionReportForm({
   teamId,
   athletes,
   practitioners,
+  defaultLanguage,
 }: {
   teamId: string;
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
   practitioners: RecipientCandidate[];
+  defaultLanguage: string;
 }) {
   const [state, formAction] = useActionState(generateNutritionReport, initialState);
   const [subMode, setSubMode] = useState<"next_day" | "general">("next_day");
@@ -64,7 +66,24 @@ export default function NutritionReportForm({
     <div className="flex flex-col gap-6">
       <form action={formAction} className="flex flex-col gap-5" noValidate>
         <input type="hidden" name="team_id" value={teamId} />
-        <input type="hidden" name="language" value="english" />
+        <div className="flex max-w-xs flex-col gap-1.5">
+          <label htmlFor="NutritionReportForm_language" className={labelClass} style={{ color: "var(--text)" }}>
+            Report language
+          </label>
+          <select
+            id="NutritionReportForm_language"
+            name="language"
+            defaultValue={defaultLanguage}
+            className={inputClass}
+            style={inputStyle}
+          >
+            <option value="english">English</option>
+            <option value="arabic">Arabic</option>
+          </select>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Defaults to your club&apos;s setting. Changing it here affects this report only.
+          </p>
+        </div>
         <input type="hidden" name="sub_mode" value={subMode} />
 
         <fieldset className="flex flex-col gap-2">
