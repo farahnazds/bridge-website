@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getAssignedClubs, getScopedAthletes } from "@/lib/adminScope";
+import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
 
 export const metadata: Metadata = { title: "Product Requests — Admin — Bridgetx" };
@@ -51,6 +51,7 @@ function personName(p: { first_name: string | null; last_name: string | null } |
 
 export default async function AdminProductRequestsPage() {
   const clubs = await getAssignedClubs();
+  const scopeNoun = await getScopeNoun();
   const clubNameById = new Map(clubs.map((c) => [c.id, c.name]));
   const clubIds = clubs.map((c) => c.id);
   const { athletes } = await getScopedAthletes(clubs);
@@ -84,7 +85,7 @@ export default async function AdminProductRequestsPage() {
           Product Requests
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          In-person purchase tracking across your assigned clubs. View-only — requests are marked
+          In-person purchase tracking across ${scopeNoun}. View-only — requests are marked
           fulfilled from the club&apos;s own dashboard.
         </p>
       </div>
@@ -103,7 +104,7 @@ export default async function AdminProductRequestsPage() {
       )}
 
       {!error && clubs.length > 0 && rows.length === 0 && (
-        <EmptyState message="No product requests at your assigned clubs yet." />
+        <EmptyState message={`No product requests at ${scopeNoun} yet.`} />
       )}
 
       {!error && rows.length > 0 && (

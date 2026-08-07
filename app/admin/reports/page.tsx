@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getAssignedClubs, getScopedAthletes } from "@/lib/adminScope";
+import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import EmptyState from "@/components/EmptyState";
 import ReportMarkdown from "@/components/ReportMarkdown";
@@ -37,6 +37,7 @@ function personName(p: { first_name: string | null; last_name: string | null } |
 // generating practitioner (docs/04-user-flows.md Flow 7).
 export default async function AdminReportsPage() {
   const clubs = await getAssignedClubs();
+  const scopeNoun = await getScopeNoun();
   const { athletes, error: athleteError } = await getScopedAthletes(clubs);
   const athleteById = new Map(athletes.map((a) => [a.id, a]));
   const athleteIds = athletes.map((a) => a.id);
@@ -95,7 +96,7 @@ export default async function AdminReportsPage() {
           Reports
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Reports generated across your assigned clubs. View-only — the generating practitioner
+          Reports generated across ${scopeNoun}. View-only — the generating practitioner
           decides whether and with whom a report is shared.
         </p>
       </div>
@@ -114,7 +115,7 @@ export default async function AdminReportsPage() {
       )}
 
       {!error && clubs.length > 0 && rows.length === 0 && (
-        <EmptyState message="No reports generated at your assigned clubs yet." />
+        <EmptyState message={`No reports generated at ${scopeNoun} yet.`} />
       )}
 
       {!error && rows.length > 0 && (

@@ -63,6 +63,16 @@ export default async function SuperAdminLayout({
             >
               Branding &amp; Templates
             </Link>
+            {/* The cross-platform oversight views (athletes, assessments,
+                compliance, reports, injuries, competitions, content, product
+                requests) live under /admin and are shared with the Admin role
+                — same pages, wider scope. See the note in app/admin/layout. */}
+            <Link
+              href="/admin"
+              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
+            >
+              Oversight
+            </Link>
           </nav>
           <span className="text-sm text-white/70">{profile.first_name ?? profile.email}</span>
         </div>

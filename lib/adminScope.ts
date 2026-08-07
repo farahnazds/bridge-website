@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth";
 
 // The Admin's club scope, resolved in one place. Every Admin page derives
 // its data from this rather than re-deriving the boundary itself — the
@@ -13,6 +14,26 @@ export interface AssignedClub {
 
 export async function getAssignedClubs(): Promise<AssignedClub[]> {
   const supabase = await createClient();
+
+  // Super Admin is unscoped: every club, not an assignment list.
+  //
+  // docs/02-roles-and-permissions.md — "Super Admin: Full access to
+  // everything" — and docs/03-site-map.md describes Admin as "Same structure
+  // as Super Admin, scoped to assigned clubs". Scope is therefore a function
+  // of ROLE over one shared set of pages, rather than a duplicate dashboard.
+  //
+  // This branch is load-bearing, not a convenience: admin_club_assignments
+  // holds no rows for a Super Admin, so without it they reach every Admin
+  // page and find all of them empty — which is exactly what the audit found.
+  //
+  // Not a privilege escalation. Every table already carries a "super admin
+  // full access" RLS policy, so the database has always returned these rows
+  // to this role; only the app layer was narrowing them away.
+  const profile = await getCurrentProfile();
+  if (profile?.role === "super_admin") {
+    const { data } = await supabase.from("clubs").select("id, name").order("name");
+    return (data ?? []) as AssignedClub[];
+  }
 
   // One round trip, not two. This previously fetched assignment rows and
   // then fetched `clubs` by id — two sequential network hops to build one
@@ -69,4 +90,20 @@ export async function getScopedAthletes(
   })) as ScopedAthlete[];
 
   return { athletes, error: error?.message ?? null };
+}
+
+/**
+ * How to describe the current caller's reach in user-facing copy.
+ *
+ * These pages serve both Admin (scoped to assignments) and Super Admin
+ * (unscoped). Telling a Super Admin they are looking at "your assigned clubs"
+ * is wrong — they have none, and they are seeing every club. In a product
+ * whose whole subject is who-can-see-what, that copy has to track the actual
+ * scope rather than assume the narrower role.
+ *
+ * Cheap to call: getCurrentProfile() is React-cached per request.
+ */
+export async function getScopeNoun(): Promise<string> {
+  const profile = await getCurrentProfile();
+  return profile?.role === "super_admin" ? "all clubs" : "your assigned clubs";
 }

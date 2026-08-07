@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getAssignedClubs, getScopedAthletes } from "@/lib/adminScope";
+import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
 
 export const metadata: Metadata = { title: "Assessments — Admin — Bridgetx" };
@@ -46,6 +46,7 @@ function fmt(v: number | null, unit = ""): string {
 // Practitioner dashboard; this is cross-club oversight.
 export default async function AdminAssessmentsPage() {
   const clubs = await getAssignedClubs();
+  const scopeNoun = await getScopeNoun();
   const { athletes, error: athleteError } = await getScopedAthletes(clubs);
   const athleteById = new Map(athletes.map((a) => [a.id, a]));
   const athleteIds = athletes.map((a) => a.id);
@@ -77,7 +78,7 @@ export default async function AdminAssessmentsPage() {
           Assessments
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Body composition assessment history across your assigned clubs. View-only — assessments
+          Body composition assessment history across ${scopeNoun}. View-only — assessments
           are logged by Club Practitioners.
         </p>
       </div>
@@ -96,7 +97,7 @@ export default async function AdminAssessmentsPage() {
       )}
 
       {!error && clubs.length > 0 && rows.length === 0 && (
-        <EmptyState message="No assessments logged at your assigned clubs yet." />
+        <EmptyState message={`No assessments logged at ${scopeNoun} yet.`} />
       )}
 
       {!error && rows.length > 0 && (

@@ -33,7 +33,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const profile = await getCurrentProfile();
 
   if (!profile) redirect("/login");
-  if (profile.role !== "admin") redirect("/");
+
+  // Super Admin shares these pages rather than having a parallel set.
+  // docs/03-site-map.md: Admin is "Same structure as Super Admin, scoped to
+  // assigned clubs" — so the difference between the two roles is SCOPE, which
+  // getAssignedClubs() resolves, not a separate dashboard. Duplicating 16
+  // routes under /super-admin would have meant two implementations of the
+  // same views drifting apart, and would have needed the same scope fix
+  // anyway.
+  //
+  // Before this, a Super Admin was redirected away from every page here —
+  // including seven fully-built ones — despite having full RLS read access
+  // to all of the underlying data.
+  const isSuperAdmin = profile.role === "super_admin";
+  if (profile.role !== "admin" && !isSuperAdmin) redirect("/");
 
   return (
     <div className="flex min-h-screen">
@@ -52,9 +65,24 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           />
         </div>
 
+        {/* The label states the SCOPE, because the same pages serve two roles
+            with different reach. A Super Admin seeing "Assigned clubs" would
+            be actively misleading — they are looking at every club. */}
         <div className="px-2">
-          <p className="text-xs uppercase tracking-wide text-white/50">Admin</p>
-          <p className="text-sm font-semibold text-white">Assigned clubs</p>
+          <p className="text-xs uppercase tracking-wide text-white/50">
+            {isSuperAdmin ? "Super Admin" : "Admin"}
+          </p>
+          <p className="text-sm font-semibold text-white">
+            {isSuperAdmin ? "All clubs" : "Assigned clubs"}
+          </p>
+          {isSuperAdmin && (
+            <Link
+              href="/super-admin/clubs"
+              className="mt-2 inline-block text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
+            >
+              ← Club management
+            </Link>
+          )}
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">

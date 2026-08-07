@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getAssignedClubs, getScopedAthletes } from "@/lib/adminScope";
+import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
 
 export const metadata: Metadata = { title: "Compliance — Admin — Bridgetx" };
@@ -15,6 +15,7 @@ const NOT_LOGGED = { label: "Not yet logged", color: "var(--text-muted)" };
 // Club Practitioner) — the Admin view is adherence oversight across clubs.
 export default async function AdminCompliancePage() {
   const clubs = await getAssignedClubs();
+  const scopeNoun = await getScopeNoun();
   const { athletes, error: athleteError } = await getScopedAthletes(clubs);
   const athleteIds = athletes.map((a) => a.id);
 
@@ -60,7 +61,7 @@ export default async function AdminCompliancePage() {
           Compliance
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Check-in adherence across your assigned clubs —{" "}
+          Check-in adherence across ${scopeNoun} —{" "}
           {new Date(today).toLocaleDateString(undefined, {
             weekday: "long",
             month: "long",
@@ -84,7 +85,7 @@ export default async function AdminCompliancePage() {
       )}
 
       {!error && clubs.length > 0 && athletes.length === 0 && (
-        <EmptyState message="No athletes registered at your assigned clubs yet." />
+        <EmptyState message={`No athletes registered at ${scopeNoun} yet.`} />
       )}
 
       {!error && athletes.length > 0 && (

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getAssignedClubs, getScopedAthletes } from "@/lib/adminScope";
+import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
 
 export const metadata: Metadata = { title: "Athletes — Admin — Bridgetx" };
@@ -15,6 +15,7 @@ const TIER_LABEL: Record<string, string> = {
 // oversight across assigned clubs (docs/02-roles-and-permissions.md).
 export default async function AdminAthletesPage() {
   const clubs = await getAssignedClubs();
+  const scopeNoun = await getScopeNoun();
   const { athletes, error } = await getScopedAthletes(clubs);
 
   type Row = (typeof athletes)[number] & {
@@ -54,7 +55,7 @@ export default async function AdminAthletesPage() {
       )}
 
       {!error && clubs.length > 0 && rows.length === 0 && (
-        <EmptyState message="No athletes registered at your assigned clubs yet." />
+        <EmptyState message={`No athletes registered at ${scopeNoun} yet.`} />
       )}
 
       {!error && rows.length > 0 && (

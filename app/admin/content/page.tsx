@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getAssignedClubs } from "@/lib/adminScope";
+import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
 
 export const metadata: Metadata = { title: "Content/Relay — Admin — Bridgetx" };
@@ -39,6 +39,7 @@ function personName(p: { first_name: string | null; last_name: string | null } |
 
 export default async function AdminContentPage() {
   const clubs = await getAssignedClubs();
+  const scopeNoun = await getScopeNoun();
   const clubNameById = new Map(clubs.map((c) => [c.id, c.name]));
   const clubIds = clubs.map((c) => c.id);
 
@@ -73,7 +74,7 @@ export default async function AdminContentPage() {
           Content/Relay
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Platform-wide content plus anything relayed specifically to your assigned clubs.
+          Platform-wide content plus anything relayed specifically to ${scopeNoun}.
         </p>
       </div>
 
@@ -87,7 +88,7 @@ export default async function AdminContentPage() {
       )}
 
       {!error && rows.length === 0 && (
-        <EmptyState message="No content published to your assigned clubs yet." />
+        <EmptyState message={`No content published to ${scopeNoun} yet.`} />
       )}
 
       {!error && rows.length > 0 && (

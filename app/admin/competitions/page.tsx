@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getAssignedClubs } from "@/lib/adminScope";
+import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
 
 export const metadata: Metadata = { title: "Competition Intelligence — Admin — Bridgetx" };
@@ -81,6 +81,7 @@ function FixtureTable({
 // (oversight, all clubs)" for Super Admin, scoped to assigned clubs here).
 export default async function AdminCompetitionsPage() {
   const clubs = await getAssignedClubs();
+  const scopeNoun = await getScopeNoun();
   const clubNameById = new Map(clubs.map((c) => [c.id, c.name]));
   const clubIds = clubs.map((c) => c.id);
 
@@ -117,7 +118,7 @@ export default async function AdminCompetitionsPage() {
           Competition Intelligence
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Fixtures across your assigned clubs. View-only — fixtures are entered from each
+          Fixtures across ${scopeNoun}. View-only — fixtures are entered from each
           club&apos;s own dashboard.
         </p>
       </div>
@@ -136,7 +137,7 @@ export default async function AdminCompetitionsPage() {
       )}
 
       {!error && clubs.length > 0 && rows.length === 0 && (
-        <EmptyState message="No fixtures recorded at your assigned clubs yet." />
+        <EmptyState message={`No fixtures recorded at ${scopeNoun} yet.`} />
       )}
 
       {!error && upcoming.length > 0 && (

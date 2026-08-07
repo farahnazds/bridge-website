@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getAssignedClubs, getScopedAthletes } from "@/lib/adminScope";
+import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import { INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 import EmptyState from "@/components/EmptyState";
 
@@ -43,6 +43,7 @@ function personName(p: { first_name: string | null; last_name: string | null } |
 // Practitioners.
 export default async function AdminInjuriesPage() {
   const clubs = await getAssignedClubs();
+  const scopeNoun = await getScopeNoun();
   const { athletes, error: athleteError } = await getScopedAthletes(clubs);
   const athleteById = new Map(athletes.map((a) => [a.id, a]));
   const athleteIds = athletes.map((a) => a.id);
@@ -76,7 +77,7 @@ export default async function AdminInjuriesPage() {
           Injury Log / Return to Play
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Injuries and return-to-play phases across your assigned clubs. View-only — injuries are
+          Injuries and return-to-play phases across ${scopeNoun}. View-only — injuries are
           logged by Club Practitioners.
         </p>
       </div>
@@ -95,7 +96,7 @@ export default async function AdminInjuriesPage() {
       )}
 
       {!error && clubs.length > 0 && rows.length === 0 && (
-        <EmptyState message="No injuries logged at your assigned clubs." />
+        <EmptyState message={`No injuries logged at ${scopeNoun}.`} />
       )}
 
       {!error && rows.length > 0 && (

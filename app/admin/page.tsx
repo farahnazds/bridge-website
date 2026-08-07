@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs } from "@/lib/adminScope";
 
 export const metadata: Metadata = { title: "Overview — Admin — Bridgetx" };
@@ -47,6 +48,9 @@ export default async function AdminOverviewPage() {
   // copy of the scoping query, which duplicated the security boundary and
   // meant it missed the single-round-trip fix made to getAssignedClubs.
   const assignedClubs = await getAssignedClubs();
+  // These pages serve Admin and Super Admin; the metric label below has to say
+  // which reach it is reporting rather than always claiming "assigned".
+  const isSuperAdmin = (await getCurrentProfile())?.role === "super_admin";
   const clubIds = assignedClubs.map((c) => c.id);
   const assignmentError = null;
 
@@ -139,7 +143,7 @@ export default async function AdminOverviewPage() {
       {!loadError && clubIds.length > 0 && (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <StatCard label="Assigned clubs" value={clubs.length} />
+            <StatCard label={isSuperAdmin ? "Clubs" : "Assigned clubs"} value={clubs.length} />
             <StatCard label="Athletes" value={athletes.length} hint="Across your clubs" />
             <StatCard
               label="Check-ins today"
