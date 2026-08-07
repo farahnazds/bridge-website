@@ -9,6 +9,7 @@ import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
 import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
 import { resolveReportLanguage } from "@/lib/reportLanguage";
+import { getClinicalLibraryEntries } from "@/lib/clinicalLibrary";
 import {
   buildCompliancePrompt,
   COMPLIANCE_SYSTEM_PROMPT,
@@ -138,11 +139,11 @@ export async function generateComplianceReport(
     .limit(1)
     .maybeSingle();
 
-  const { data: libraryData } = await supabase
-    .from("clinical_research_library")
-    .select("title, year, source, clinical_note")
-    .eq("topic_tag", "compliance");
-  const clinicalLibraryEntries: ClinicalLibraryEntry[] = libraryData ?? [];
+  // Service role, not the caller's client: clinical_research_library is
+  // super-admin-only under RLS, so reading it as the practitioner returned
+  // zero rows every time. See lib/clinicalLibrary.ts.
+  const libraryData = await getClinicalLibraryEntries("compliance");
+  const clinicalLibraryEntries: ClinicalLibraryEntry[] = libraryData;
 
   const dataCheckNote =
     checkins.length > 0
@@ -390,11 +391,11 @@ export async function generateBodyCompositionReport(
     .limit(1)
     .maybeSingle();
 
-  const { data: libraryData } = await supabase
-    .from("clinical_research_library")
-    .select("title, year, source, clinical_note")
-    .eq("topic_tag", "body_composition");
-  const clinicalLibraryEntries: ClinicalLibraryEntry[] = libraryData ?? [];
+  // Service role, not the caller's client: clinical_research_library is
+  // super-admin-only under RLS, so reading it as the practitioner returned
+  // zero rows every time. See lib/clinicalLibrary.ts.
+  const libraryData = await getClinicalLibraryEntries("body_composition");
+  const clinicalLibraryEntries: ClinicalLibraryEntry[] = libraryData;
 
   const dataCheckNote = usedFallbackAssessment
     ? `No assessment logged between ${periodStart} and ${periodEnd} — using the most recent assessment available before that: ${assessments[0].date}.${
@@ -788,10 +789,10 @@ export async function generateNutritionReport(
     culturalNotes: (s.cultural_notes as string | null) ?? null,
   }));
 
-  const { data: libraryData } = await supabase
-    .from("clinical_research_library")
-    .select("title, year, source, clinical_note")
-    .eq("topic_tag", "nutrition");
+  // Service role, not the caller's client: clinical_research_library is
+  // super-admin-only under RLS, so reading it as the practitioner returned
+  // zero rows every time. See lib/clinicalLibrary.ts.
+  const libraryData = await getClinicalLibraryEntries("nutrition");
 
   const { data: previousReport } = await supabase
     .from("reports")
@@ -840,7 +841,7 @@ export async function generateNutritionReport(
     trainingLoad,
     prescription,
     supplementLibrary,
-    clinicalLibraryEntries: libraryData ?? [],
+    clinicalLibraryEntries: libraryData,
     previousReportSummary: previousReport?.ai_summary ?? null,
     periodStart,
     periodEnd,
@@ -1005,10 +1006,10 @@ export async function generatePerformanceReport(
     .limit(1)
     .maybeSingle();
 
-  const { data: libraryData } = await supabase
-    .from("clinical_research_library")
-    .select("title, year, source, clinical_note")
-    .eq("topic_tag", "performance");
+  // Service role, not the caller's client: clinical_research_library is
+  // super-admin-only under RLS, so reading it as the practitioner returned
+  // zero rows every time. See lib/clinicalLibrary.ts.
+  const libraryData = await getClinicalLibraryEntries("performance");
 
   // Stated in the same plain register the report itself must use — a
   // missing source is a fact about coverage, not a warning.
@@ -1030,7 +1031,7 @@ export async function generatePerformanceReport(
     valdRows,
     periodStart,
     periodEnd,
-    clinicalLibraryEntries: libraryData ?? [],
+    clinicalLibraryEntries: libraryData,
     previousReportSummary: previousReport?.ai_summary ?? null,
     additionalInstructions,
     language,
@@ -1197,10 +1198,10 @@ export async function generateInjuryReport(
     .limit(1)
     .maybeSingle();
 
-  const { data: libraryData } = await supabase
-    .from("clinical_research_library")
-    .select("title, year, source, clinical_note")
-    .eq("topic_tag", "injury");
+  // Service role, not the caller's client: clinical_research_library is
+  // super-admin-only under RLS, so reading it as the practitioner returned
+  // zero rows every time. See lib/clinicalLibrary.ts.
+  const libraryData = await getClinicalLibraryEntries("injury");
 
   const carried = injuries.filter((i) => i.carriedIn).length;
   const unresolved = injuries.filter((i) => i.status !== "cleared").length;
@@ -1221,7 +1222,7 @@ export async function generateInjuryReport(
     injuries,
     periodStart,
     periodEnd,
-    clinicalLibraryEntries: libraryData ?? [],
+    clinicalLibraryEntries: libraryData,
     previousReportSummary: previousReport?.ai_summary ?? null,
     additionalInstructions,
     language,

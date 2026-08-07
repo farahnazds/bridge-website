@@ -81,6 +81,18 @@ export const OTHER_SPECIALTY = "__other__";
 // Matches the values ever written into `reports.report_types` by this
 // build. docs/07-ai-engine.md lists five types; four are implemented —
 // Injury is the only one still unbuilt.
+// The ONLY valid topic_tag values. Each one is queried verbatim by a report
+// generator in app/staff/[teamId]/reports/actions.ts — an entry tagged with
+// anything else is invisible to every report, silently. That is why the
+// library form offers a fixed select rather than a free-text field.
+export const CLINICAL_TOPIC_TAGS = [
+  { value: "compliance", label: "Compliance" },
+  { value: "body_composition", label: "Body Composition" },
+  { value: "nutrition", label: "Nutrition" },
+  { value: "performance", label: "Performance" },
+  { value: "injury", label: "Injury" },
+] as const;
+
 export const REPORT_TYPE_LABELS: Record<string, string> = {
   compliance: "Compliance",
   body_composition: "Body Composition",

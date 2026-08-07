@@ -58,6 +58,12 @@ export default async function SuperAdminLayout({
               Clubs
             </Link>
             <Link
+              href="/super-admin/clinical-research"
+              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
+            >
+              Clinical + Research
+            </Link>
+            <Link
               href="/super-admin/branding"
               className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
             >
