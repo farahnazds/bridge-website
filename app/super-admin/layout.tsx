@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import SuperAdminClubSwitcher from "./SuperAdminClubSwitcher";
 
 export default async function SuperAdminLayout({
   children,
@@ -12,6 +14,11 @@ export default async function SuperAdminLayout({
 
   if (!profile) redirect("/login");
   if (profile.role !== "super_admin") redirect("/");
+
+  // Every club — Super Admin has no scoping. Feeds the persistent switcher so
+  // jumping between clubs never requires going back to a list page.
+  const supabase = await createClient();
+  const { data: clubs } = await supabase.from("clubs").select("id, name, sport").order("name");
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "var(--bg)" }}>
@@ -36,6 +43,13 @@ export default async function SuperAdminLayout({
           </span>
         </Link>
         <div className="flex items-center gap-6">
+          <SuperAdminClubSwitcher
+            clubs={(clubs ?? []).map((c) => ({
+              id: c.id as string,
+              label: c.name as string,
+              sublabel: (c.sport as string) ?? null,
+            }))}
+          />
           <nav className="flex items-center gap-4">
             <Link
               href="/super-admin/clubs"

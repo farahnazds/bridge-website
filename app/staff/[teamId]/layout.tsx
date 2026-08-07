@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
+import ContextSwitcher from "@/components/ContextSwitcher";
 
 const NAV_SECTIONS: { label: string; slug: string }[] = [
   { label: "Roster", slug: "" },
@@ -37,7 +38,7 @@ export default async function TeamLayout({
   const context = await getStaffTeamContext(teamId);
   if (!context) notFound();
 
-  const { profile, team, isManager } = context;
+  const { profile, team, isManager, availableTeams } = context;
   if (profile.role !== "club_practitioner" && profile.role !== "club_manager") redirect("/");
 
   return (
@@ -64,9 +65,18 @@ export default async function TeamLayout({
           >
             {isManager ? "← Teams & Staff" : "← My Teams"}
           </Link>
-          <p className="mt-2 text-sm font-semibold text-white">{team.name}</p>
-          {team.clubs && <p className="text-xs text-white/50">{team.clubs.name}</p>}
         </div>
+
+        {/* Persistent team switcher. Switching keeps you on the same page —
+            /staff/<a>/assessments becomes /staff/<b>/assessments — so changing
+            team never means going back to the list first. Falls back to plain
+            text when the caller only has one team. */}
+        <ContextSwitcher
+          currentId={team.id}
+          options={availableTeams.map((t) => ({ id: t.id, label: t.name, sublabel: t.clubName }))}
+          fallbackBase="/staff"
+          label="Switch team"
+        />
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
           {NAV_SECTIONS.map((section) => (

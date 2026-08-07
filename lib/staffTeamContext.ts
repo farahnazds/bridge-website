@@ -13,6 +13,9 @@ export type StaffTeamContext = {
   profile: Profile;
   team: TeamHeader;
   isManager: boolean;
+  /** Every team this caller may open, for the persistent team switcher.
+   *  Derived from the SAME query — no extra round trip. */
+  availableTeams: { id: string; name: string; clubName: string | null }[];
 };
 
 // Shape returned by the single query below. supabase-js types PostgREST
@@ -71,13 +74,15 @@ export const getStaffTeamContext = cache(
       .from("profiles")
       .select(SELECT)
       .eq("user_id", user.id)
-      // Embedded filters narrow the payload; they are NOT relied on for
-      // authorisation. Every condition that decides access is re-checked in
-      // TypeScript below, so a change in PostgREST embed-filter semantics
-      // can only ever return too much data, never grant access.
-      .eq("staff_team_assignments.team_id", teamId)
+      // Only the staff_role filter is kept. The two team-id filters were
+      // dropped so this one query also yields every team the caller may open,
+      // which feeds the team switcher without a second round trip.
+      //
+      // This does NOT weaken anything: the embedded filters were never relied
+      // on for authorisation. Access is decided in TypeScript below by finding
+      // the requested team among the caller's own rows, so a wider result set
+      // returns more data to filter, never more access.
       .eq("club_staff.staff_role", "club_manager")
-      .eq("club_staff.clubs.teams.id", teamId)
       .maybeSingle();
 
     const row = data as unknown as ContextRow | null;
@@ -94,16 +99,31 @@ export const getStaffTeamContext = cache(
     };
 
     if (row.role === "club_practitioner") {
-      const assignment = (row.staff_team_assignments ?? []).find(
-        (a) => a.team_id === teamId && a.teams?.id === teamId
-      );
+      const assignments = (row.staff_team_assignments ?? []).filter((a) => a.teams);
+      const availableTeams = assignments
+        .map((a) => ({
+          id: a.teams!.id,
+          name: a.teams!.name,
+          clubName: a.teams!.clubs?.name ?? null,
+        }))
+        .sort((x, y) => x.name.localeCompare(y.name));
+
+      const assignment = assignments.find((a) => a.team_id === teamId && a.teams?.id === teamId);
       if (!assignment?.teams) return null;
-      return { profile, team: assignment.teams, isManager: false };
+      return { profile, team: assignment.teams, isManager: false, availableTeams };
     }
 
     if (row.role === "club_manager") {
-      for (const cs of row.club_staff ?? []) {
-        if (cs.staff_role !== "club_manager") continue;
+      const managerRows = (row.club_staff ?? []).filter((cs) => cs.staff_role === "club_manager");
+      const availableTeams = managerRows
+        .flatMap((cs) =>
+          (cs.clubs?.teams ?? [])
+            .filter((t) => t.club_id === cs.club_id)
+            .map((t) => ({ id: t.id, name: t.name, clubName: cs.clubs?.name ?? null }))
+        )
+        .sort((x, y) => x.name.localeCompare(y.name));
+
+      for (const cs of managerRows) {
         const team = (cs.clubs?.teams ?? []).find(
           (t) => t.id === teamId && t.club_id === cs.club_id
         );
@@ -112,6 +132,7 @@ export const getStaffTeamContext = cache(
             profile,
             team: { ...team, clubs: cs.clubs ? { name: cs.clubs.name } : null },
             isManager: true,
+            availableTeams,
           };
         }
       }

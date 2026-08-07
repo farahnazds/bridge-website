@@ -95,8 +95,14 @@ export default async function ClubsPage() {
             <tbody>
               {clubs.map((club) => (
                 <tr key={club.id} style={{ borderTop: "1px solid var(--border)" }}>
-                  <td className="px-5 py-3 font-medium" style={{ color: "var(--text)" }}>
-                    {club.name}
+                  <td className="px-5 py-3 font-medium">
+                    <Link
+                      href={`/super-admin/clubs/${club.id}`}
+                      className="underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      style={{ color: "var(--brand-blue)" }}
+                    >
+                      {club.name}
+                    </Link>
                   </td>
                   <td className="px-5 py-3" style={{ color: "var(--text)" }}>
                     {club.sport}

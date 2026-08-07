@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import ContextSwitcher from "@/components/ContextSwitcher";
 
 const NAV_SECTIONS: { label: string; slug: string }[] = [
   { label: "Overview", slug: "" },
@@ -50,6 +51,22 @@ export default async function ClubLayout({
 
   if (!club) notFound();
 
+  // Clubs this manager holds a club_manager row at. club_staff allows one
+  // profile across several clubs simultaneously (see its table comment), and
+  // resolvePostLoginPath already branches on the multi-club case — so the
+  // switcher is needed here, not only for practitioners.
+  const { data: managed } = await supabase
+    .from("club_staff")
+    .select("club_id, clubs(name, sport)")
+    .eq("profile_id", profile.id)
+    .eq("staff_role", "club_manager");
+  type ManagedRow = { club_id: string; clubs: { name: string; sport: string | null } | null };
+  const seen = new Set<string>();
+  const availableClubs = ((managed ?? []) as unknown as ManagedRow[])
+    .filter((m) => m.clubs && !seen.has(m.club_id) && seen.add(m.club_id))
+    .map((m) => ({ id: m.club_id, label: m.clubs!.name, sublabel: m.clubs!.sport ?? null }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   return (
     <div className="flex min-h-screen">
       <aside
@@ -69,8 +86,18 @@ export default async function ClubLayout({
 
         <div className="px-2">
           <p className="text-xs uppercase tracking-wide text-white/50">Club</p>
-          <p className="text-sm font-semibold text-white">{club.name}</p>
         </div>
+
+        {/* Persistent club switcher, for a manager who holds club_manager rows
+            at more than one club. Switching preserves the current page, so
+            /club/<a>/settings becomes /club/<b>/settings. Renders as plain
+            text for the single-club case, which is most managers. */}
+        <ContextSwitcher
+          currentId={clubId}
+          options={availableClubs}
+          fallbackBase="/club"
+          label="Switch club"
+        />
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
           {NAV_SECTIONS.map((section) => (
