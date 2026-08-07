@@ -4,6 +4,9 @@ import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+// "My Assessments" is deliberately absent: it and "My Body Composition" read
+// the same `assessments` rows, so the two site-map entries are served by one
+// page. /athlete/[athleteId]/assessments still resolves — it redirects.
 const NAV_SECTIONS: { label: string; slug: string }[] = [
   { label: "Home", slug: "" },
   { label: "Daily Check-In", slug: "checkin" },
@@ -11,7 +14,6 @@ const NAV_SECTIONS: { label: string; slug: string }[] = [
   { label: "My Body Composition", slug: "body-composition" },
   { label: "My Protocol", slug: "protocol" },
   { label: "My Reports", slug: "reports" },
-  { label: "My Assessments", slug: "assessments" },
   { label: "Messenger", slug: "messenger" },
   { label: "Profile", slug: "profile" },
 ];

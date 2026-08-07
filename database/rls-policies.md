@@ -596,3 +596,67 @@ Every policy above must be a real Postgres RLS policy on the table
 itself — never enforced only in the frontend. Edit-window rules (7-day,
 2-day) should be enforced as actual row-level time comparisons in the
 policy, not just disabled buttons in the UI.
+
+## Added: `supplement_protocols` (2026-08-07)
+
+New table (migration 020). "My Protocol" was specified across the docs — a
+Club Athlete page, athletes read-only on "protocol", "current protocol" pulled
+before report generation — but there was no table for it.
+
+**Policy set mirrors `assessments`**, the closest analogue (athlete-linked
+clinical data entered by staff):
+
+| Role | Access |
+|---|---|
+| Super Admin | full |
+| Admin | full, scoped through `is_admin_for_club()` on the athlete's club |
+| Club staff | select / insert / update via `is_assigned_to_athlete_via_team()` |
+| Independent practitioner | select / insert, update only rows they prescribed |
+| Athlete | **select only**, `is_own_athlete_profile(athlete_id)` |
+
+The athlete has no insert or update policy at all: a Club Athlete has zero
+self-editable fields, and a protocol is prescribed *to* them, never by them.
+
+Unlike `assessments` there is no 7-day edit window. Superseding is the
+correction mechanism, so history stays intact instead of being rewritten in
+place. The UPDATE policy carries both `using` and `with check` scoped to the
+caller's team athletes, so a row cannot be reassigned to another athlete on
+update.
+
+**Two structural guarantees, not conventions:**
+
+- a partial unique index `(athlete_id) where end_date is null` makes "one
+  active row per athlete" impossible to violate;
+- a `before insert` trigger closes the previous active row. It must be
+  `before`, not `after` — the partial unique index is checked as the row goes
+  in, so an `after` trigger would fire only once the insert had already been
+  rejected.
+
+**Links to both clinical and commercial layers** (`supplement_library_id`,
+`product_id`) so the protocol page, the AI prescription layer and
+`assertReportSafe` resolve to the same sources rather than becoming a third
+unreconciled one. See the migration header for the full reasoning.
+
+## Added: athlete reads linked staff profiles (2026-08-07)
+
+Migration 021. An athlete's only SELECT policy on `profiles` was
+`read own profile`, so every athlete-facing surface that names a staff member
+resolved the PostgREST embed to null and fell back to a placeholder:
+
+- `/athlete/[id]/protocol` — "Prescribed by your practitioner" rather than the name
+- `/athlete/[id]/reports` — "shared by —" (**pre-existing**; `MyReportsList`
+  has rendered an em dash since it was built, found while verifying 020)
+
+Nothing leaked and nothing errored, which is why it went unnoticed — a
+data-completeness bug, not a security one.
+
+`"athlete reads linked staff profiles"` mirrors the existing
+`"club staff reads linked staff profiles"` in the opposite direction, scoped
+via `is_staff_linked_to_current_athlete()` to club staff at the athlete's own
+club plus independent practitioners with a live approved link. No other
+profiles become visible.
+
+The helper is `SECURITY DEFINER` with a pinned `search_path` on purpose: a
+policy on `profiles` that inline-queries `athletes`/`club_staff` risks the
+recursive-policy failure this schema hit in migrations 001 and 014 (42P17).
+Reading those tables outside RLS inside the helper means no cycle can form.
