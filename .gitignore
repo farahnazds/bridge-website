@@ -42,3 +42,8 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Claude Code: personal permission allow-list, machine-specific.
+# The vendored skill in .claude/skills/ IS committed deliberately — see
+# .claude/skills/ui-ux-pro-max/PINNED.md
+.claude/settings.local.json

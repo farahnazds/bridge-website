@@ -63,6 +63,33 @@ Built and owned by Blessing Mushonga, Performance Nutritionist.
 Always check `docs/06-design-system.md` for colors, fonts, and component
 style — do not invent new colors, spacing, or fonts ad hoc.
 
+### The `ui-ux-pro-max` skill is advisory, not authoritative
+
+A third-party UI/UX skill is vendored at `.claude/skills/ui-ux-pro-max`
+(pinned — see `PINNED.md` there). It offers 84 styles, 192 palettes and 74
+font pairings.
+
+**`docs/06-design-system.md` always wins.** Bridgetx already has a committed
+brand direction: the gradient, `--brand-navy` through `--brand-teal`, General
+Sans for headings, Inter for body, JetBrains Mono for data, 8–12px radii,
+generous whitespace. The skill is a source of *extra ideas* — layout patterns,
+accessibility checks, chart selection, motion presets, things the design
+system doesn't cover — never a replacement for it.
+
+Concretely, when the skill suggests something that conflicts:
+
+- **Colour, typography, radius, spacing** — follow `06-design-system.md`.
+  Don't adopt a suggested palette or font pairing over the brand ones.
+- **Patterns the design system is silent on** — the skill is useful input.
+  Apply it *in* the brand's colours and faces, not in its own.
+- **If a suggestion seems genuinely better than the current system** — say so
+  and let the user decide. Don't silently deviate, and don't quietly
+  incorporate it either.
+
+The skill can write a `MASTER.md` design-system file of its own. Do not let it
+do that here — it would create a second, competing source of truth alongside
+`docs/06-design-system.md`.
+
 ## Before generating any dashboard, form, or data view
 
 Always check `docs/02-roles-and-permissions.md` to confirm exactly what
