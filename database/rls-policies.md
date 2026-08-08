@@ -660,3 +660,54 @@ The helper is `SECURITY DEFINER` with a pinned `search_path` on purpose: a
 policy on `profiles` that inline-queries `athletes`/`club_staff` risks the
 recursive-policy failure this schema hit in migrations 001 and 014 (42P17).
 Reading those tables outside RLS inside the helper means no cycle can form.
+
+## Added: `segments` policies — table was fully unreachable (2026-08-07)
+
+Migration 023. `segments` shipped with `enable row level security` and **zero
+policies**. RLS denies by default, so the effect was that no role could read or
+write it at all — including Super Admin. Verified live before writing the
+migration: SELECT returned 0 rows for every role and INSERT failed with
+`42501 new row violates row-level security policy for table "segments"`.
+
+This was invisible because the table was also empty: a SELECT returning 0 rows
+looks identical whether the table has no rows or the reader has no access. The
+distinction only surfaced on the first write attempt.
+
+It blocked a real business rule rather than a hypothetical one. A segment is the
+virtual-club mechanism that gives Guided and Independent athletes a prescription
+brand (docs/05-business-rules.md), and `club_brand_products.segment_id` has
+nowhere to point without it.
+
+- `"super admin full access" on segments for all` — matches the pattern used by
+  every other Super-Admin-managed catalogue table.
+- `"authenticated read segments" on segments for select` — every role needs to
+  resolve a segment name to render an athlete's brand assignment; segments carry
+  no athlete-identifying data, so a global read is not a scope leak.
+
+## Verified, not changed: `plans`, `role_permissions`, `brands`, `products` (2026-08-07)
+
+No migration. Recorded because these were checked while building the Payments,
+Supplements & Brands, and Staff & Permissions pages, and the result is
+load-bearing for how those pages gate writes.
+
+All four already carry authenticated-read + super-admin-write policies, which is
+what the pages assume. The check that matters was proving the write denial is
+real rather than apparent: **an RLS-filtered UPDATE reports success while
+changing nothing**, because it matches zero rows and returns no error. Probing
+with `error === null` therefore reported that a club_manager could rewrite
+pricing and the permission ceiling — a false positive.
+
+Re-verified by reading each value back afterwards:
+
+- `plans.price` 99 → still 99 after a club_manager UPDATE
+- `plans` row survived a club_manager DELETE
+- `role_permissions.access_level` `hide` → still `hide` after a club_manager UPDATE
+- club_manager INSERT granting `super_admin` edit → refused, `42501`
+- `brands.name` and `club_brand_products.discount_percent` unchanged after both
+  admin and club_manager UPDATEs
+
+One genuine gap noted, not fixed: **an Admin reads 0 rows from
+`club_brand_products`** even for a club they are assigned to, because that
+table's policy is club-scoped and `admin_club_assignments` does not satisfy it.
+`/admin/supplements-brands` states this on the page rather than rendering an
+empty list that reads as "this club has no brand assigned".

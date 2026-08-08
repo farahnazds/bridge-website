@@ -85,6 +85,104 @@ export const OTHER_SPECIALTY = "__other__";
 // generator in app/staff/[teamId]/reports/actions.ts — an entry tagged with
 // anything else is invisible to every report, silently. That is why the
 // library form offers a fixed select rather than a free-text field.
+// Lives here, not in the leads server-action file: a "use server" module may
+// only export async functions, and exporting this array from there produced
+// "A \"use server\" file can only export async functions, found object." plus a
+// downstream "i.map is not a function" in the client that imported it.
+export const LEAD_STATUSES = ["new", "contacted", "qualified", "won", "lost"] as const;
+
+// Matches the `plans.applies_to` / `plans.billing_period` check constraints in
+// database/schema.sql — fixed DB enums, so no "Other" escape hatch. Note the
+// absence of any club tier: club contracts are arranged offline and carry no
+// amount (docs/05-business-rules.md), so `plans` covers only the self-serve
+// independent tiers.
+export const PLAN_APPLIES_TO = [
+  { value: "independent_athlete", label: "Independent Athlete" },
+  { value: "guided_athlete", label: "Guided Athlete" },
+  { value: "independent_practitioner", label: "Independent Practitioner" },
+];
+export const BILLING_PERIODS = [
+  { value: "monthly", label: "Monthly" },
+  { value: "yearly", label: "Yearly" },
+];
+
+// Matches the `club_brand_products.payment_mode` check constraint.
+export const PAYMENT_MODES = [
+  { value: "in_person", label: "In person" },
+  { value: "bridge_checkout", label: "Bridge checkout" },
+  { value: "redirect_affiliate", label: "Redirect / affiliate" },
+];
+
+// `products.category` is free text and schema.sql comments it "loosely ties to
+// supplement_library.category" — that tie is what lets the commercial layer
+// find a real product for a clinical recommendation (docs/05-business-rules.md,
+// "Clinical recommendation vs. commercial product"). Curated list keeps the two
+// vocabularies aligned; "Other" keeps it open, same pattern as SPORTS.
+export const PRODUCT_CATEGORIES = [
+  { value: "protein", label: "Protein" },
+  { value: "creatine", label: "Creatine" },
+  { value: "vitamin_d", label: "Vitamin D" },
+  { value: "omega_3", label: "Omega-3" },
+  { value: "electrolytes", label: "Electrolytes" },
+  { value: "carbohydrate", label: "Carbohydrate" },
+  { value: "iron", label: "Iron" },
+  { value: "magnesium", label: "Magnesium" },
+  { value: "multivitamin", label: "Multivitamin" },
+  { value: "caffeine", label: "Caffeine" },
+];
+export const OTHER_PRODUCT_CATEGORY = "__other__";
+
+// "Not set" is a real, distinct state in the permission matrix — no row in
+// `role_permissions` at all. It means no ceiling has been declared for that
+// role/module pair, which is different from a declared "hide". Selecting it
+// deletes the row rather than storing a sentinel value the CHECK constraint
+// would reject anyway. Lives here rather than in the matrix's server-action
+// file, which may only export async functions.
+export const NOT_SET = "__not_set__";
+
+// Matches the `role_permissions.access_level` check constraint.
+export const ACCESS_LEVELS = [
+  { value: "hide", label: "Hide" },
+  { value: "view", label: "View" },
+  { value: "edit", label: "Edit" },
+];
+
+// The roles the ceiling matrix can constrain. Deliberately excludes
+// super_admin: the ceiling is the thing Super Admin sets, so letting it be
+// lowered for super_admin would be a self-lockout with no way back in through
+// the UI — the same failure class as the Admin-scope lockout fixed earlier.
+export const PERMISSION_ROLES = [
+  { value: "admin", label: "Admin" },
+  { value: "club_manager", label: "Club Manager" },
+  { value: "club_practitioner", label: "Club Practitioner" },
+  { value: "independent_practitioner", label: "Independent Practitioner" },
+  { value: "athlete", label: "Athlete" },
+  { value: "brand_partner", label: "Brand Partner" },
+  { value: "partnerships_consultant", label: "Partnerships Consultant" },
+];
+
+// `role_permissions.module` is free text (schema.sql: "athletes, assessments,
+// compliance, reports_nutrition, reports_injury, messenger, etc."). This list
+// names modules that actually exist in the build, so the matrix describes real
+// surfaces rather than aspirational ones.
+export const PERMISSION_MODULES = [
+  { value: "athletes", label: "Athletes" },
+  { value: "assessments", label: "Assessments" },
+  { value: "body_composition", label: "Body Composition" },
+  { value: "compliance", label: "Compliance" },
+  { value: "injuries", label: "Injuries" },
+  { value: "supplement_protocols", label: "Supplement Protocols" },
+  { value: "reports_nutrition", label: "Reports — Nutrition" },
+  { value: "reports_injury", label: "Reports — Injury" },
+  { value: "reports_compliance", label: "Reports — Compliance" },
+  { value: "reports_body_composition", label: "Reports — Body Composition" },
+  { value: "reports_performance", label: "Reports — Performance" },
+  { value: "training_load", label: "Training Load" },
+  { value: "messenger", label: "Messenger" },
+  { value: "product_requests", label: "Product Requests" },
+  { value: "billing", label: "Billing" },
+];
+
 export const CLINICAL_TOPIC_TAGS = [
   { value: "compliance", label: "Compliance" },
   { value: "body_composition", label: "Body Composition" },

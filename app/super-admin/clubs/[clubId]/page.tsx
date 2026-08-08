@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import StopResumePanel from "./StopResumePanel";
 
 export const metadata: Metadata = { title: "Club — Super Admin — Bridgetx" };
 
@@ -9,10 +10,10 @@ export const metadata: Metadata = { title: "Club — Super Admin — Bridgetx" }
 // "list, staff, subscription dates (start/end), manual stop/resume". The list
 // existed; there was no way to open an individual club at all.
 //
-// Read-only for now. Manual stop/resume is in the site map but is a state
-// change on a live club's access, so it belongs behind an explicit action
-// rather than being bolted on here without being asked for — see the handover
-// note.
+// Mostly read-only. The one write is manual stop/resume (StopResumePanel),
+// which is the site map's "manual stop/resume with 'talk to support' message
+// on lockout" — gated behind typing the club name, since it cuts off a live
+// club's entire staff and athlete base.
 
 const STATUS_LABEL: Record<string, string> = {
   active: "Active",
@@ -166,6 +167,12 @@ export default async function SuperAdminClubDetailPage({
           </div>
         </div>
       </div>
+
+      <StopResumePanel
+        clubId={club.id as string}
+        clubName={club.name as string}
+        stopped={Boolean(club.stopped_by_super_admin)}
+      />
 
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
