@@ -1,0 +1,346 @@
+[
+  {
+    "year": 2023,
+    "area": "Carbohydrate periodization",
+    "title": "Fuel for the Work Required: A Theoretical Framework",
+    "source": "Sports Medicine",
+    "note": "Burke et al. Underpins carb periodization logic \u2014 match/training/rest day modifiers.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2021,
+    "area": "Protein timing",
+    "title": "A Systematic Review of Protein Timing and MPS",
+    "source": "Journal of the International Society of Sports Nutrition",
+    "note": "Morton et al. 0.4g/kg per meal, 4-5 meals/day maximises muscle protein synthesis. Leucine threshold 2-3g per meal.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2023,
+    "area": "RED-S",
+    "title": "2023 Updated IOC Consensus on Relative Energy Deficiency in Sport",
+    "source": "British Journal of Sports Medicine",
+    "note": "Mountjoy et al. Updated RED-S model. Used for female and male LEA screening.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2022,
+    "area": "Creatine",
+    "title": "Common Questions and Misconceptions About Creatine Supplementation",
+    "source": "Journal of the International Society of Sports Nutrition",
+    "note": "Rawson et al. Addresses safety, loading, maintenance. 5g/day maintenance, no loading required.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2023,
+    "area": "Caffeine",
+    "title": "IOC Consensus on Dietary Supplements and the High-Performance Athlete",
+    "source": "British Journal of Sports Medicine",
+    "note": "Maughan et al. Caffeine 3-6mg/kg 45-60min pre-exercise Grade A. Age-gating for U16.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2019,
+    "area": "Nitrate/beetroot",
+    "title": "Dietary Nitrate Supplementation and Exercise Performance",
+    "source": "Annual Review of Nutrition",
+    "note": "Jones et al. Chronic loading 6 days before competition recommended.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2020,
+    "area": "Beta-alanine",
+    "title": "International Society of Sports Nutrition Position Stand: Beta-Alanine",
+    "source": "Journal of the International Society of Sports Nutrition",
+    "note": "Hobson et al. 4-6g/day 4-6 weeks required for full muscle carnosine loading. Age 16+ only.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2019,
+    "area": "Iron & female athletes",
+    "title": "Iron Considerations for the Athlete",
+    "source": "European Journal of Applied Physiology",
+    "note": "Peeling et al. Female endurance athletes at highest risk. Ferritin <30 ng/mL = intervention threshold.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2025,
+    "area": "Iron status",
+    "title": "Iron Deficiency in Sport: Clinical Assessment and Evidence-Based Treatment",
+    "source": "British Journal of Sports Medicine",
+    "note": "Burden et al. Three-stage iron deficiency model. IV iron under physician guidance for Stage 3.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2023,
+    "area": "Omega-3",
+    "title": "Omega-3 Fatty Acids and Athletic Performance",
+    "source": "Nutrients",
+    "note": "Philpott et al. 2-4g EPA+DHA reduces DOMS, supports neuromuscular function and cognitive performance.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2017,
+    "area": "Collagen & tendons",
+    "title": "Vitamin C-Enriched Gelatin Supplementation Increases Collagen Synthesis",
+    "source": "American Journal of Clinical Nutrition",
+    "note": "Shaw et al. 15g collagen + 50mg Vit C 1hr pre-exercise doubles collagen synthesis rates.",
+    "suggested_tag": "injury"
+  },
+  {
+    "year": 2022,
+    "area": "Tart cherry",
+    "title": "Tart Cherry Concentrate and Team-Sport Recovery: Systematic Review",
+    "source": "Journal of Science and Medicine in Sport",
+    "note": "Bell et al. 30ml concentrate reduces CRP, DOMS, and recovery time.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2019,
+    "area": "Sodium bicarbonate",
+    "title": "Sodium Bicarbonate and High-Intensity Exercise: A Meta-Analysis",
+    "source": "British Journal of Sports Medicine",
+    "note": "Lopes-Silva et al. 0.3g/kg 60-90min pre-event improves anaerobic performance. Age 16+.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2021,
+    "area": "HMB",
+    "title": "HMB Supplementation and Muscle Mass During Energy Restriction",
+    "source": "Journal of Strength and Conditioning Research",
+    "note": "Wilson et al. 3g/day preserves lean mass during caloric restriction.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2019,
+    "area": "Sweat & sodium",
+    "title": "A Practical Guide to Hydration: Evidence for the Athlete and Practitioner",
+    "source": "Sports Science Exchange",
+    "note": "Sawka et al. Sodium replacement essential when >2hr sweat exposure.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2015,
+    "area": "Heat acclimatisation",
+    "title": "Consensus Recommendations on Training and Competing in the Heat",
+    "source": "British Journal of Sports Medicine",
+    "note": "Racinais et al. 10-14 days acclimatisation reduces heat illness risk 50%.",
+    "suggested_tag": "performance"
+  },
+  {
+    "year": 2022,
+    "area": "Hyponatremia prevention",
+    "title": "Hyponatremia in Sport: Prevention and Management",
+    "source": "Clinical Journal of Sport Medicine",
+    "note": "Rosner et al. Overdrinking plain water is the primary cause. Sodium-containing drinks essential >90min.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2020,
+    "area": "Ramadan hydration",
+    "title": "Ramadan and Elite Sport: A Nutritional Review",
+    "source": "Journal of Sports Sciences",
+    "note": "Chamari et al. Pre-dawn hydration window critical. Suhoor = 500ml fluid + electrolytes.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2016,
+    "area": "ACWR",
+    "title": "The Acute:Chronic Workload Ratio Predicts Injury in Elite Rugby League",
+    "source": "British Journal of Sports Medicine",
+    "note": "Hulin et al. ACWR 0.8-1.3 = sweet spot. >1.5 = 6x injury risk increase.",
+    "suggested_tag": "injury"
+  },
+  {
+    "year": 2021,
+    "area": "Training load monitoring",
+    "title": "Training Load and the Promotion of Injury Prevention: A Systematic Review",
+    "source": "International Journal of Sports Physiology and Performance",
+    "note": "Impellizzeri et al. Differentiating external (GPS) vs internal (RPE/HR) load is essential.",
+    "suggested_tag": "performance"
+  },
+  {
+    "year": 2018,
+    "area": "Carb periodization advanced",
+    "title": "Fuelling the Endurance-Trained Athlete: Optimising Nutrition for Training",
+    "source": "Sports Medicine",
+    "note": "Impey et al. Fuel for the work required \u2014 periodised low-carb-availability sessions + full carb on high-intensity days.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2022,
+    "area": "Session RPE",
+    "title": "Session RPE as an Internal Load Monitoring Tool: A Systematic Review",
+    "source": "International Journal of Sports Physiology and Performance",
+    "note": "Impellizzeri et al. sRPE x duration = session load.",
+    "suggested_tag": "performance"
+  },
+  {
+    "year": 2023,
+    "area": "Double sessions",
+    "title": "Nutritional Strategies for Concurrent Training in Team Sports",
+    "source": "Nutrients",
+    "note": "Impey et al. Between-session carb window 1.2g/kg/hr for 4hr. Protein 40g within 30min of each session.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2021,
+    "area": "Sleep and performance",
+    "title": "Sleep and Performance in Elite Athletes: A Systematic Review",
+    "source": "Sports Medicine",
+    "note": "Sargent et al. <7hr sleep impairs reaction time, mood, and injury risk.",
+    "suggested_tag": "performance"
+  },
+  {
+    "year": 2016,
+    "area": "Casein & overnight MPS",
+    "title": "Protein Ingestion Before Sleep Increases Postexercise Overnight Recovery",
+    "source": "Journal of Nutrition",
+    "note": "Trommelen & van Loon. 40g casein pre-sleep increases MPS 22% vs placebo.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2022,
+    "area": "Sleep deprivation & nutrition",
+    "title": "The Hidden Cost of Sleep Loss on Metabolic Regulation and Nutrition",
+    "source": "ACSM Health & Fitness Journal",
+    "note": "Buman et al. Sleep deprivation increases ghrelin, reduces leptin \u2014 drives overeating and impairs glycemic control.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2020,
+    "area": "Magnesium & sleep",
+    "title": "Magnesium and Sleep Quality in Athletes: A Randomised Trial",
+    "source": "Nutrients",
+    "note": "Abbasi et al. 500mg magnesium oxide improves sleep onset and quality.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2019,
+    "area": "Melatonin & travel",
+    "title": "Melatonin Supplementation and Jet Lag in Athletes",
+    "source": "Current Sports Medicine Reports",
+    "note": "Fowler et al. 0.5-5mg melatonin 30-60min before target sleep time reduces jet lag.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2021,
+    "area": "Tart cherry & sleep",
+    "title": "Tart Cherry Juice Increases Melatonin and Improves Sleep Quality",
+    "source": "European Journal of Nutrition",
+    "note": "Howatson et al. 30ml tart cherry concentrate raises melatonin 15%.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2021,
+    "area": "Cognitive performance & nutrition",
+    "title": "Nutrition and Brain Function in Athletes: A Review",
+    "source": "Nutrients",
+    "note": "Cheatham et al. Caffeine, omega-3 DHA, and glucose availability improve executive function and reaction time.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2022,
+    "area": "Mindset & eating behaviour",
+    "title": "Psychological Factors in Athlete Dietary Adherence",
+    "source": "International Journal of Sport Nutrition and Exercise Metabolism",
+    "note": "Vella et al. Goal-setting, self-monitoring, and social support are strongest predictors of nutrition plan compliance.",
+    "suggested_tag": "compliance"
+  },
+  {
+    "year": 2020,
+    "area": "Gut-brain axis",
+    "title": "The Gut Microbiome and Sport Performance: Implications for Athletes",
+    "source": "European Journal of Sport Science",
+    "note": "O'Sullivan et al. Microbiome diversity correlates with VO2max.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2023,
+    "area": "Stress & cortisol nutrition",
+    "title": "Nutritional Strategies to Manage Psychological Stress in Elite Sport",
+    "source": "Frontiers in Psychology",
+    "note": "Dziedzic et al. Ashwagandha (300-600mg), magnesium, and omega-3 reduce cortisol under psychological stress.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2021,
+    "area": "Pre-competition anxiety",
+    "title": "Nutrition and Anxiety: Evidence-Based Strategies for Athletes",
+    "source": "Sports Medicine",
+    "note": "Walsh et al. Blood glucose stability via low-GI pre-match meal reduces anxiety symptoms.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2023,
+    "area": "VALD & injury risk",
+    "title": "Force Asymmetry as a Predictor of Soft Tissue Injury in Team Sport",
+    "source": "British Journal of Sports Medicine",
+    "note": "Opar et al. >15% asymmetry = significantly elevated injury risk.",
+    "suggested_tag": "injury"
+  },
+  {
+    "year": 2022,
+    "area": "CMJ & fatigue monitoring",
+    "title": "CMJ and Neuromuscular Fatigue: Validity and Sensitivity Review",
+    "source": "Journal of Strength and Conditioning Research",
+    "note": "Gathercole et al. CMJ flight time/contraction time ratio is sensitive to fatigue accumulation.",
+    "suggested_tag": "performance"
+  },
+  {
+    "year": 2020,
+    "area": "Body composition DXA",
+    "title": "International Standards for Athlete Body Composition Assessment",
+    "source": "International Journal of Sport Nutrition and Exercise Metabolism",
+    "note": "Ackland et al. DXA gold standard for sport-specific body composition literature.",
+    "suggested_tag": "body_composition"
+  },
+  {
+    "year": 2022,
+    "area": "Return to play nutrition",
+    "title": "Nutritional Support for Injury Recovery in Athletes",
+    "source": "Sports Medicine",
+    "note": "Smith et al. Phase-specific RTP nutrition: acute (anti-inflammatory), immobilisation (protein 2.5g/kg), rehab (collagen + creatine).",
+    "suggested_tag": "injury"
+  },
+  {
+    "year": 2019,
+    "area": "Vitamin D",
+    "title": "Vitamin D and Athlete Health: A Systematic Review",
+    "source": "International Journal of Sport Nutrition and Exercise Metabolism",
+    "note": "Farrokhyar et al. 56% of athletes are vitamin D insufficient. 2000-4000 IU/day therapeutic.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2023,
+    "area": "Gut health & sport",
+    "title": "Gastrointestinal Issues in Sport: Prevalence, Mechanisms and Nutrition",
+    "source": "Nutrients",
+    "note": "Costa et al. 30-50% of athletes report GI symptoms during competition.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2024,
+    "area": "Anti-doping supplements",
+    "title": "WADA Prohibited List 2026: Supplement Risks and Athlete Guidance",
+    "source": "World Anti-Doping Agency",
+    "note": "Athletes bear strict liability. Only batch-tested (Informed Sport) products recommended.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2021,
+    "area": "Female hormones & sport",
+    "title": "Exercise and the Menstrual Cycle: Implications for Nutrition",
+    "source": "Frontiers in Physiology",
+    "note": "Wohlgemuth et al. Luteal phase: +100-300 kcal resting metabolic rate, elevated protein catabolism.",
+    "suggested_tag": "nutrition"
+  },
+  {
+    "year": 2022,
+    "area": "Blood biomarkers",
+    "title": "Routine Blood Monitoring in Elite Sport: Reference Ranges and Interpretation",
+    "source": "British Journal of Sports Medicine",
+    "note": "Heaton et al. Ferritin <30 ng/mL = intervention. Haemoglobin <130 (M) / <120 (F) = clinical concern.",
+    "suggested_tag": "body_composition"
+  }
+]
