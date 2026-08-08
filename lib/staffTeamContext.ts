@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, type Profile } from "@/lib/auth";
+import { getAssignedClubs } from "@/lib/adminScope";
 
 export type TeamHeader = {
   id: string;
@@ -13,6 +14,11 @@ export type StaffTeamContext = {
   profile: Profile;
   team: TeamHeader;
   isManager: boolean;
+  /** True for Admin / Super Admin, who reach a team through the documented
+   *  role cascade rather than through a club_staff or assignment row. Kept
+   *  separate from `isManager` because that flag also drives *capability*
+   *  (see the comments page's canToggleOff), not just navigation labels. */
+  isOversight: boolean;
   /** Every team this caller may open, for the persistent team switcher.
    *  Derived from the SAME query — no extra round trip. */
   availableTeams: { id: string; name: string; clubName: string | null }[];
@@ -110,7 +116,53 @@ export const getStaffTeamContext = cache(
 
       const assignment = assignments.find((a) => a.team_id === teamId && a.teams?.id === teamId);
       if (!assignment?.teams) return null;
-      return { profile, team: assignment.teams, isManager: false, availableTeams };
+      return { profile, team: assignment.teams, isManager: false, isOversight: false, availableTeams };
+    }
+
+    // Admin and Super Admin reach a team through the role cascade in
+    // docs/02-roles-and-permissions.md ("Everything a Club Manager can do →
+    // Admin can do (within clubs assigned). Everything an Admin can do →
+    // Super Admin can do."), not through club_staff or an assignment row.
+    //
+    // Before this branch existed they fell through to `return null` below,
+    // which the layout turns into notFound() — so all 9 built team pages
+    // answered 404 to the two roles the cascade says outrank everyone.
+    //
+    // Scope still comes from getAssignedClubs(), which is itself role-aware
+    // (every club for Super Admin, the assignment list for Admin), and RLS
+    // remains the real boundary underneath: an Admin who reaches a team
+    // outside their assignments gets no rows from any page query.
+    if (row.role === "admin" || row.role === "super_admin") {
+      const clubs = await getAssignedClubs();
+      if (clubs.length === 0) return null;
+      const clubNameById = new Map(clubs.map((c) => [c.id, c.name]));
+
+      // A second round trip, but only for these two roles — the single-query
+      // shape above is built around club_staff/assignment embeds that neither
+      // role has rows in, so there is nothing to embed from.
+      const { data: teamRows } = await supabase
+        .from("teams")
+        .select("id, name, club_id")
+        .in("club_id", [...clubNameById.keys()])
+        .order("name");
+
+      const teams = (teamRows ?? []) as { id: string; name: string; club_id: string }[];
+      const availableTeams = teams.map((t) => ({
+        id: t.id,
+        name: t.name,
+        clubName: clubNameById.get(t.club_id) ?? null,
+      }));
+
+      const team = teams.find((t) => t.id === teamId);
+      if (!team) return null;
+
+      return {
+        profile,
+        team: { ...team, clubs: { name: clubNameById.get(team.club_id) ?? "" } },
+        isManager: false,
+        isOversight: true,
+        availableTeams,
+      };
     }
 
     if (row.role === "club_manager") {
@@ -132,6 +184,7 @@ export const getStaffTeamContext = cache(
             profile,
             team: { ...team, clubs: cs.clubs ? { name: cs.clubs.name } : null },
             isManager: true,
+            isOversight: false,
             availableTeams,
           };
         }

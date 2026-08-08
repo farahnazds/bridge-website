@@ -38,8 +38,27 @@ export default async function TeamLayout({
   const context = await getStaffTeamContext(teamId);
   if (!context) notFound();
 
-  const { profile, team, isManager, availableTeams } = context;
-  if (profile.role !== "club_practitioner" && profile.role !== "club_manager") redirect("/");
+  const { profile, team, isManager, isOversight, availableTeams } = context;
+
+  // Admin and Super Admin are included per the role cascade in
+  // docs/02-roles-and-permissions.md. getStaffTeamContext() has already
+  // resolved their scope and returned null (-> notFound above) for a team
+  // outside it, so reaching this line means the team is legitimately theirs.
+  if (
+    profile.role !== "club_practitioner" &&
+    profile.role !== "club_manager" &&
+    profile.role !== "admin" &&
+    profile.role !== "super_admin"
+  ) {
+    redirect("/");
+  }
+
+  const backHref = isOversight
+    ? "/staff"
+    : isManager
+      ? `/club/${team.club_id}/teams-staff`
+      : "/staff";
+  const backLabel = isOversight ? "← All teams" : isManager ? "← Teams & Staff" : "← My Teams";
 
   return (
     <div className="flex min-h-screen">
@@ -60,10 +79,10 @@ export default async function TeamLayout({
 
         <div className="px-2">
           <Link
-            href={isManager ? `/club/${team.club_id}/teams-staff` : "/staff"}
+            href={backHref}
             className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
           >
-            {isManager ? "← Teams & Staff" : "← My Teams"}
+            {backLabel}
           </Link>
         </div>
 
@@ -91,7 +110,10 @@ export default async function TeamLayout({
         </nav>
 
         <div className="border-t border-white/10 px-2 pt-4">
-          {isManager ? (
+          {/* /staff/profile is a Club Practitioner's own staff profile — an
+              oversight viewer has no such record, so it stays plain text for
+              them rather than linking somewhere they'd be redirected out of. */}
+          {isManager || isOversight ? (
             <p className="text-xs text-white/50">{profile.first_name ?? profile.email}</p>
           ) : (
             <Link

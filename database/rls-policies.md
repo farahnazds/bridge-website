@@ -711,3 +711,44 @@ One genuine gap noted, not fixed: **an Admin reads 0 rows from
 table's policy is club-scoped and `admin_club_assignments` does not satisfy it.
 `/admin/supplements-brands` states this on the page rather than rendering an
 empty list that reads as "this club has no brand assigned".
+
+## Added, then corrected: consultant reads referred club names (2026-08-08)
+
+Migrations 024 and 025. Recorded together because 024 alone is wrong and
+should never be applied without 025.
+
+**024** gave `partnerships_consultant` a SELECT policy on `clubs` gated by a
+`SECURITY DEFINER` helper, so the club each pipeline row points at would resolve
+to a name instead of rendering "Club (name not shared)". Same data-completeness
+class as 021 — nothing leaked, nothing errored, a name just silently rendered as
+a placeholder.
+
+Its header claimed the grant covered "id + name … and no other column". **That
+was false.** RLS is row-level; a SELECT policy grants every column of every
+matching row. Migration 018 already exists in this schema for precisely this
+reason, and 024 repeated the mistake.
+
+The first check appeared to confirm the narrow claim, because the fixture's
+`contact_*` and `subscription_*` columns were NULL — unreadable and empty look
+identical. Populating them first showed the consultant reading `contact_name`,
+`contact_email`, `contact_phone`, `subscription_start`, `subscription_end`,
+`subscription_status`, `stopped_by_super_admin`, `sport`, `timezone` and
+`created_at` on their referred club.
+
+No athlete data was ever exposed, so the "No athlete data whatsoever" guarantee
+held throughout. But "own referral pipeline only" did not: stage, deal value and
+commission already live on the consultant's own
+`partnerships_consultant_clubs` row, and a club's contact record and
+subscription state are not part of that pipeline.
+
+**025** drops the policy and the helper, and exposes exactly `id` and `name`
+through the `consultant_referred_clubs` SECURITY DEFINER view — the
+`injuries_athlete_view` shape from 018, where the view's WHERE clause is the
+entire boundary and column scoping is structural rather than asserted in a
+comment.
+
+Consultant scoping itself was correct in 024 and is preserved: they read the one
+club they referred and not the club they did not, verified with a real pipeline
+row present so the deny is not vacuous. No other role's `clubs` access changed —
+Super Admin 2, Admin 1, Club Manager 1, Brand Partner 0, athlete 0, measured
+before and after.
