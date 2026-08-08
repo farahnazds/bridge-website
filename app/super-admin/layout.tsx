@@ -26,7 +26,7 @@ export default async function SuperAdminLayout({
         className="flex items-center justify-between border-b px-6 py-4"
         style={{ borderColor: "var(--border)", backgroundColor: "var(--brand-navy)" }}
       >
-        <Link href="/super-admin/clubs" className="flex items-center gap-2">
+        <Link href="/super-admin" className="flex items-center gap-2">
           <Image
             src="/brand/logo-horizontal-dark.png"
             alt="Bridgetx"
@@ -51,6 +51,12 @@ export default async function SuperAdminLayout({
             }))}
           />
           <nav className="flex items-center gap-4">
+            <Link
+              href="/super-admin"
+              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
+            >
+              Overview
+            </Link>
             <Link
               href="/super-admin/clubs"
               className="text-sm text-white/70 transition-colors duration-150 hover:text-white"

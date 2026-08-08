@@ -112,7 +112,11 @@ export async function resolvePostLoginPath(): Promise<string> {
 
   switch (profile.role) {
     case "super_admin":
-      return "/super-admin/clubs";
+      // The Overview, not the clubs list. docs/03-site-map.md lists Overview
+      // first under Super Admin, and it is where alerts surface — landing on
+      // the clubs table meant anything needing attention had to be gone
+      // looking for.
+      return "/super-admin";
     case "admin":
       return "/admin";
 
