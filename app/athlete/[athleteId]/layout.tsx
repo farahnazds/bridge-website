@@ -1,4 +1,6 @@
 import { redirect, notFound } from "next/navigation";
+import SidebarNav from "@/components/SidebarNav";
+import DashboardHeader from "@/components/DashboardHeader";
 import Image from "next/image";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
@@ -7,16 +9,8 @@ import { createClient } from "@/lib/supabase/server";
 // "My Assessments" is deliberately absent: it and "My Body Composition" read
 // the same `assessments` rows, so the two site-map entries are served by one
 // page. /athlete/[athleteId]/assessments still resolves — it redirects.
-const NAV_SECTIONS: { label: string; slug: string }[] = [
-  { label: "Home", slug: "" },
-  { label: "Daily Check-In", slug: "checkin" },
-  { label: "My Compliance", slug: "compliance" },
-  { label: "My Body Composition", slug: "body-composition" },
-  { label: "My Protocol", slug: "protocol" },
-  { label: "My Reports", slug: "reports" },
-  { label: "Messenger", slug: "messenger" },
-  { label: "Profile", slug: "profile" },
-];
+// Grouped per the Phase 2 brief: frequent items first, admin/config last.
+// Built inside the component because hrefs depend on the route param.
 
 export default async function AthleteLayout({
   children,
@@ -42,47 +36,44 @@ export default async function AthleteLayout({
     .single();
 
   if (!athlete) notFound();
+  const navGroups = [
+  { label: null, items: [
+    { label: "Home", href: `/athlete/${athleteId}` },
+    { label: "Daily Check-In", href: `/athlete/${athleteId}/checkin` },
+    { label: "My Reports", href: `/athlete/${athleteId}/reports` },
+    { label: "Messenger", href: `/athlete/${athleteId}/messenger` },
+  ] },
+  { label: "MY DATA", items: [
+    { label: "My Compliance", href: `/athlete/${athleteId}/compliance` },
+    { label: "My Body Composition", href: `/athlete/${athleteId}/body-composition` },
+    { label: "My Protocol", href: `/athlete/${athleteId}/protocol` },
+  ] },
+  { label: "ACCOUNT", items: [
+    { label: "Profile", href: `/athlete/${athleteId}/profile` },
+  ] },
+  ];
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col">
+      <DashboardHeader
+        name={`${athlete.first_name} ${athlete.last_name}`}
+        email={profile.email}
+        role="Athlete"
+        homeHref={`/athlete/${athleteId}`}
+      />
+      <div className="flex flex-1">
       <aside
         className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
         style={{ backgroundColor: "var(--brand-navy)" }}
       >
-        <div className="px-2">
-          <Image
-            src="/brand/logo-horizontal-dark.png"
-            alt="Bridgetx"
-            width={28}
-            height={28}
-            className="h-7 w-auto object-contain"
-            priority
-          />
-        </div>
 
-        <div className="px-2">
-          <p className="text-xs uppercase tracking-wide text-white/50">Athlete</p>
-          <p className="text-sm font-semibold text-white">
-            {athlete.first_name} {athlete.last_name}
-          </p>
-        </div>
-
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-          {NAV_SECTIONS.map((section) => (
-            <Link
-              key={section.slug}
-              href={`/athlete/${athleteId}${section.slug ? `/${section.slug}` : ""}`}
-              className="rounded-lg px-3 py-2 text-sm text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-            >
-              {section.label}
-            </Link>
-          ))}
-        </nav>
+        <SidebarNav groups={navGroups} />
       </aside>
 
-      <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
-        {children}
-      </main>
+        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

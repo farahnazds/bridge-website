@@ -1,9 +1,28 @@
 import { redirect } from "next/navigation";
+import SidebarNav from "@/components/SidebarNav";
+import DashboardHeader from "@/components/DashboardHeader";
 import Image from "next/image";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import SuperAdminClubSwitcher from "./SuperAdminClubSwitcher";
+
+// Approved Phase 2 structure. Super Admin now uses the same left sidebar as
+// every other dashboard: this is the one role that moves between all five, and
+// a consistent shape everywhere is worth more than a bespoke top nav.
+const NAV_GROUPS = [
+  { label: null, items: [
+    { label: "Overview", href: "/super-admin" },
+    { label: "Clubs", href: "/super-admin/clubs" },
+  ] },
+  { label: "PLATFORM", items: [
+    { label: "Clinical + Research", href: "/super-admin/clinical-research" },
+    { label: "Branding & Templates", href: "/super-admin/branding" },
+  ] },
+  { label: "OVERSIGHT", items: [
+    { label: "All club data", href: "/admin" },
+  ] },
+];
 
 export default async function SuperAdminLayout({
   children,
@@ -21,75 +40,33 @@ export default async function SuperAdminLayout({
   const { data: clubs } = await supabase.from("clubs").select("id, name, sport").order("name");
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "var(--bg)" }}>
-      <header
-        className="flex items-center justify-between border-b px-6 py-4"
-        style={{ borderColor: "var(--border)", backgroundColor: "var(--brand-navy)" }}
+    <div className="flex min-h-screen flex-col">
+      <DashboardHeader
+        name={profile.first_name ?? profile.email}
+        email={profile.email}
+        role="Super Admin"
+        context="All clubs"
+        homeHref="/super-admin"
       >
-        <Link href="/super-admin" className="flex items-center gap-2">
-          <Image
-            src="/brand/logo-horizontal-dark.png"
-            alt="Bridgetx"
-            width={28}
-            height={28}
-            className="h-7 w-auto object-contain"
-            priority
-          />
-          <span
-            className="text-sm font-normal text-white/60"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            · Super Admin
-          </span>
-        </Link>
-        <div className="flex items-center gap-6">
-          <SuperAdminClubSwitcher
-            clubs={(clubs ?? []).map((c) => ({
-              id: c.id as string,
-              label: c.name as string,
-              sublabel: (c.sport as string) ?? null,
-            }))}
-          />
-          <nav className="flex items-center gap-4">
-            <Link
-              href="/super-admin"
-              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
-            >
-              Overview
-            </Link>
-            <Link
-              href="/super-admin/clubs"
-              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
-            >
-              Clubs
-            </Link>
-            <Link
-              href="/super-admin/clinical-research"
-              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
-            >
-              Clinical + Research
-            </Link>
-            <Link
-              href="/super-admin/branding"
-              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
-            >
-              Branding &amp; Templates
-            </Link>
-            {/* The cross-platform oversight views (athletes, assessments,
-                compliance, reports, injuries, competitions, content, product
-                requests) live under /admin and are shared with the Admin role
-                — same pages, wider scope. See the note in app/admin/layout. */}
-            <Link
-              href="/admin"
-              className="text-sm text-white/70 transition-colors duration-150 hover:text-white"
-            >
-              Oversight
-            </Link>
-          </nav>
-          <span className="text-sm text-white/70">{profile.first_name ?? profile.email}</span>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
+        <SuperAdminClubSwitcher
+          clubs={(clubs ?? []).map((c) => ({
+            id: c.id as string,
+            label: c.name as string,
+            sublabel: (c.sport as string) ?? null,
+          }))}
+        />
+      </DashboardHeader>
+      <div className="flex flex-1">
+        <aside
+          className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
+          style={{ backgroundColor: "var(--brand-navy)" }}
+        >
+          <SidebarNav groups={NAV_GROUPS} />
+        </aside>
+        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

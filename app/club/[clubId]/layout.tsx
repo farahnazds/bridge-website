@@ -1,4 +1,6 @@
 import { redirect, notFound } from "next/navigation";
+import SidebarNav from "@/components/SidebarNav";
+import DashboardHeader from "@/components/DashboardHeader";
 import Image from "next/image";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
@@ -6,25 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import ContextSwitcher from "@/components/ContextSwitcher";
 import { getAssignedClubs } from "@/lib/adminScope";
 
-const NAV_SECTIONS: { label: string; slug: string }[] = [
-  { label: "Overview", slug: "" },
-  { label: "Teams & Staff", slug: "teams-staff" },
-  { label: "Athletes", slug: "athletes" },
-  { label: "Assessments", slug: "assessments" },
-  { label: "GPS/Performance", slug: "gps-performance" },
-  { label: "Body Composition", slug: "body-composition" },
-  { label: "VALD", slug: "vald" },
-  { label: "Compliance", slug: "compliance" },
-  { label: "Injury Log / RTP", slug: "injuries" },
-  { label: "Periodization", slug: "periodization" },
-  { label: "Competition Intelligence", slug: "competitions" },
-  { label: "Reports", slug: "reports" },
-  { label: "Messenger", slug: "messenger" },
-  { label: "Content", slug: "content" },
-  { label: "Product Requests", slug: "product-requests" },
-  { label: "Settings", slug: "settings" },
-  { label: "Billing", slug: "billing" },
-];
+// Grouped per the Phase 2 brief: frequent items first, admin/config last.
+// Built inside the component because hrefs depend on the route param.
 
 export default async function ClubLayout({
   children,
@@ -89,40 +74,54 @@ export default async function ClubLayout({
       .map((m) => ({ id: m.club_id, label: m.clubs!.name, sublabel: m.clubs!.sport ?? null }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }
+  const navGroups = [
+  { label: null, items: [
+    { label: "Overview", href: `/club/${clubId}` },
+    { label: "Athletes", href: `/club/${clubId}/athletes` },
+    { label: "Reports", href: `/club/${clubId}/reports` },
+    { label: "Messenger", href: `/club/${clubId}/messenger` },
+  ] },
+  { label: "ATHLETE DATA", items: [
+    { label: "Assessments", href: `/club/${clubId}/assessments` },
+    { label: "Compliance", href: `/club/${clubId}/compliance` },
+    { label: "Body Composition", href: `/club/${clubId}/body-composition` },
+    { label: "GPS/Performance", href: `/club/${clubId}/gps-performance` },
+    { label: "VALD", href: `/club/${clubId}/vald` },
+    { label: "Injuries", href: `/club/${clubId}/injuries` },
+  ] },
+  { label: "PLANNING", items: [
+    { label: "Periodization", href: `/club/${clubId}/periodization` },
+    { label: "Competitions", href: `/club/${clubId}/competitions` },
+    { label: "Content", href: `/club/${clubId}/content` },
+  ] },
+  { label: "ADMIN", items: [
+    { label: "Teams & Staff", href: `/club/${clubId}/teams-staff` },
+    { label: "Product Requests", href: `/club/${clubId}/product-requests` },
+    { label: "Settings", href: `/club/${clubId}/settings` },
+    { label: "Billing", href: `/club/${clubId}/billing` },
+  ] },
+  ];
 
   return (
-    <div className="flex min-h-screen">
-      <aside
-        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--brand-navy)" }}
+    <div className="flex min-h-screen flex-col">
+      <DashboardHeader
+        name={profile.first_name ?? profile.email}
+        email={profile.email}
+        role={isOversight ? (profile.role === "super_admin" ? "Super Admin" : "Admin") : "Club Manager"}
+        homeHref={isOversight ? (profile.role === "super_admin" ? "/super-admin" : "/admin") : `/club/${clubId}`}
       >
-        <div className="px-2">
-          <Image
-            src="/brand/logo-horizontal-dark.png"
-            alt="Bridgetx"
-            width={28}
-            height={28}
-            className="h-7 w-auto object-contain"
-            priority
-          />
-        </div>
-
-        <div className="px-2">
-          <p className="text-xs uppercase tracking-wide text-white/50">
-            {isOversight ? (profile.role === "super_admin" ? "Super Admin · Club" : "Admin · Club") : "Club"}
-          </p>
-        </div>
-
-        {/* Persistent club switcher, for a manager who holds club_manager rows
-            at more than one club. Switching preserves the current page, so
-            /club/<a>/settings becomes /club/<b>/settings. Renders as plain
-            text for the single-club case, which is most managers. */}
         <ContextSwitcher
           currentId={clubId}
           options={availableClubs}
           fallbackBase="/club"
           label="Switch club"
         />
+      </DashboardHeader>
+      <div className="flex flex-1">
+      <aside
+        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
+        style={{ backgroundColor: "var(--brand-navy)" }}
+      >
 
         {isOversight && (
           <div className="px-2">
@@ -135,28 +134,12 @@ export default async function ClubLayout({
           </div>
         )}
 
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-          {NAV_SECTIONS.map((section) => (
-            <Link
-              key={section.slug}
-              href={`/club/${clubId}${section.slug ? `/${section.slug}` : ""}`}
-              className="rounded-lg px-3 py-2 text-sm text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-            >
-              {section.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="border-t border-white/10 px-2 pt-4">
-          <p className="truncate text-xs text-white/50">
-            {profile.first_name ?? profile.email}
-          </p>
-        </div>
+        <SidebarNav groups={navGroups} />
       </aside>
-
-      <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
-        {children}
-      </main>
+        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

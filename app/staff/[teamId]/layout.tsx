@@ -1,21 +1,23 @@
 import { redirect, notFound } from "next/navigation";
+import SidebarNav from "@/components/SidebarNav";
+import DashboardHeader from "@/components/DashboardHeader";
 import Image from "next/image";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import ContextSwitcher from "@/components/ContextSwitcher";
 
-const NAV_SECTIONS: { label: string; slug: string }[] = [
-  { label: "Roster", slug: "" },
-  { label: "Assessments", slug: "assessments" },
-  { label: "Injury Log / RTP", slug: "injuries" },
-  { label: "GPS / Performance", slug: "gps-performance" },
-  { label: "VALD", slug: "vald" },
-  { label: "Training Load Plan", slug: "training-load" },
-  { label: "Reports", slug: "reports" },
-  { label: "Messenger", slug: "messenger" },
-  { label: "Comments", slug: "comments" },
-];
+// The header states which role you are viewing as — a Club Manager and an
+// oversight Admin both reach team pages, and it should be obvious which you are.
+const ROLE_LABEL: Record<string, string> = {
+  club_practitioner: "Club Practitioner",
+  club_manager: "Club Manager",
+  admin: "Admin",
+  super_admin: "Super Admin",
+};
+
+// Grouped per the Phase 2 brief: frequent items first, admin/config last.
+// Built inside the component because hrefs depend on the route param.
 
 export default async function TeamLayout({
   children,
@@ -59,23 +61,42 @@ export default async function TeamLayout({
       ? `/club/${team.club_id}/teams-staff`
       : "/staff";
   const backLabel = isOversight ? "← All teams" : isManager ? "← Teams & Staff" : "← My Teams";
+  const navGroups = [
+  { label: null, items: [
+    { label: "Roster", href: `/staff/${teamId}` },
+    { label: "Training Load Plan", href: `/staff/${teamId}/training-load` },
+    { label: "Reports", href: `/staff/${teamId}/reports` },
+    { label: "Messenger", href: `/staff/${teamId}/messenger` },
+  ] },
+  { label: "ATHLETE DATA", items: [
+    { label: "Assessments", href: `/staff/${teamId}/assessments` },
+    { label: "GPS/Performance", href: `/staff/${teamId}/gps-performance` },
+    { label: "VALD", href: `/staff/${teamId}/vald` },
+    { label: "Injury Log", href: `/staff/${teamId}/injuries` },
+    { label: "Comments", href: `/staff/${teamId}/comments` },
+  ] },
+  ];
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col">
+      <DashboardHeader
+        name={profile.first_name ?? profile.email}
+        email={profile.email}
+        role={ROLE_LABEL[profile.role] ?? "Staff"}
+        homeHref={isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : "/staff"}
+      >
+        <ContextSwitcher
+          currentId={team.id}
+          options={availableTeams.map((t) => ({ id: t.id, label: t.name, sublabel: t.clubName }))}
+          fallbackBase="/staff"
+          label="Switch team"
+        />
+      </DashboardHeader>
+      <div className="flex flex-1">
       <aside
         className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
         style={{ backgroundColor: "var(--brand-navy)" }}
       >
-        <div className="px-2">
-          <Image
-            src="/brand/logo-horizontal-dark.png"
-            alt="Bridgetx"
-            width={28}
-            height={28}
-            className="h-7 w-auto object-contain"
-            priority
-          />
-        </div>
 
         <div className="px-2">
           <Link
@@ -86,49 +107,24 @@ export default async function TeamLayout({
           </Link>
         </div>
 
-        {/* Persistent team switcher. Switching keeps you on the same page —
-            /staff/<a>/assessments becomes /staff/<b>/assessments — so changing
-            team never means going back to the list first. Falls back to plain
-            text when the caller only has one team. */}
-        <ContextSwitcher
-          currentId={team.id}
-          options={availableTeams.map((t) => ({ id: t.id, label: t.name, sublabel: t.clubName }))}
-          fallbackBase="/staff"
-          label="Switch team"
-        />
-
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-          {NAV_SECTIONS.map((section) => (
-            <Link
-              key={section.slug}
-              href={`/staff/${teamId}${section.slug ? `/${section.slug}` : ""}`}
-              className="rounded-lg px-3 py-2 text-sm text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-            >
-              {section.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="border-t border-white/10 px-2 pt-4">
-          {/* /staff/profile is a Club Practitioner's own staff profile — an
-              oversight viewer has no such record, so it stays plain text for
-              them rather than linking somewhere they'd be redirected out of. */}
-          {isManager || isOversight ? (
-            <p className="text-xs text-white/50">{profile.first_name ?? profile.email}</p>
-          ) : (
+        <SidebarNav groups={navGroups} />
+        {/* Identity now lives in the shared header; what remains here is the
+            practitioner-only link to their own staff profile. */}
+        {!isManager && !isOversight && (
+          <div className="border-t border-white/10 px-2 pt-4">
             <Link
               href="/staff/profile"
               className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
             >
-              {profile.first_name ?? profile.email}
+              My profile
             </Link>
-          )}
-        </div>
+          </div>
+        )}
       </aside>
-
-      <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
-        {children}
-      </main>
+        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
