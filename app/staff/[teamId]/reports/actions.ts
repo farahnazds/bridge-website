@@ -673,7 +673,7 @@ export async function generateNutritionReport(
 
   const { data: athlete, error: athleteError } = await supabase
     .from("athletes")
-    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference, club_id, segment_id")
+    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference, menstrual_status, iron_status, club_id, segment_id")
     .eq("id", athleteId)
     .single();
   if (athleteError || !athlete) return { ...base, error: "Couldn't load that athlete." };
@@ -684,7 +684,7 @@ export async function generateNutritionReport(
   if (subMode === "next_day") {
     const { data: planRows } = await supabase
       .from("training_load_plans")
-      .select("date, intensity, rpe, season_phase, athlete_id, team_id")
+      .select("date, intensity, rpe, season_phase, athlete_id, team_id, session_type, session_duration_band, estimated_sweat_rate_ml")
       .eq("date", targetDate)
       .or(`athlete_id.eq.${athleteId},team_id.eq.${teamId}`);
 
@@ -711,8 +711,36 @@ export async function generateNutritionReport(
       rpe: chosen.rpe as number,
       seasonPhase: (chosen.season_phase as string | null) ?? null,
       scope: chosen.athlete_id === athleteId ? "athlete" : "team",
+      // Migration 027. Null means the practitioner did not record it; the
+      // prompt renders "not recorded" rather than assuming a default, because
+      // a guessed session type or duration changes the macro split.
+      sessionType: (chosen.session_type as string | null) ?? null,
+      durationBand: (chosen.session_duration_band as string | null) ?? null,
+      sweatRateMl:
+        chosen.estimated_sweat_rate_ml === null || chosen.estimated_sweat_rate_ml === undefined
+          ? null
+          : Number(chosen.estimated_sweat_rate_ml),
     };
   }
+
+  // Unresolved injuries drive phase-appropriate recovery nutrition. Read
+  // through the caller's client like every other athlete-scoped query here, so
+  // RLS decides visibility; `injuries` is practitioner-facing, unlike the
+  // column-restricted injuries_athlete_view the athlete surfaces use.
+  const { data: injuryRows } = await supabase
+    .from("injuries")
+    .select("type, status, rtp_phase, date, target_return_date")
+    .eq("athlete_id", athleteId)
+    .neq("status", "cleared")
+    .order("date", { ascending: false });
+
+  const activeInjuries = (injuryRows ?? []).map((i) => ({
+    type: (i.type as string | null) ?? null,
+    status: i.status as string,
+    rtpPhase: (i.rtp_phase as string | null) ?? null,
+    date: i.date as string,
+    targetReturnDate: (i.target_return_date as string | null) ?? null,
+  }));
 
   // ---- Clinical profile ----
   const [{ data: conditionRows }, { data: allergyRows }, { data: intoleranceRows }] = await Promise.all([
@@ -825,6 +853,7 @@ export async function generateNutritionReport(
   const userPrompt = buildNutritionPrompt({
     subMode,
     athlete,
+    activeInjuries,
     conditions,
     allergies,
     intolerances,

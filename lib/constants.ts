@@ -46,6 +46,23 @@ export const DIET_PREFERENCES = [
   { value: "gluten_free", label: "Gluten-free" },
 ];
 
+// Matches the `athletes.menstrual_status` / `athletes.iron_status` check
+// constraints added in migration 028. Permanent athlete health fields, not
+// per-session inputs. NULL / unset is a legal, distinct state — "not recorded"
+// — which the nutrition prompt reports rather than treating as normal.
+export const MENSTRUAL_STATUSES = [
+  { value: "regular", label: "Regular" },
+  { value: "irregular", label: "Irregular" },
+  { value: "amenorrhoeic", label: "Amenorrhoeic" },
+  { value: "not_applicable", label: "Not applicable" },
+];
+
+export const IRON_STATUSES = [
+  { value: "normal", label: "Normal" },
+  { value: "low", label: "Low" },
+  { value: "deficient", label: "Deficient" },
+];
+
 // Matches `athletes.gender` check constraint in database/schema.sql.
 export const GENDERS = [
   { value: "male", label: "Male" },
@@ -222,6 +239,28 @@ export const INTENSITIES = [
   { value: "medium", label: "Medium" },
   { value: "low", label: "Low" },
   { value: "rest", label: "Rest" },
+];
+
+// Matches the `training_load_plans.session_type` / `session_duration_band`
+// check constraints added in migration 027 — fixed DB enums, so no "Other"
+// escape hatch. Both are optional on an entry: the nutrition prompt reports
+// "not recorded" rather than assuming a default, because a guessed session
+// type or duration silently changes an athlete's fuelling plan.
+export const SESSION_TYPES = [
+  { value: "strength", label: "Strength" },
+  { value: "endurance", label: "Endurance" },
+  { value: "hiit", label: "HIIT" },
+  { value: "skill", label: "Skill" },
+  { value: "recovery", label: "Recovery" },
+  { value: "match", label: "Match" },
+  { value: "double", label: "Double session" },
+];
+
+export const SESSION_DURATION_BANDS = [
+  { value: "under_45", label: "Under 45 min" },
+  { value: "45_90", label: "45–90 min" },
+  { value: "90_120", label: "90–120 min" },
+  { value: "over_120", label: "Over 120 min" },
 ];
 
 // `training_load_plans.season_phase` is free text, and schema.sql's own

@@ -3,12 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
 
 export interface ActionState {
   error: string | null;
 }
 
 const INTENSITY_VALUES = ["high", "medium", "low", "rest"];
+
+// Derived from the shared constants rather than restated, so these cannot
+// drift from the pickers in the form or the CHECK constraints in migration 027.
+const SESSION_TYPE_VALUES = SESSION_TYPES.map((s) => s.value);
+const DURATION_BAND_VALUES = SESSION_DURATION_BANDS.map((d) => d.value);
 
 // Both roles: a Club Manager can do everything a Club Practitioner can
 // (docs/02-roles-and-permissions.md role cascade), the /staff/[teamId]
@@ -31,6 +37,9 @@ export async function saveTrainingLoad(_prevState: ActionState, formData: FormDa
   const intensity = String(formData.get("intensity") ?? "").trim();
   const rpeRaw = String(formData.get("rpe") ?? "").trim();
   const seasonPhase = String(formData.get("season_phase") ?? "").trim() || null;
+  const sessionType = String(formData.get("session_type") ?? "").trim() || null;
+  const durationBand = String(formData.get("session_duration_band") ?? "").trim() || null;
+  const sweatRaw = String(formData.get("estimated_sweat_rate_ml") ?? "").trim();
   const appliesTo = String(formData.get("applies_to") ?? "all").trim();
   const athleteIds = formData.getAll("athlete_ids").map(String).filter(Boolean);
 
@@ -39,6 +48,29 @@ export async function saveTrainingLoad(_prevState: ActionState, formData: FormDa
   }
   if (!INTENSITY_VALUES.includes(intensity)) {
     return { error: "Invalid intensity." };
+  }
+
+  // Rejected rather than coerced, like every other enum in this build: these
+  // feed macro and hydration reasoning, so a silently-dropped bad value would
+  // change an athlete's fuelling plan with no error anywhere.
+  if (sessionType && !SESSION_TYPE_VALUES.includes(sessionType)) {
+    return { error: `Session type must be one of: ${SESSION_TYPE_VALUES.join(", ")}.` };
+  }
+  if (durationBand && !DURATION_BAND_VALUES.includes(durationBand)) {
+    return { error: `Session duration must be one of: ${DURATION_BAND_VALUES.join(", ")}.` };
+  }
+
+  // Millilitres per HOUR. The bound matches the CHECK in migration 027 and
+  // exists to catch unit slips (litres typed as "2", or a whole-session total
+  // pasted into a per-hour field) — those skew hydration advice without ever
+  // failing.
+  let sweatRate: number | null = null;
+  if (sweatRaw) {
+    const parsed = Number(sweatRaw);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 5000) {
+      return { error: "Estimated sweat rate must be between 0 and 5000 ml per hour." };
+    }
+    sweatRate = parsed;
   }
 
   // Forward-looking by design — schema.sql calls this the "Periodization /
@@ -62,7 +94,12 @@ export async function saveTrainingLoad(_prevState: ActionState, formData: FormDa
     return { error: "Select at least one athlete, or switch to the whole team." };
   }
 
-  const base = { date, season_phase: seasonPhase, intensity, rpe, created_by: profile.id };
+  const base = {
+    date, season_phase: seasonPhase, intensity, rpe, created_by: profile.id,
+    session_type: sessionType,
+    session_duration_band: durationBand,
+    estimated_sweat_rate_ml: sweatRate,
+  };
 
   // Annotated rather than inferred: the two branches below differ only in
   // athlete_id (string vs null), and inferring a union of array types makes
@@ -75,6 +112,9 @@ export async function saveTrainingLoad(_prevState: ActionState, formData: FormDa
     intensity: string;
     rpe: number | null;
     created_by: string;
+    session_type: string | null;
+    session_duration_band: string | null;
+    estimated_sweat_rate_ml: number | null;
   }
 
   // "All" is a single team-scoped row (athlete_id null), matching the

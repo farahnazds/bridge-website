@@ -4,7 +4,20 @@
 // same split as promptBuilder.ts (Compliance) and
 // bodyCompositionPromptBuilder.ts.
 
+import { SESSION_TYPES, SESSION_DURATION_BANDS, RTP_PHASES, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
+
 export type NutritionSubMode = "next_day" | "general";
+
+const SESSION_TYPE_LABEL: Record<string, string> = Object.fromEntries(SESSION_TYPES.map((t) => [t.value, t.label]));
+const DURATION_BAND_LABEL: Record<string, string> = Object.fromEntries(SESSION_DURATION_BANDS.map((d) => [d.value, d.label]));
+const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
+const MENSTRUAL_LABEL: Record<string, string> = Object.fromEntries(MENSTRUAL_STATUSES.map((m) => [m.value, m.label]));
+const IRON_LABEL: Record<string, string> = Object.fromEntries(IRON_STATUSES.map((i) => [i.value, i.label]));
+
+// Earliest phase = most limiting. Gives the model one unambiguous anchor when
+// an athlete sits at several RTP phases at once — which is the normal case,
+// not an edge case.
+const RTP_ORDER = ["acute", "sub_acute", "return_to_training", "returned"];
 
 export interface TrainingLoadContext {
   date: string;
@@ -12,6 +25,21 @@ export interface TrainingLoadContext {
   rpe: number | null;
   seasonPhase: string | null;
   scope: "athlete" | "team";
+  /** Migration 027. All three are optional on a plan entry — null means the
+   *  practitioner did not record it, and the prompt says so rather than
+   *  letting the model assume a default. */
+  sessionType: string | null;
+  durationBand: string | null;
+  sweatRateMl: number | null;
+}
+
+/** An injury that is not yet cleared, for phase-appropriate recovery nutrition. */
+export interface ActiveInjuryContext {
+  type: string | null;
+  status: string;
+  rtpPhase: string | null;
+  date: string;
+  targetReturnDate: string | null;
 }
 
 export interface AssessmentContext {
@@ -68,12 +96,19 @@ export interface NutritionPromptInput {
     gender: string | null;
     ethnicity: string | null;
     diet_preference: string;
+    /** Permanent health fields (migration 028). Null = not recorded, which is
+     *  distinct from "normal" and must never be reported as such. */
+    menstrual_status: string | null;
+    iron_status: string | null;
   };
   conditions: string[];
   allergies: string[];
   intolerances: string[];
   latestAssessment: AssessmentContext | null;
   trainingLoad: TrainingLoadContext | null;
+  /** Every unresolved injury, not just one: an athlete can sit at several RTP
+   *  phases at once, and the most acute one governs recovery nutrition. */
+  activeInjuries: ActiveInjuryContext[];
   prescription: PrescriptionContext | null;
   supplementLibrary: SupplementLibraryEntry[];
   clinicalLibraryEntries: ClinicalLibraryEntry[];
@@ -116,6 +151,14 @@ Clinical reference rules (docs/07-ai-engine.md):
 - Goal body weight: goal_ffm / (1 - goal_bf/100).
 - Age, diet preference and declared conditions filter what may be recommended at all.
 - Where cultural or seasonal context is relevant (Ramadan, regional heat, travel), apply it to timing and hydration guidance.
+- Session type and duration drive the MACRO split, not just the total. A strength session and an endurance session of the same RPE need different carbohydrate and protein handling; a match or a double session is not the same fuelling problem as a skill session; a recovery session should not be fuelled as though it were a hard one. Duration band sets the fuelling window — whether intra-session carbohydrate is warranted at all, and how the pre/post split should sit around it.
+- Estimated sweat rate, when recorded, drives INDIVIDUALISED fluid and sodium targets in ml per hour rather than generic advice. When it is not recorded, say plainly that hydration guidance is generic because no sweat rate was measured, and state what measuring it would change. Never invent a sweat rate figure.
+- Where any of session type, duration or sweat rate is marked "not recorded", do not silently assume a value. Give the best guidance available without it and name the gap.
+- RED-S SCREENING. Where the athlete block carries the RED-S clinical flag (a female athlete whose menstrual status is irregular or amenorrhoeic), treat low energy availability as a live differential. Say so explicitly, check that energy availability is sufficient before adding any performance supplement, and cover iron, magnesium and omega-3 as part of that picture. Recommend practitioner follow-up and appropriate bloods rather than presenting nutrition alone as the fix. Where the Clinical + Research library contains a RED-S entry, cite it.
+- IRON REPLETION. Where the athlete block carries the iron clinical flag (status low or deficient), give an explicit iron protocol with vitamin C co-ingestion to aid absorption, state what to separate it from (calcium, tea/coffee) and when, and defer dosing escalation to a physician. Where the library contains an iron entry, cite it — including any ferritin threshold it states.
+- A menstrual or iron status of "not recorded" is NOT the same as normal. Never write as though an unrecorded field were reassuring: name the gap and say what recording it would change. Do not apply RED-S or iron-repletion pathways on an unrecorded field.
+- Menstrual status of "not applicable", and iron status of "normal", are recorded answers: do not flag them as gaps.
+- Unresolved injuries change recovery nutrition. Anchor that guidance to the most limiting RTP phase given, and make the reasoning phase-specific: acute and sub-acute phases prioritise protein sufficiency, energy availability and anti-inflammatory support; return-to-training reintroduces training-load-matched fuelling alongside connective-tissue support. Do not write injury-recovery guidance when no unresolved injury is listed.
 
 Citations — hard rule: only cite entries from the "Clinical + Research library entries" section below, if any are provided. Never cite anything from general training knowledge, even if a relevant paper is known to you. If none are provided, write the point without a citation rather than reaching for an unverified source.
 
@@ -127,9 +170,9 @@ Do not:
 
 const NEXT_DAY_STRUCTURE = `Required output structure, in this exact order:
 1. Executive summary
-2. Tomorrow's fuelling plan — concrete, time-anchored guidance for the specific session described in "Training load for the target date": pre-session, during-session, and post-session. Tie the intensity and RPE directly to the fuelling decisions, and say plainly why a high-RPE day changes the plan versus a rest day.
+2. Tomorrow's fuelling plan — concrete, time-anchored guidance for the specific session described in "Training load for the target date": pre-session, during-session, and post-session. Tie the intensity, RPE, session type and duration band directly to the fuelling decisions, and say plainly why a high-RPE day changes the plan versus a rest day, and why this session TYPE changes the macro split versus another type at the same RPE.
 3. Supplement prescription — clinical layer first (what is needed and why), then the commercial layer (which assigned-brand product fulfils it, where one exists).
-4. Hydration and timing
+4. Hydration and timing — driven by the estimated sweat rate where one is recorded (state ml/hour targets and sodium accordingly), and explicitly flagged as generic where it is not
 5. Goals for next period
 6. Practitioner recommendations`;
 
@@ -150,6 +193,7 @@ export function buildNutritionPrompt(input: NutritionPromptInput): string {
     intolerances,
     latestAssessment,
     trainingLoad,
+    activeInjuries,
     prescription,
     supplementLibrary,
     clinicalLibraryEntries,
@@ -173,11 +217,58 @@ ${
 }`
     : "No assessment on record for this athlete. State this plainly; do not invent body composition figures, and base guidance on sport/age/training load alone.";
 
+  // Permanent health fields. "not recorded" is rendered explicitly because it
+  // is NOT the same as "normal" — reporting a blank as normal would suppress
+  // screening the athlete may actually need.
+  const menstrualLabel = athlete.menstrual_status
+    ? MENSTRUAL_LABEL[athlete.menstrual_status] ?? athlete.menstrual_status
+    : "not recorded";
+  const ironLabel = athlete.iron_status
+    ? IRON_LABEL[athlete.iron_status] ?? athlete.iron_status
+    : "not recorded";
+
+  // The triggers are computed here rather than left for the model to infer, so
+  // the same input always produces the same clinical pathway.
+  const redSFlag =
+    athlete.gender === "female" &&
+    (athlete.menstrual_status === "irregular" || athlete.menstrual_status === "amenorrhoeic");
+  const ironFlag = athlete.iron_status === "low" || athlete.iron_status === "deficient";
+  const healthFlags =
+    [
+      redSFlag
+        ? "\nCLINICAL FLAG — RED-S SCREENING REQUIRED: this is a female athlete with an irregular or absent menstrual cycle. Treat low energy availability as a live differential, not a footnote."
+        : "",
+      ironFlag
+        ? `\nCLINICAL FLAG — IRON REPLETION REQUIRED: iron status is ${athlete.iron_status}. An iron protocol with vitamin C co-ingestion is indicated.`
+        : "",
+    ].join("");
+
+  // Recovery nutrition is phase-dependent, so the model gets every unresolved
+  // injury plus an explicit "most limiting" anchor. Passing only one would hide
+  // a genuine multi-phase picture; passing several unordered would leave the
+  // model to guess which governs.
+  const sortedInjuries = [...activeInjuries].sort(
+    (a, b) => RTP_ORDER.indexOf(a.rtpPhase ?? "returned") - RTP_ORDER.indexOf(b.rtpPhase ?? "returned")
+  );
+  const phaseLabel = (p: string | null) => (p ? RTP_LABEL[p] ?? p : "not set");
+  const injuryBlock =
+    sortedInjuries.length === 0
+      ? "No unresolved injuries on record. Do not write injury-recovery nutrition guidance."
+      : sortedInjuries
+          .map((i) => {
+            const target = i.targetReturnDate ? ` | target return: ${i.targetReturnDate}` : "";
+            return `- ${i.type ?? "Unspecified injury"} (sustained ${i.date}) | status: ${i.status} | RTP phase: ${phaseLabel(i.rtpPhase)}${target}`;
+          })
+          .join("\n") +
+        `\n\nMost limiting phase: ${phaseLabel(sortedInjuries[0].rtpPhase)}. Anchor recovery nutrition to THIS phase.`;
+
   const loadBlock =
     subMode === "next_day"
       ? trainingLoad
         ? `Date: ${trainingLoad.date}
 Intensity: ${trainingLoad.intensity} | RPE: ${trainingLoad.rpe} | Season phase: ${trainingLoad.seasonPhase ?? "not specified"}
+Session type: ${SESSION_TYPE_LABEL[trainingLoad.sessionType ?? ""] ?? "not recorded"} | Duration: ${DURATION_BAND_LABEL[trainingLoad.durationBand ?? ""] ?? "not recorded"}
+Estimated sweat rate: ${trainingLoad.sweatRateMl !== null ? `${trainingLoad.sweatRateMl} ml/hour` : "not recorded"}
 Scope: ${trainingLoad.scope === "team" ? "team-wide plan entry" : "individual plan entry for this athlete"}`
         : "No training load entry — this should not happen in next-day mode; generation is blocked upstream when RPE is missing."
       : "Not applicable — this is a general standing plan, not a single-day plan. No training load entry was requested.";
@@ -240,6 +331,7 @@ Name: ${athlete.first_name} ${athlete.last_name}
 Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ?? "not specified"}
 Age: ${age ?? "not provided"} | Gender: ${athlete.gender ?? "not specified"}
 Diet preference: ${athlete.diet_preference}
+Menstrual status: ${menstrualLabel} | Iron status: ${ironLabel}${healthFlags}
 Declared allergies: ${listOrNone(allergies)}
 Declared intolerances: ${listOrNone(intolerances)}
 Declared medical/operational conditions: ${listOrNone(conditions)}
@@ -253,6 +345,9 @@ ${assessmentBlock}
 
 ## Training load for the target date
 ${loadBlock}
+
+## Unresolved injuries (recovery nutrition)
+${injuryBlock}
 
 ## Assigned prescription brand (COMMERCIAL LAYER — use only after the clinical layer)
 ${prescriptionBlock}

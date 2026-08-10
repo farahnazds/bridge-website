@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { getAllCountries } from "countries-and-timezones";
-import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS } from "@/lib/constants";
+import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 import { generateAthleteCode } from "@/lib/athleteCode";
 import { registerAthlete, type RegisterAthleteState } from "./actions";
 
@@ -411,25 +411,37 @@ export default function AthleteForm({
             >
               Menstrual status
             </label>
-            <input
+            {/* Constrained since migration 028: free text here could not drive
+                RED-S screening reliably, and now violates a CHECK. */}
+            <select
               id="menstrual_status"
               name="menstrual_status"
-              type="text"
+              defaultValue=""
               className={inputClass}
               style={inputStyle}
-            />
+            >
+              <option value="">Not recorded</option>
+              {MENSTRUAL_STATUSES.map((m) => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="iron_status" className={labelClass} style={{ color: "var(--text)" }}>
               Iron status
             </label>
-            <input
+            <select
               id="iron_status"
               name="iron_status"
-              type="text"
+              defaultValue=""
               className={inputClass}
               style={inputStyle}
-            />
+            >
+              <option value="">Not recorded</option>
+              {IRON_STATUSES.map((i) => (
+                <option key={i.value} value={i.value}>{i.label}</option>
+              ))}
+            </select>
           </div>
         </div>
       </section>

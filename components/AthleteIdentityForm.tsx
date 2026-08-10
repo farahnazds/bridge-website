@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { updateAthleteIdentity, type IdentityState } from "@/app/club/[clubId]/athletes/[athleteId]/actions";
-import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS } from "@/lib/constants";
+import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 import type { AthleteIdentity } from "@/lib/athleteProfile";
 
 const initial: IdentityState = { error: null, saved: false };
@@ -55,6 +55,8 @@ export default function AthleteIdentityForm({
   const tierLabel = TIERS.find((t) => t.value === athlete.tier)?.label ?? athlete.tier ?? "—";
   const dietLabel = DIET_PREFERENCES.find((d) => d.value === athlete.diet_preference)?.label ?? athlete.diet_preference ?? "—";
   const genderLabel = GENDERS.find((g) => g.value === athlete.gender)?.label ?? athlete.gender ?? "—";
+  const menstrualLabel = MENSTRUAL_STATUSES.find((m) => m.value === athlete.menstrual_status)?.label ?? athlete.menstrual_status ?? "Not recorded";
+  const ironLabel = IRON_STATUSES.find((i) => i.value === athlete.iron_status)?.label ?? athlete.iron_status ?? "Not recorded";
 
   if (!editing) {
     return (
@@ -82,6 +84,8 @@ export default function AthleteIdentityForm({
           <Read label="Gender" value={genderLabel} />
           <Read label="Country" value={athlete.country ?? "—"} />
           <Read label="Status" value={athlete.status === "read_only" ? "Read-only" : "Active"} />
+          <Read label="Menstrual status" value={menstrualLabel} />
+          <Read label="Iron status" value={ironLabel} />
         </div>
         {state.saved && (
           <p className="text-sm" style={{ color: "var(--success)" }}>Saved.</p>
@@ -150,6 +154,20 @@ export default function AthleteIdentityForm({
           <select name="status" defaultValue={athlete.status} className={inputClass} style={inputStyle}>
             <option value="active">Active</option>
             <option value="read_only">Read-only</option>
+          </select>
+        </Field>
+        {/* Permanent health fields, not per-session. Blank = not recorded, and
+            the nutrition prompt reports that rather than assuming normal. */}
+        <Field label="Menstrual status">
+          <select name="menstrual_status" defaultValue={athlete.menstrual_status ?? ""} className={inputClass} style={inputStyle}>
+            <option value="">Not recorded</option>
+            {MENSTRUAL_STATUSES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+        </Field>
+        <Field label="Iron status">
+          <select name="iron_status" defaultValue={athlete.iron_status ?? ""} className={inputClass} style={inputStyle}>
+            <option value="">Not recorded</option>
+            {IRON_STATUSES.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
           </select>
         </Field>
       </div>

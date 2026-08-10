@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { INTENSITIES, SEASON_PHASES, OTHER_SEASON_PHASE } from "@/lib/constants";
+import { INTENSITIES, SEASON_PHASES, OTHER_SEASON_PHASE, SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
 import AthleteMultiSelect, { type SelectableAthlete } from "@/components/AthleteMultiSelect";
 import { saveTrainingLoad, deleteTrainingLoad, type ActionState } from "./actions";
 
@@ -188,6 +188,55 @@ function PlanForm({
             <option value={OTHER_SEASON_PHASE}>Other…</option>
           </select>
         )}
+      </div>
+
+      {/* Session detail (migration 027). All three are optional: the Nutrition
+          prompt reports "not recorded" rather than assuming a default, since a
+          guessed session type or duration changes fuelling advice. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="session_type" className={labelClass} style={{ color: "var(--text)" }}>
+            Session type
+          </label>
+          <select id="session_type" name="session_type" defaultValue="" className={inputClass} style={inputStyle}>
+            <option value="">Not specified</option>
+            {SESSION_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="session_duration_band" className={labelClass} style={{ color: "var(--text)" }}>
+            Session duration
+          </label>
+          <select id="session_duration_band" name="session_duration_band" defaultValue="" className={inputClass} style={inputStyle}>
+            <option value="">Not specified</option>
+            {SESSION_DURATION_BANDS.map((d) => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="estimated_sweat_rate_ml" className={labelClass} style={{ color: "var(--text)" }}>
+            Est. sweat rate (ml/hr)
+          </label>
+          <input
+            id="estimated_sweat_rate_ml"
+            name="estimated_sweat_rate_ml"
+            type="number"
+            min={0}
+            max={5000}
+            step={50}
+            placeholder="Optional"
+            className={inputClass}
+            style={inputStyle}
+          />
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Per hour, not per session. Drives individualised hydration guidance.
+          </p>
+        </div>
       </div>
 
       <fieldset className="flex flex-col gap-2">

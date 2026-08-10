@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasRole } from "@/lib/auth";
 import { getBaseUrl } from "@/lib/site";
+import { MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 
 export interface RegisterAthleteState {
   error: string | null;
@@ -59,6 +60,18 @@ export async function registerAthlete(
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "Enter a valid email for the athlete." };
+  }
+
+  // Constrained by migration 028. Validated here rather than left to the CHECK
+  // so a bad value produces a readable message instead of a raw Postgres
+  // violation mid-registration — these were free-text inputs until now.
+  const MENSTRUAL_VALUES = MENSTRUAL_STATUSES.map((m) => m.value);
+  const IRON_VALUES = IRON_STATUSES.map((i) => i.value);
+  if (menstrualStatus && !MENSTRUAL_VALUES.includes(menstrualStatus)) {
+    return { error: `Menstrual status must be one of: ${MENSTRUAL_VALUES.join(", ")}.` };
+  }
+  if (ironStatus && !IRON_VALUES.includes(ironStatus)) {
+    return { error: `Iron status must be one of: ${IRON_VALUES.join(", ")}.` };
   }
 
   const supabase = await createClient();

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { TIERS, DIET_PREFERENCES, GENDERS } from "@/lib/constants";
+import { TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 
 // The first real "edit athlete" surface in the product. Until now the only
 // athlete writes were /athletes/new and /athletes/import, plus two internal
@@ -32,6 +32,8 @@ export interface IdentityState {
 const VALID_TIERS = TIERS.map((t) => t.value);
 const VALID_DIETS = DIET_PREFERENCES.map((d) => d.value);
 const VALID_GENDERS = GENDERS.map((g) => g.value);
+const VALID_MENSTRUAL = MENSTRUAL_STATUSES.map((m) => m.value);
+const VALID_IRON = IRON_STATUSES.map((i) => i.value);
 const EDITOR_ROLES = ["club_manager", "club_practitioner", "admin", "super_admin"];
 
 export async function updateAthleteIdentity(
@@ -73,6 +75,18 @@ export async function updateAthleteIdentity(
   if (gender && !VALID_GENDERS.includes(gender)) {
     return { error: `Gender must be one of: ${VALID_GENDERS.join(", ")}.`, saved: false };
   }
+  // Permanent health fields (migration 028). Empty means "not recorded" and is
+  // stored as NULL — a distinct state the nutrition prompt reports rather than
+  // treating as normal.
+  const menstrualStatus = String(formData.get("menstrual_status") ?? "").trim();
+  if (menstrualStatus && !VALID_MENSTRUAL.includes(menstrualStatus)) {
+    return { error: `Menstrual status must be one of: ${VALID_MENSTRUAL.join(", ")}.`, saved: false };
+  }
+  const ironStatus = String(formData.get("iron_status") ?? "").trim();
+  if (ironStatus && !VALID_IRON.includes(ironStatus)) {
+    return { error: `Iron status must be one of: ${VALID_IRON.join(", ")}.`, saved: false };
+  }
+
   const status = String(formData.get("status") ?? "").trim();
   if (status && !["active", "read_only"].includes(status)) {
     return { error: "Status must be active or read_only.", saved: false };
@@ -100,6 +114,8 @@ export async function updateAthleteIdentity(
     dob: dob || null,
     gender: gender || null,
     status: status || "active",
+    menstrual_status: menstrualStatus || null,
+    iron_status: ironStatus || null,
     updated_at: new Date().toISOString(),
   };
 
