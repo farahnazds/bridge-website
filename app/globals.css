@@ -65,3 +65,93 @@ h5,
 h6 {
   font-family: var(--font-heading);
 }
+
+/* ==========================================================================
+   Landing page (app/page.tsx) — imported from the "Bridgetx brand guidelines"
+   design project, file "Bridgetx Landing v2.dc.html".
+   Everything here is scoped under .lp so the dark marketing surface cannot
+   leak into the light-themed product UI.
+   The design expressed hover states as a `style-hover` attribute, which is a
+   design-tool convention with no browser meaning — they are real CSS here.
+   Per-element hover colours come through --hov / --hovbg so one rule serves
+   every card rather than duplicating the transition on each.
+   ========================================================================== */
+.lp { background: #05091A; color: #fff; overflow-x: hidden; }
+.lp a { color: rgba(255, 255, 255, .62); text-decoration: none; transition: color 180ms ease-out; }
+.lp a:hover { color: #fff; }
+
+.lp-card { transition: border-color 240ms ease-out, transform 240ms ease-out; }
+.lp-card:hover { border-color: var(--hov, rgba(255, 255, 255, .3)); transform: translateY(-4px); }
+
+.lp-btn { transition: filter 220ms ease-out, transform 220ms ease-out; }
+.lp-btn:hover { filter: brightness(1.15); transform: translateY(-1px); color: #fff; }
+
+.lp-ghost { transition: border-color 200ms ease-out, background 200ms ease-out, color 200ms ease-out; }
+.lp-ghost:hover { border-color: rgba(255, 255, 255, .34); background: rgba(255, 255, 255, .05); color: #fff; }
+
+.lp-row { transition: background 240ms ease-out; }
+.lp-row:hover { background: var(--hovbg, rgba(255, 255, 255, .03)); }
+
+.lp-social { transition: color 200ms ease-out, border-color 200ms ease-out, background 200ms ease-out; }
+.lp-social:hover { color: var(--hov, #fff); border-color: var(--hovbd, rgba(255, 255, 255, .3)); background: var(--hovbg, rgba(255, 255, 255, .06)); }
+
+@keyframes lp-rise { from { opacity: 0; transform: translateY(var(--rv, 22px)); } to { opacity: 1; transform: none; } }
+@keyframes lp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lp-growX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes lp-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes lp-halo { 0%, 100% { opacity: .55; transform: scale(.95); } 50% { opacity: .85; transform: scale(1.05); } }
+@keyframes lp-sweep { from { transform: translateX(-140%); } to { transform: translateX(240%); } }
+@keyframes lp-pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes lp-drawIn { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes lp-gauge { from { stroke-dashoffset: 1; } to { stroke-dashoffset: .4; } }
+
+/* The design leans heavily on motion. Honour a reduced-motion preference by
+   settling everything into its final state rather than removing the content. */
+@media (prefers-reduced-motion: reduce) {
+  .lp *, .lp *::before, .lp *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* ==========================================================================
+   Sign-in page (app/login) — imported from the same design project,
+   file "Bridgetx Sign In.dc.html". Scoped under .si.
+   The design's `style-focus` / `style-hover` attributes are design-tool
+   conventions with no browser meaning; they are real CSS here.
+   ========================================================================== */
+.si { background: #05091A; color: #fff; }
+.si a { color: rgba(255, 255, 255, .62); text-decoration: none; transition: color 180ms ease-out; }
+.si a:hover { color: #fff; }
+.si input { font-family: var(--font-body), Inter, system-ui, sans-serif; }
+.si input::placeholder { color: rgba(255, 255, 255, .28); }
+
+.si-inp {
+  width: 100%; box-sizing: border-box; padding: 13px 15px; border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .11); background: rgba(255, 255, 255, .03);
+  color: #fff; font-size: 15px; outline: none;
+  transition: border-color 200ms ease-out, background 200ms ease-out, box-shadow 200ms ease-out;
+}
+.si-inp:focus { border-color: var(--focus, rgba(0, 179, 166, .55)); background: rgba(255, 255, 255, .05); box-shadow: 0 0 0 3px var(--focusring, rgba(0, 179, 166, .12)); }
+
+.si-pwtoggle { transition: color 180ms ease-out; }
+.si-pwtoggle:hover { color: #4FD8CE; }
+
+.si-submit { transition: filter 220ms ease-out; }
+.si-submit:hover:not(:disabled) { filter: brightness(1.14); }
+.si-submit:disabled { cursor: not-allowed; }
+
+@keyframes si-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes si-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes si-spin { to { transform: rotate(360deg); } }
+@keyframes si-drift { 0%, 100% { transform: translate3d(0,0,0) rotate(var(--r, 0deg)); } 50% { transform: translate3d(-2.5%, 2%, 0) rotate(var(--r, 0deg)); } }
+@keyframes si-driftB { 0%, 100% { transform: translate3d(0,0,0) rotate(var(--r, 0deg)); } 50% { transform: translate3d(3%, -2%, 0) rotate(var(--r, 0deg)); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .si *, .si *::before, .si *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important; transition-duration: .001ms !important;
+  }
+}
