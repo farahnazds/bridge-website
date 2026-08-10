@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Referral Pipeline — Bridgetx" };
 
@@ -103,7 +103,7 @@ export default async function PartnerConsultantPage({
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {STAGES.map((s) => (
-            <div key={s} className="rounded-xl border p-4"
+            <div key={s} className={`${CARD} p-4`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>{STAGE_LABEL[s]}</p>
               <p className="mt-1 text-xl font-semibold"
@@ -127,12 +127,12 @@ export default async function PartnerConsultantPage({
           </div>
 
           {pipeline.length === 0 ? (
-            <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+            <p className={NOTICE_EMPTY}
               style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
               No referrals recorded yet.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border"
+            <div className={`overflow-x-auto ${CARD}`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
               <table className="w-full text-left text-sm">
                 <thead>
@@ -176,7 +176,7 @@ export default async function PartnerConsultantPage({
           )}
 
           {anyUnnamed && (
-            <p className="rounded-lg border px-4 py-3 text-sm"
+            <p className={NOTICE}
               style={{ borderColor: "var(--border)", color: "var(--text-muted)", backgroundColor: "var(--surface)" }}>
               Some club names aren&apos;t shown. That means a pipeline row points at a club this account
               can no longer resolve — worth reporting, rather than something you can fix here.

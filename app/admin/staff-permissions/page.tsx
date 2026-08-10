@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
+import { CARD, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 import {
   PermissionMatrix, AdminAssignments,
   type PermissionRow, type AdminAssignment, type Option,
@@ -105,12 +106,12 @@ export default async function AdminStaffPermissionsPage() {
           </p>
         </div>
         {staff.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+          <p className={NOTICE_EMPTY}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             No staff registered in {scopeNoun}.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border"
+          <div className={`overflow-x-auto ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>
@@ -159,7 +160,7 @@ export default async function AdminStaffPermissionsPage() {
           </p>
         </div>
         {!canWrite && (
-          <p className="rounded-lg border px-4 py-3 text-sm"
+          <p className={NOTICE}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)", backgroundColor: "var(--bg)" }}>
             Assignments are set by Super Admin.
           </p>
@@ -178,7 +179,7 @@ export default async function AdminStaffPermissionsPage() {
           </p>
         </div>
 
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p className={NOTICE}
           style={{ borderColor: "var(--warning)", color: "var(--text)", backgroundColor: "color-mix(in srgb, var(--warning) 8%, transparent)" }}>
           <strong>Stored, not yet enforced.</strong> Nothing in the app reads this matrix today — access is
           currently decided by database row-level security and per-page role checks. Changing a cell records
@@ -187,7 +188,7 @@ export default async function AdminStaffPermissionsPage() {
         </p>
 
         {permsRes.error && (
-          <p className="rounded-lg border px-4 py-3 text-sm"
+          <p role="status" className={NOTICE}
             style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
             Couldn&apos;t load the matrix: {permsRes.error.message}
           </p>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Compliance — Bridgetx",
@@ -58,7 +59,8 @@ export default async function ClubCompliancePage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load athletes: {error.message}
@@ -67,7 +69,7 @@ export default async function ClubCompliancePage({
 
       {!error && athletes && athletes.length === 0 && (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>No athletes registered yet.</p>
@@ -76,7 +78,7 @@ export default async function ClubCompliancePage({
 
       {!error && athletes && athletes.length > 0 && (
         <div
-          className="overflow-hidden rounded-xl border"
+          className={`overflow-hidden ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <table className="w-full text-left text-sm">

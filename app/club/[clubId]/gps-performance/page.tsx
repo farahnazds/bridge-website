@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "GPS/Performance — Bridgetx" };
 
@@ -68,7 +69,8 @@ export default async function GpsPerformancePage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load GPS logs: {error}
@@ -79,7 +81,7 @@ export default async function GpsPerformancePage({
 
       {!error && rows.length > 0 && (
         <div
-          className="overflow-x-auto rounded-xl border"
+          className={`overflow-x-auto ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <table className="w-full min-w-[900px] text-left text-sm">

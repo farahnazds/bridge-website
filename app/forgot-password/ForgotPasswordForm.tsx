@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { BTN_PRIMARY_FULL } from "@/lib/ui";
+import { BTN_PRIMARY_FULL, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { requestPasswordReset, type ForgotPasswordState } from "./actions";
 
@@ -39,7 +39,7 @@ export default function ForgotPasswordForm() {
       {state.error && (
         <p
           role="alert"
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{
             borderColor: "var(--danger)",
             color: "var(--danger)",
@@ -65,12 +65,8 @@ export default function ForgotPasswordForm() {
           autoComplete="email"
           required
           placeholder="you@club.com"
-          className="rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]"
-          style={{
-            borderColor: "var(--border)",
-            backgroundColor: "var(--surface)",
-            color: "var(--text)",
-          }}
+          className={INPUT}
+          style={INPUT_STYLE}
         />
       </div>
 

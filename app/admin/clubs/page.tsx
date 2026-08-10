@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs } from "@/lib/adminScope";
-import { CHIP } from "@/lib/ui";
+import { CARD, CHIP, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Clubs — Admin — Bridgetx" };
 
@@ -84,7 +84,8 @@ export default async function AdminClubsPage() {
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load clubs: {error.message}
@@ -93,7 +94,7 @@ export default async function AdminClubsPage() {
 
       {!error && clubs.length === 0 && (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>
@@ -111,7 +112,7 @@ export default async function AdminClubsPage() {
             return (
               <div
                 key={club.id}
-                className="rounded-xl border p-5"
+                className={`${CARD} p-5`}
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">

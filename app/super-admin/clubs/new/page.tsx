@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ClubForm from "./ClubForm";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "New Club — Super Admin — Bridgetx",
@@ -29,7 +30,7 @@ export default function NewClubPage() {
       </div>
 
       <div
-        className="max-w-2xl rounded-xl border p-6 shadow-sm"
+        className={`max-w-2xl ${CARD} p-6 shadow-sm`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <ClubForm />

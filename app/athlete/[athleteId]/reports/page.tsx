@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import MyReportsList, { type MyReportEntry } from "./MyReportsList";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "My Reports — Bridgetx" };
 
@@ -56,7 +57,8 @@ export default async function MyReportsPage() {
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load your reports: {error.message}
@@ -65,7 +67,7 @@ export default async function MyReportsPage() {
 
       {!error && reports.length === 0 && (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>No reports have been shared with you yet.</p>

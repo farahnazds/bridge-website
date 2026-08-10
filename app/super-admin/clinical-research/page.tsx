@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import LibraryClient, { type LibraryEntry } from "./LibraryClient";
+import { NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Clinical + Research — Super Admin — Bridgetx" };
 
@@ -41,14 +42,14 @@ export default async function ClinicalResearchPage() {
       </div>
 
       {error && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p role="status" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
           Couldn&apos;t load the library: {error.message}
         </p>
       )}
 
       {!error && entries.length === 0 && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p className={NOTICE}
           style={{
             borderColor: "var(--warning)",
             color: "var(--text)",

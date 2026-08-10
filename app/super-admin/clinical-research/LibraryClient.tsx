@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY } from "@/lib/ui";
+import { BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { createEntry, updateEntry, deleteEntry, type LibraryState } from "./actions";
 import { CLINICAL_TOPIC_TAGS } from "@/lib/constants";
@@ -16,9 +16,6 @@ export interface LibraryEntry {
 }
 
 const initial: LibraryState = { error: null, saved: false };
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 const TAG_LABEL: Record<string, string> = Object.fromEntries(
   CLINICAL_TOPIC_TAGS.map((t) => [t.value, t.label])
 );
@@ -48,7 +45,7 @@ function EntryFields({ entry }: { entry?: LibraryEntry }) {
           {/* A fixed select, never free text: each value is queried verbatim by
               a report generator, so a typo would make the entry invisible to
               every report with no error shown anywhere. */}
-          <select name="topic_tag" defaultValue={entry?.topic_tag ?? "compliance"} className={inputClass} style={inputStyle}>
+          <select name="topic_tag" defaultValue={entry?.topic_tag ?? "compliance"} className={INPUT} style={INPUT_STYLE}>
             {CLINICAL_TOPIC_TAGS.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -61,14 +58,14 @@ function EntryFields({ entry }: { entry?: LibraryEntry }) {
             Year
           </label>
           <input name="year" type="number" min={1900} max={new Date().getFullYear() + 1}
-            defaultValue={entry?.year ?? ""} placeholder="2019" className={inputClass} style={inputStyle} />
+            defaultValue={entry?.year ?? ""} placeholder="2019" className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
             Source
           </label>
           <input name="source" defaultValue={entry?.source ?? ""} placeholder="Journal of Sports Sciences"
-            className={inputClass} style={inputStyle} />
+            className={INPUT} style={INPUT_STYLE} />
         </div>
       </div>
 
@@ -78,7 +75,7 @@ function EntryFields({ entry }: { entry?: LibraryEntry }) {
         </label>
         <input name="title" required defaultValue={entry?.title ?? ""}
           placeholder="Protein timing and lean mass retention in adolescent athletes"
-          className={inputClass} style={inputStyle} />
+          className={INPUT} style={INPUT_STYLE} />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -87,7 +84,7 @@ function EntryFields({ entry }: { entry?: LibraryEntry }) {
         </label>
         <textarea name="clinical_note" rows={3} defaultValue={entry?.clinical_note ?? ""}
           placeholder="What this supports, in the terms a report would cite it for."
-          className={inputClass} style={inputStyle} />
+          className={INPUT} style={INPUT_STYLE} />
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           The AI reads this to decide whether the entry is relevant to a section.
         </p>
@@ -99,7 +96,7 @@ function EntryFields({ entry }: { entry?: LibraryEntry }) {
 function Feedback({ state }: { state: LibraryState }) {
   if (state.error) {
     return (
-      <p role="alert" className="rounded-lg border px-4 py-3 text-sm"
+      <p role="alert" className={NOTICE}
         style={{ borderColor: "var(--danger)", color: "var(--danger)", backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)" }}>
         {state.error}
       </p>
@@ -107,7 +104,7 @@ function Feedback({ state }: { state: LibraryState }) {
   }
   if (state.saved) {
     return (
-      <p className="rounded-lg border px-4 py-3 text-sm"
+      <p role="status" className={NOTICE}
         style={{ borderColor: "var(--success)", color: "var(--success)", backgroundColor: "color-mix(in srgb, var(--success) 8%, transparent)" }}>
         Saved.
       </p>
@@ -164,7 +161,7 @@ export default function LibraryClient({ entries }: { entries: LibraryEntry[] }) 
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4 rounded-xl border p-5"
+      <div className={`flex flex-col gap-4 ${CARD} p-5`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
         <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
           Add an entry
@@ -191,12 +188,12 @@ export default function LibraryClient({ entries }: { entries: LibraryEntry[] }) 
             </div>
 
             {group.entries.length === 0 ? (
-              <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+              <p className={NOTICE_EMPTY}
                 style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
                 No entries — {group.label} reports will generate with no citations.
               </p>
             ) : (
-              <div className="overflow-hidden rounded-xl border"
+              <div className={`overflow-hidden ${CARD}`}
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
                 {group.entries.map((e, i) => (
                   <div key={e.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>

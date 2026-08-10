@@ -3,7 +3,7 @@ import AthleteIdentityForm from "@/components/AthleteIdentityForm";
 import { COMPLIANCE_WINDOW, type AthleteProfileData } from "@/lib/athleteProfile";
 import { goalBodyWeightKg, gap } from "@/lib/bodyComposition";
 import { REPORT_TYPE_LABELS, INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD, NOTICE_EMPTY } from "@/lib/ui";
 
 // The staff-facing athlete profile, rendered identically for the Club Manager
 // route and the Club Practitioner route. Only `links` differs, so each role
@@ -55,7 +55,7 @@ function Section({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+    <p className={NOTICE_EMPTY}
       style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
       {children}
     </p>
@@ -64,7 +64,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 function Card({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="rounded-xl border p-4" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+    <div className={`${CARD} p-4`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>{label}</p>
       <p className="mt-1 text-xl font-semibold"
         style={{ fontFamily: "var(--font-heading)", color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
@@ -77,7 +77,7 @@ function Card({ label, value, hint }: { label: string; value: string | number; h
 
 function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+    <div className={`overflow-x-auto ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <table className="w-full text-left text-sm">
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -156,7 +156,7 @@ export default function AthleteProfile({
       {/* Clinical flags sit beside identity because they gate supplement rules,
           but they are not editable here — they live in three vocabulary-backed
           join tables and need their own surface. */}
-      <div className="rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+      <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
         <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
           Clinical flags
         </h2>
@@ -180,7 +180,7 @@ export default function AthleteProfile({
       <Section title="Supplement protocol" href={links.protocol}
         hint="One active prescription at a time; a new one supersedes the last rather than deleting it.">
         {data.activeProtocol ? (
-          <div className="rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{data.activeProtocol.supplement_name}</p>
               <span className={BADGE}

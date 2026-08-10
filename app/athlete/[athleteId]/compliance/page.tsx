@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
 import TrendSparkline from "@/components/TrendSparkline";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "My Compliance — Bridgetx" };
 
@@ -38,7 +39,7 @@ function avg(values: (number | null)[]): number | null {
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div
-      className="rounded-xl border p-5"
+      className={`${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -72,7 +73,7 @@ function MetricPanel({
 }) {
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border p-5"
+      className={`flex flex-col gap-3 ${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <div className="flex items-baseline justify-between">
@@ -150,7 +151,8 @@ export default async function MyCompliancePage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load your check-ins: {error.message}
@@ -185,7 +187,7 @@ export default async function MyCompliancePage({
           </div>
 
           <div
-            className="overflow-x-auto rounded-xl border"
+            className={`overflow-x-auto ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             <table className="w-full min-w-[820px] text-left text-sm">

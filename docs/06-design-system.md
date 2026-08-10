@@ -100,7 +100,30 @@ different heights.
 | `BTN_TERTIARY` | The quiet "Cancel"/"Done" paired with a primary — no border, no fill |
 | `BADGE` | Tinted status pill — carries a *state* (active, overdue, paid) |
 | `CHIP` | Outlined tag — *labels* rather than states (team name, recipient, phase) |
-| `CARD` | `rounded-xl border` card surface |
+| `CARD` | The page-level surface — `rounded-xl border` |
+| `PANEL` | A bordered box *inside* the page — `rounded-lg border` |
+| `NOTICE` | One-line message banner — error, warning, success or note |
+| `NOTICE_EMPTY` | `NOTICE`'s dashed sibling, for inline "nothing here yet" states |
+| `INPUT` | Text inputs, selects, textareas |
+| `INPUT_STYLE` | The inline style object that always accompanies `INPUT` |
+
+`CARD` and `PANEL` differ only in radius, and that is the point: 12px is
+the page surface, 8px is one level nested inside it. If the box is the
+outermost thing on the page it is a `CARD`; if it sits within one — an
+inline add/edit form, a preview box, a scroll list — it is a `PANEL`.
+Neither carries padding, so a stat card (`p-5`), an empty state
+(`p-10 text-center`) and a table wrapper (`overflow-x-auto`) stay one
+surface at different densities.
+
+`NOTICE` was the most duplicated string in the codebase — 94 identical
+copies. Its dashed variant is not decoration: a dashed border says
+"nothing here yet" where a solid one in the same slot would read as an
+error.
+
+`INPUT` uses a focus **ring** rather than the offset outline the buttons
+use. An input is a filled box, so a ring reads as the field lighting up,
+where an offset outline reads as a box drawn around a box. It previously
+existed as a byte-identical `const inputClass` in **30** separate files.
 
 `BADGE` and `CHIP` are deliberately two roles, not one. A badge is filled
 with a `color-mix` tint and set in `font-medium` because it reports

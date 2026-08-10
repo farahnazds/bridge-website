@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Overview — Bridgetx",
@@ -14,7 +15,7 @@ const STATUS_LABEL: Record<string, string> = {
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div
-      className="rounded-xl border p-5"
+      className={`${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>

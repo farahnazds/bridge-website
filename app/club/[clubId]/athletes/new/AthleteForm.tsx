@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_LG } from "@/lib/ui";
+import { BTN_PRIMARY_LG, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { getAllCountries } from "countries-and-timezones";
 import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
@@ -14,13 +14,6 @@ const COUNTRIES = Object.values(getAllCountries())
   .map((c) => ({ code: c.id, name: c.name }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = {
-  borderColor: "var(--border)",
-  backgroundColor: "var(--surface)",
-  color: "var(--text)",
-};
 const labelClass = "text-sm font-medium";
 
 function SubmitButton() {
@@ -101,8 +94,8 @@ function ChecklistField({
           name={otherFieldName}
           required
           placeholder="Specify…"
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         />
       )}
     </fieldset>
@@ -148,7 +141,7 @@ export default function AthleteForm({
       {state.error && (
         <p
           role="alert"
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{
             borderColor: "var(--danger)",
             color: "var(--danger)",
@@ -208,8 +201,8 @@ export default function AthleteForm({
               name="first_name"
               type="text"
               required
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -223,8 +216,8 @@ export default function AthleteForm({
               required
               value={lastName}
               onChange={handleLastNameChange}
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
@@ -240,8 +233,8 @@ export default function AthleteForm({
               type="email"
               required
               placeholder="athlete@example.com"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -252,8 +245,8 @@ export default function AthleteForm({
               id="dob"
               name="dob"
               type="date"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
@@ -263,7 +256,7 @@ export default function AthleteForm({
             <label htmlFor="gender" className={labelClass} style={{ color: "var(--text)" }}>
               Gender
             </label>
-            <select id="gender" name="gender" defaultValue="" className={inputClass} style={inputStyle}>
+            <select id="gender" name="gender" defaultValue="" className={INPUT} style={INPUT_STYLE}>
               <option value="">Not specified</option>
               {GENDERS.map((g) => (
                 <option key={g.value} value={g.value}>
@@ -276,7 +269,7 @@ export default function AthleteForm({
             <label htmlFor="country" className={labelClass} style={{ color: "var(--text)" }}>
               Country
             </label>
-            <select id="country" name="country" defaultValue="" className={inputClass} style={inputStyle}>
+            <select id="country" name="country" defaultValue="" className={INPUT} style={INPUT_STYLE}>
               <option value="">Not specified</option>
               {COUNTRIES.map((c) => (
                 <option key={c.code} value={c.name}>
@@ -295,8 +288,8 @@ export default function AthleteForm({
             id="ethnicity"
             name="ethnicity"
             type="text"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Sensitive field — visibility is restricted to Medical staff, Admin, and Super Admin.
@@ -318,8 +311,8 @@ export default function AthleteForm({
               type="number"
               step="0.1"
               min="0"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -332,8 +325,8 @@ export default function AthleteForm({
               type="number"
               step="0.1"
               min="0"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -347,8 +340,8 @@ export default function AthleteForm({
               step="0.1"
               min="0"
               max="100"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
@@ -369,8 +362,8 @@ export default function AthleteForm({
             id="diet_preference"
             name="diet_preference"
             defaultValue="none"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           >
             {DIET_PREFERENCES.map((d) => (
               <option key={d.value} value={d.value}>
@@ -418,8 +411,8 @@ export default function AthleteForm({
               id="menstrual_status"
               name="menstrual_status"
               defaultValue=""
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             >
               <option value="">Not recorded</option>
               {MENSTRUAL_STATUSES.map((m) => (
@@ -435,8 +428,8 @@ export default function AthleteForm({
               id="iron_status"
               name="iron_status"
               defaultValue=""
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             >
               <option value="">Not recorded</option>
               {IRON_STATUSES.map((i) => (
@@ -465,8 +458,8 @@ export default function AthleteForm({
                 onChange={(e) => {
                   if (e.target.value === OTHER_SPORT) setSportMode("other");
                 }}
-                className={inputClass}
-                style={inputStyle}
+                className={INPUT}
+                style={INPUT_STYLE}
               >
                 <option value="" disabled>
                   Select a sport…
@@ -487,8 +480,8 @@ export default function AthleteForm({
                   required
                   autoFocus
                   placeholder="Enter sport name"
-                  className={inputClass}
-                  style={inputStyle}
+                  className={INPUT}
+                  style={INPUT_STYLE}
                 />
                 <button
                   type="button"
@@ -511,8 +504,8 @@ export default function AthleteForm({
               name="position"
               type="text"
               placeholder="e.g. Point Guard"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
@@ -522,7 +515,7 @@ export default function AthleteForm({
             <label htmlFor="tier" className={labelClass} style={{ color: "var(--text)" }}>
               Tier
             </label>
-            <select id="tier" name="tier" defaultValue="" className={inputClass} style={inputStyle}>
+            <select id="tier" name="tier" defaultValue="" className={INPUT} style={INPUT_STYLE}>
               <option value="">Not specified</option>
               {TIERS.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -542,8 +535,8 @@ export default function AthleteForm({
                 name="team_id"
                 required
                 defaultValue=""
-                className={inputClass}
-                style={inputStyle}
+                className={INPUT}
+                style={INPUT_STYLE}
               >
                 <option value="" disabled>
                   Select a team…
@@ -579,8 +572,8 @@ export default function AthleteForm({
               setCodeTouched(true);
               setCode(e.target.value);
             }}
-            className={inputClass}
-            style={{ ...inputStyle, fontFamily: "var(--font-mono)" }}
+            className={INPUT}
+            style={{ ...INPUT_STYLE, fontFamily: "var(--font-mono)" }}
           />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Auto-generated — edit if you&apos;d rather use your own numbering.

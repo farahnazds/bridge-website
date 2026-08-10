@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD, NOTICE, PANEL } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Content/Relay — Admin — Bridgetx" };
 
@@ -81,7 +81,8 @@ export default async function AdminContentPage() {
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load content: {error}
@@ -97,7 +98,7 @@ export default async function AdminContentPage() {
           {rows.map((r) => (
             <div
               key={r.id}
-              className="rounded-xl border p-5"
+              className={`${CARD} p-5`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -145,7 +146,7 @@ export default async function AdminContentPage() {
                     View content
                   </summary>
                   <div
-                    className="mt-3 rounded-lg border p-4 whitespace-pre-wrap text-sm leading-relaxed"
+                    className={`mt-3 ${PANEL} p-4 whitespace-pre-wrap text-sm leading-relaxed`}
                     style={{
                       borderColor: "var(--border)",
                       backgroundColor: "var(--bg)",

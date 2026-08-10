@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import StopResumePanel from "./StopResumePanel";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Club — Super Admin — Bridgetx" };
 
@@ -29,7 +29,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+    <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>{label}</p>
       <p
         className="mt-1 text-2xl font-semibold"
@@ -141,7 +141,7 @@ export default async function SuperAdminClubDetailPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="flex flex-col gap-4 rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`flex flex-col gap-4 ${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
             Subscription
           </h2>
@@ -153,7 +153,7 @@ export default async function SuperAdminClubDetailPage({
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`flex flex-col gap-4 ${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
             Contact &amp; configuration
           </h2>
@@ -182,7 +182,7 @@ export default async function SuperAdminClubDetailPage({
         {(teams ?? []).length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>No teams yet.</p>
         ) : (
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`overflow-hidden ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -210,7 +210,7 @@ export default async function SuperAdminClubDetailPage({
         {staffRows.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>No staff registered yet.</p>
         ) : (
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`overflow-hidden ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>

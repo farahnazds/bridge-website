@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BADGE, BTN_PRIMARY } from "@/lib/ui";
+import { BADGE, BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { savePlan, deletePlan, type PlanState } from "./actions";
 import { PLAN_APPLIES_TO, BILLING_PERIODS } from "@/lib/constants";
@@ -17,9 +17,6 @@ export interface Plan {
 }
 
 const initial: PlanState = { error: null, saved: false };
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 const APPLIES_LABEL = Object.fromEntries(PLAN_APPLIES_TO.map((p) => [p.value, p.label]));
 const PERIOD_LABEL = Object.fromEntries(BILLING_PERIODS.map((p) => [p.value, p.label]));
@@ -48,11 +45,11 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone?: () => void }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="flex flex-col gap-1.5 lg:col-span-2">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Plan name</label>
-          <input name="name" required defaultValue={plan?.name ?? ""} className={inputClass} style={inputStyle} />
+          <input name="name" required defaultValue={plan?.name ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Applies to</label>
-          <select name="applies_to" defaultValue={plan?.applies_to ?? "independent_athlete"} className={inputClass} style={inputStyle}>
+          <select name="applies_to" defaultValue={plan?.applies_to ?? "independent_athlete"} className={INPUT} style={INPUT_STYLE}>
             {PLAN_APPLIES_TO.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
@@ -60,18 +57,18 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone?: () => void }) {
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Price</label>
-          <input name="price" type="number" min="0" step="0.01" required defaultValue={plan?.price ?? ""} className={inputClass} style={inputStyle} />
+          <input name="price" type="number" min="0" step="0.01" required defaultValue={plan?.price ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Currency</label>
-          <input name="currency" maxLength={3} defaultValue={plan?.currency ?? "AED"} className={inputClass} style={inputStyle} />
+          <input name="currency" maxLength={3} defaultValue={plan?.currency ?? "AED"} className={INPUT} style={INPUT_STYLE} />
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-6">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Billing period</label>
-          <select name="billing_period" defaultValue={plan?.billing_period ?? "monthly"} className={inputClass} style={inputStyle}>
+          <select name="billing_period" defaultValue={plan?.billing_period ?? "monthly"} className={INPUT} style={INPUT_STYLE}>
             {BILLING_PERIODS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
@@ -85,7 +82,7 @@ function PlanForm({ plan, onDone }: { plan?: Plan; onDone?: () => void }) {
       </div>
 
       {state.error && (
-        <p role="alert" className="rounded-lg border px-4 py-3 text-sm"
+        <p role="alert" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{state.error}</p>
       )}
       <div className="flex items-center gap-3">
@@ -118,7 +115,7 @@ export default function PlansClient({ plans, canWrite }: { plans: Plan[]; canWri
   return (
     <div className="flex flex-col gap-6">
       {canWrite && (
-        <div className="flex flex-col gap-4 rounded-xl border p-5"
+        <div className={`flex flex-col gap-4 ${CARD} p-5`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <h3 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
             Add a plan
@@ -128,12 +125,12 @@ export default function PlansClient({ plans, canWrite }: { plans: Plan[]; canWri
       )}
 
       {plans.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+        <p className={NOTICE_EMPTY}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
           No plans defined yet.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border"
+        <div className={`overflow-hidden ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           {plans.map((p, i) => (
             <div key={p.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>

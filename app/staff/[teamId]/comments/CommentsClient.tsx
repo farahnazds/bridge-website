@@ -1,15 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BADGE, BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
+import { BADGE, BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { createComment, deleteComment, toggleReflection, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 const labelClass = "text-sm font-medium";
 
 interface Athlete {
@@ -38,7 +35,7 @@ function ErrorBanner({ error }: { error: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-lg border px-4 py-3 text-sm"
+      className={NOTICE}
       style={{
         borderColor: "var(--danger)",
         color: "var(--danger)",
@@ -79,7 +76,7 @@ function NewCommentForm({
   const [commentType, setCommentType] = useState<"private_note" | "official_comment">("private_note");
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 rounded-lg border p-4" style={{ borderColor: "var(--border)" }} noValidate>
+    <form action={formAction} className={`flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
       <input type="hidden" name="team_id" value={teamId} />
       <ErrorBanner error={state.error} />
 
@@ -88,7 +85,7 @@ function NewCommentForm({
           <label htmlFor="target" className={labelClass} style={{ color: "var(--text)" }}>
             About
           </label>
-          <select id="target" name="target" required defaultValue="team" className={inputClass} style={inputStyle}>
+          <select id="target" name="target" required defaultValue="team" className={INPUT} style={INPUT_STYLE}>
             <option value="team">{teamName} (team-wide)</option>
             {athletes.map((a) => (
               <option key={a.id} value={a.id}>
@@ -131,7 +128,7 @@ function NewCommentForm({
         <label htmlFor="body" className={labelClass} style={{ color: "var(--text)" }}>
           {commentType === "private_note" ? "Visible only to you" : "Visible to everyone with access to this athlete/team"}
         </label>
-        <textarea id="body" name="body" rows={3} required className={inputClass} style={inputStyle} />
+        <textarea id="body" name="body" rows={3} required className={INPUT} style={INPUT_STYLE} />
       </div>
 
       {commentType === "official_comment" && (
@@ -261,11 +258,11 @@ export default function CommentsClient({
       )}
 
       {comments.length === 0 ? (
-        <div className="rounded-xl border p-10 text-center" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`${CARD} p-10 text-center`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <p style={{ color: "var(--text-muted)" }}>No comments yet.</p>
         </div>
       ) : (
-        <div className="rounded-xl border px-6" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`${CARD} px-6`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           {comments.map((c) => (
             <CommentRow key={c.id} teamId={teamId} comment={c} />
           ))}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Home — Bridgetx",
@@ -31,7 +32,7 @@ function toDateStr(d: Date): string {
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div
-      className="rounded-xl border p-5"
+      className={`${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -140,7 +141,7 @@ export default async function AthleteHomePage({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div
-          className="rounded-xl border p-5"
+          className={`${CARD} p-5`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -161,7 +162,7 @@ export default async function AthleteHomePage({
       </div>
 
       <div
-        className="rounded-xl border p-5"
+        className={`${CARD} p-5`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <p className="mb-3 text-sm" style={{ color: "var(--text-muted)" }}>
@@ -188,7 +189,7 @@ export default async function AthleteHomePage({
 
       {latestInjury && (
         <div
-          className="rounded-xl border p-5"
+          className={`${CARD} p-5`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p className="mb-2 text-sm" style={{ color: "var(--text-muted)" }}>
@@ -216,7 +217,7 @@ export default async function AthleteHomePage({
       )}
 
       <div
-        className="rounded-xl border p-5"
+        className={`${CARD} p-5`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <p className="mb-2 text-sm" style={{ color: "var(--text-muted)" }}>

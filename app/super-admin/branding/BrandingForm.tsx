@@ -1,15 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY } from "@/lib/ui";
+import { BTN_PRIMARY, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { saveBranding, type BrandingState } from "./actions";
 
 const initialState: BrandingState = { error: null, saved: false };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 const labelClass = "text-sm font-medium";
 
 export interface ClubBranding {
@@ -65,8 +62,8 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
           required
           value={clubId}
           onChange={(e) => setClubId(e.target.value)}
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         >
           {clubs.map((c) => (
             <option key={c.clubId} value={c.clubId}>
@@ -85,7 +82,7 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
       {state.error && (
         <p
           role="alert"
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{
             borderColor: "var(--danger)",
             color: "var(--danger)",
@@ -98,7 +95,7 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
       {state.saved && !state.error && (
         <p
           role="status"
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{
             borderColor: "var(--success)",
             color: "var(--success)",
@@ -119,7 +116,7 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
             <label htmlFor="logo" className={labelClass} style={{ color: "var(--text)" }}>
               Club logo
             </label>
-            <input id="logo" name="logo" type="file" accept="image/*" className={inputClass} style={inputStyle} />
+            <input id="logo" name="logo" type="file" accept="image/*" className={INPUT} style={INPUT_STYLE} />
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               {current?.logoUrl ? `Current: ${current.logoUrl.split("/").pop()}` : "None uploaded yet."} Leave
               empty to keep the existing file.
@@ -134,8 +131,8 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
               name="advertising_banner"
               type="file"
               accept="image/*"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               {current?.bannerUrl ? `Current: ${current.bannerUrl.split("/").pop()}` : "None uploaded yet."}{" "}
@@ -161,8 +158,8 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
               type="text"
               placeholder="#1B3A5F"
               defaultValue={current?.reportColorHex ?? ""}
-              className={inputClass}
-              style={{ ...inputStyle, flex: 1 }}
+              className={INPUT}
+              style={{ ...INPUT_STYLE, flex: 1 }}
             />
             {current?.reportColorHex && (
               <span
@@ -184,8 +181,8 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
             rows={4}
             defaultValue={current?.reportStructureRules ?? ""}
             placeholder="Section order, cover page requirements, footer text, logo placement…"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -199,8 +196,8 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
             rows={3}
             defaultValue={current?.arabicFormatNotes ?? ""}
             placeholder="RTL layout handling, page order for bilingual reports…"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Bilingual reports are one PDF with separate pages per language. &ldquo;Bridgetx&rdquo; stays
@@ -221,7 +218,7 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
         </div>
 
         <div
-          className="rounded-lg border p-4 text-sm"
+          className={`${PANEL} p-4 text-sm`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text-muted)" }}
         >
           <p className="font-medium" style={{ color: "var(--text)" }}>
@@ -254,8 +251,8 @@ export default function BrandingForm({ clubs }: { clubs: ClubBranding[] }) {
             rows={6}
             defaultValue={current?.guardrails ?? ""}
             placeholder={GUARDRAIL_PLACEHOLDER}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       </section>

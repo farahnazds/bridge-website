@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Profile — Bridgetx" };
 
@@ -51,7 +52,7 @@ function Field({ label, value }: { label: string; value: string | null }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div
-      className="flex flex-col gap-4 rounded-xl border p-5"
+      className={`flex flex-col gap-4 ${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
@@ -115,7 +116,8 @@ export default async function AthleteProfilePage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load your profile: {error.message}
@@ -125,7 +127,7 @@ export default async function AthleteProfilePage({
       {!error && athlete && (
         <>
           <div
-            className="flex flex-wrap items-center gap-5 rounded-xl border p-5"
+            className={`flex flex-wrap items-center gap-5 ${CARD} p-5`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             {photoUrl ? (
@@ -188,7 +190,7 @@ export default async function AthleteProfilePage({
           </Section>
 
           <p
-            className="rounded-lg border px-4 py-3 text-sm"
+            className={NOTICE}
             style={{
               borderColor: "var(--border)",
               color: "var(--text-muted)",

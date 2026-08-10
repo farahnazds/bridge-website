@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import AssessmentsClient, { type AssessmentRecord } from "./AssessmentsClient";
+import { CARD, NOTICE } from "@/lib/ui";
 
 // Formats an embedded profile row into a display name. The provider name
 // used to require a second round trip (fetch ids, then fetch profiles);
@@ -117,7 +118,8 @@ export default async function TeamAssessmentsPage({
 
       {fetchError && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load assessments: {fetchError}
@@ -126,7 +128,7 @@ export default async function TeamAssessmentsPage({
 
       {athletes.length === 0 ? (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>No athletes on this team yet.</p>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Product Requests — Admin — Bridgetx" };
 
@@ -92,7 +93,8 @@ export default async function AdminProductRequestsPage() {
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load product requests: {error}
@@ -110,7 +112,7 @@ export default async function AdminProductRequestsPage() {
       {!error && rows.length > 0 && (
         <>
           <div
-            className="rounded-xl border p-5"
+            className={`${CARD} p-5`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -125,7 +127,7 @@ export default async function AdminProductRequestsPage() {
           </div>
 
           <div
-            className="overflow-x-auto rounded-xl border"
+            className={`overflow-x-auto ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             <table className="w-full min-w-[1000px] text-left text-sm">

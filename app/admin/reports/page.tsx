@@ -4,7 +4,7 @@ import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminSc
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import EmptyState from "@/components/EmptyState";
 import ReportMarkdown from "@/components/ReportMarkdown";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD, NOTICE, PANEL } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Reports — Admin — Bridgetx" };
 
@@ -104,7 +104,8 @@ export default async function AdminReportsPage() {
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load reports: {error}
@@ -123,7 +124,7 @@ export default async function AdminReportsPage() {
         <>
           {flaggedCount > 0 && (
             <div
-              className="rounded-lg border px-4 py-3 text-sm"
+              className={NOTICE}
               style={{
                 borderColor: "var(--warning)",
                 color: "var(--text)",
@@ -153,7 +154,7 @@ export default async function AdminReportsPage() {
               return (
                 <div
                   key={r.id}
-                  className="rounded-xl border p-5"
+                  className={`${CARD} p-5`}
                   style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -213,7 +214,7 @@ export default async function AdminReportsPage() {
                         View report
                       </summary>
                       <ReportMarkdown
-                        className="mt-3 rounded-lg border p-4"
+                        className={`mt-3 ${PANEL} p-4`}
                         style={{
                           borderColor: "var(--border)",
                           backgroundColor: "var(--bg)",

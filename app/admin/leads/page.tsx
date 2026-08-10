@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import LeadsClient, { type Lead } from "./LeadsClient";
+import { NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Leads & CRM — Bridgetx" };
 
@@ -36,14 +37,14 @@ export default async function LeadsPage() {
       </div>
 
       {error && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p role="status" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
           Couldn&apos;t load leads: {error.message}
         </p>
       )}
 
       {!canWrite && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p className={NOTICE}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)", backgroundColor: "var(--bg)" }}>
           Leads are managed by Super Admin. You can see this page, but the records themselves are not
           shared with the Admin role.

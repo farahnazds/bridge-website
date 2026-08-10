@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY, BTN_TERTIARY, CHIP } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_TERTIARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { INTENSITIES, SEASON_PHASES, OTHER_SEASON_PHASE, SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
 import AthleteMultiSelect, { type SelectableAthlete } from "@/components/AthleteMultiSelect";
@@ -9,9 +9,6 @@ import { saveTrainingLoad, deleteTrainingLoad, type ActionState } from "./action
 
 const initialState: ActionState = { error: null };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 const labelClass = "text-sm font-medium";
 
 export const INTENSITY_COLOR: Record<string, string> = {
@@ -43,7 +40,7 @@ function ErrorBanner({ error }: { error: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-lg border px-4 py-3 text-sm"
+      className={NOTICE}
       style={{
         borderColor: "var(--danger)",
         color: "var(--danger)",
@@ -85,7 +82,7 @@ function PlanForm({
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-4 rounded-lg border p-4"
+      className={`flex flex-col gap-4 ${PANEL} p-4`}
       style={{ borderColor: "var(--border)" }}
       noValidate
     >
@@ -104,8 +101,8 @@ function PlanForm({
             required
             defaultValue={todayStr()}
             min={todayStr()}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Forward-looking — today or later.
@@ -122,8 +119,8 @@ function PlanForm({
             required
             value={intensity}
             onChange={(e) => setIntensity(e.target.value)}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           >
             <option value="" disabled>
               Select…
@@ -148,8 +145,8 @@ function PlanForm({
             max={10}
             step={1}
             placeholder="Optional"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             {intensity === "rest" ? "Not usually needed for a rest day." : "Required later for Nutrition reports."}
@@ -168,8 +165,8 @@ function PlanForm({
             type="text"
             required
             placeholder="e.g. Tournament block"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         ) : (
           <select
@@ -177,8 +174,8 @@ function PlanForm({
             name="season_phase"
             defaultValue=""
             onChange={(e) => setPhase(e.target.value)}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           >
             <option value="">Not specified</option>
             {SEASON_PHASES.map((p) => (
@@ -199,7 +196,7 @@ function PlanForm({
           <label htmlFor="session_type" className={labelClass} style={{ color: "var(--text)" }}>
             Session type
           </label>
-          <select id="session_type" name="session_type" defaultValue="" className={inputClass} style={inputStyle}>
+          <select id="session_type" name="session_type" defaultValue="" className={INPUT} style={INPUT_STYLE}>
             <option value="">Not specified</option>
             {SESSION_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -211,7 +208,7 @@ function PlanForm({
           <label htmlFor="session_duration_band" className={labelClass} style={{ color: "var(--text)" }}>
             Session duration
           </label>
-          <select id="session_duration_band" name="session_duration_band" defaultValue="" className={inputClass} style={inputStyle}>
+          <select id="session_duration_band" name="session_duration_band" defaultValue="" className={INPUT} style={INPUT_STYLE}>
             <option value="">Not specified</option>
             {SESSION_DURATION_BANDS.map((d) => (
               <option key={d.value} value={d.value}>{d.label}</option>
@@ -231,8 +228,8 @@ function PlanForm({
             max={5000}
             step={50}
             placeholder="Optional"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Per hour, not per session. Drives individualised hydration guidance.
@@ -367,7 +364,7 @@ export default function TrainingLoadClient({
 
       {dates.length === 0 ? (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>Nothing planned yet.</p>
@@ -377,7 +374,7 @@ export default function TrainingLoadClient({
           {dates.map((date) => (
             <div
               key={date}
-              className="rounded-xl border px-5 py-4"
+              className={`${CARD} px-5 py-4`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
             >
               <p

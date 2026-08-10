@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { BTN_PRIMARY } from "@/lib/ui";
+import { BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { saveMatrix, assignAdminToClub, removeAdminAssignment, type MatrixState, type AssignmentState } from "./actions";
 import { ACCESS_LEVELS, PERMISSION_ROLES, PERMISSION_MODULES, NOT_SET } from "@/lib/constants";
@@ -24,9 +24,6 @@ export interface Option {
 
 const matrixInitial: MatrixState = { error: null, saved: false, changed: 0 };
 const assignInitial: AssignmentState = { error: null, saved: false };
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 const LEVEL_COLOR: Record<string, string> = {
   hide: "var(--danger)",
@@ -52,7 +49,7 @@ export function PermissionMatrix({ rows, canWrite }: { rows: PermissionRow[]; ca
 
   return (
     <form action={action} className="flex flex-col gap-4">
-      <div className="overflow-x-auto rounded-xl border"
+      <div className={`overflow-x-auto ${CARD}`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
         <table className="w-full text-left text-sm">
           <thead>
@@ -107,7 +104,7 @@ export function PermissionMatrix({ rows, canWrite }: { rows: PermissionRow[]; ca
       </div>
 
       {state.error && (
-        <p role="alert" className="rounded-lg border px-4 py-3 text-sm"
+        <p role="alert" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{state.error}</p>
       )}
       {state.saved && !state.error && (
@@ -130,7 +127,7 @@ export function AdminAssignments({
   return (
     <div className="flex flex-col gap-4">
       {canWrite && (
-        <form action={action} className="flex flex-col gap-4 rounded-xl border p-5"
+        <form action={action} className={`flex flex-col gap-4 ${CARD} p-5`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <h3 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
             Assign an admin to a club
@@ -138,14 +135,14 @@ export function AdminAssignments({
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Admin</label>
-              <select name="admin_profile_id" className={inputClass} style={inputStyle}>
+              <select name="admin_profile_id" className={INPUT} style={INPUT_STYLE}>
                 <option value="">Select an admin…</option>
                 {admins.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Club</label>
-              <select name="club_id" className={inputClass} style={inputStyle}>
+              <select name="club_id" className={INPUT} style={INPUT_STYLE}>
                 <option value="">Select a club…</option>
                 {clubs.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
@@ -153,19 +150,19 @@ export function AdminAssignments({
             <Submit label="Assign" />
           </div>
           {state.error && (
-            <p role="alert" className="rounded-lg border px-4 py-3 text-sm"
+            <p role="alert" className={NOTICE}
               style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{state.error}</p>
           )}
         </form>
       )}
 
       {assignments.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+        <p className={NOTICE_EMPTY}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
           No admin assignments yet.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border"
+        <div className={`overflow-hidden ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           {assignments.map((a, i) => (
             <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 p-5"

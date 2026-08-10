@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BADGE, BTN_PRIMARY } from "@/lib/ui";
+import { BADGE, BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { saveLead, deleteLead, type LeadState } from "./actions";
 import { LEAD_STATUSES } from "@/lib/constants";
@@ -21,9 +21,6 @@ export interface Lead {
 }
 
 const initial: LeadState = { error: null, saved: false };
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 const STATUS_COLOR: Record<string, string> = {
   new: "var(--text-muted)",
@@ -53,26 +50,26 @@ function LeadForm({ lead, onDone }: { lead?: Lead; onDone?: () => void }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Name</label>
-          <input name="name" required defaultValue={lead?.name ?? ""} className={inputClass} style={inputStyle} />
+          <input name="name" required defaultValue={lead?.name ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Club</label>
-          <input name="club_name" defaultValue={lead?.club_name ?? ""} className={inputClass} style={inputStyle} />
+          <input name="club_name" defaultValue={lead?.club_name ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Email</label>
-          <input name="email" type="email" defaultValue={lead?.email ?? ""} className={inputClass} style={inputStyle} />
+          <input name="email" type="email" defaultValue={lead?.email ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Phone</label>
-          <input name="phone" defaultValue={lead?.phone ?? ""} className={inputClass} style={inputStyle} />
+          <input name="phone" defaultValue={lead?.phone ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-6">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Status</label>
-          <select name="status" defaultValue={lead?.status ?? "new"} className={inputClass} style={inputStyle}>
+          <select name="status" defaultValue={lead?.status ?? "new"} className={INPUT} style={INPUT_STYLE}>
             {LEAD_STATUSES.map((s) => (
               <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
             ))}
@@ -93,11 +90,11 @@ function LeadForm({ lead, onDone }: { lead?: Lead; onDone?: () => void }) {
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Notes</label>
-        <textarea name="notes" rows={2} defaultValue={lead?.notes ?? ""} className={inputClass} style={inputStyle} />
+        <textarea name="notes" rows={2} defaultValue={lead?.notes ?? ""} className={INPUT} style={INPUT_STYLE} />
       </div>
 
       {state.error && (
-        <p role="alert" className="rounded-lg border px-4 py-3 text-sm"
+        <p role="alert" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{state.error}</p>
       )}
       <div className="flex items-center gap-3">
@@ -133,7 +130,7 @@ export default function LeadsClient({ leads, canWrite }: { leads: Lead[]; canWri
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {byStatus.map((s) => (
-          <div key={s.status} className="rounded-xl border p-4"
+          <div key={s.status} className={`${CARD} p-4`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <p className="text-xs capitalize" style={{ color: "var(--text-muted)" }}>{s.status}</p>
             <p className="mt-1 text-xl font-semibold"
@@ -145,7 +142,7 @@ export default function LeadsClient({ leads, canWrite }: { leads: Lead[]; canWri
       </div>
 
       {canWrite && (
-        <div className="flex flex-col gap-4 rounded-xl border p-5"
+        <div className={`flex flex-col gap-4 ${CARD} p-5`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
             Add a lead
@@ -155,12 +152,12 @@ export default function LeadsClient({ leads, canWrite }: { leads: Lead[]; canWri
       )}
 
       {leads.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+        <p className={NOTICE_EMPTY}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
           No leads yet. The public contact form writes here too.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border"
+        <div className={`overflow-hidden ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           {leads.map((l, i) => (
             <div key={l.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>

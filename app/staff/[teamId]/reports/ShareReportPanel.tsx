@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY, BTN_TERTIARY, CHIP } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_TERTIARY, CHIP, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { shareReport, type ShareState } from "./actions";
 
@@ -44,7 +44,7 @@ export default function ShareReportPanel({
   const pending = recipients.filter((r) => !alreadySharedWith.includes(r.id));
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
+    <div className={`flex flex-col gap-2 ${PANEL} p-3`} style={{ borderColor: "var(--border)" }}>
       <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--text-muted)" }}>
         <span className="font-medium" style={{ color: "var(--text)" }}>
           Shared with:

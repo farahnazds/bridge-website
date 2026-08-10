@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BTN_PRIMARY } from "@/lib/ui";
+import { BTN_PRIMARY, CARD, NOTICE } from "@/lib/ui";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
@@ -53,7 +53,8 @@ export default async function ClubsPage() {
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load clubs: {error.message}
@@ -62,7 +63,7 @@ export default async function ClubsPage() {
 
       {!error && clubs && clubs.length === 0 && (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>
@@ -73,7 +74,7 @@ export default async function ClubsPage() {
 
       {!error && clubs && clubs.length > 0 && (
         <div
-          className="overflow-hidden rounded-xl border"
+          className={`overflow-hidden ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <table className="w-full text-left text-sm">

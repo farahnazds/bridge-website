@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import TrainingLoadClient, { type PlanEntry } from "./TrainingLoadClient";
 import type { SelectableAthlete } from "@/components/AthleteMultiSelect";
+import { NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Training Load Plan — Bridgetx" };
 
@@ -104,7 +105,8 @@ export default async function TrainingLoadPage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load the plan: {error.message}

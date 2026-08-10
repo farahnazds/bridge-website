@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { CARD, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Brand Partner — Bridgetx" };
 
@@ -74,14 +75,14 @@ export default async function BrandPartnerPage({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>Products listed</p>
             <p className="mt-1 text-2xl font-semibold"
               style={{ fontFamily: "var(--font-heading)", color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
               {products.length}
             </p>
           </div>
-          <div className="rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>Catalogue status</p>
             <p className="mt-1 text-2xl font-semibold"
               style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
@@ -98,12 +99,12 @@ export default async function BrandPartnerPage({
             Your products
           </h2>
           {products.length === 0 ? (
-            <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+            <p className={NOTICE_EMPTY}
               style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
               No products listed for this brand yet.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border"
+            <div className={`overflow-x-auto ${CARD}`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
               <table className="w-full text-left text-sm">
                 <thead>
@@ -133,7 +134,7 @@ export default async function BrandPartnerPage({
             would read as "nobody bought anything". Sales aggregates live in
             product_requests, which this role's RLS does not grant — a
             deliberate boundary, since those rows carry athlete_id. */}
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p className={NOTICE}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)", backgroundColor: "var(--surface)" }}>
           Sales and redemption figures aren&apos;t shown here. Purchase records are tied to individual
           athletes, and brand partners are never given athlete-level data. Ask your Bridgetx contact for an

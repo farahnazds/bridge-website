@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BTN_PRIMARY, BTN_TERTIARY, CHIP } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_TERTIARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { TEAM_CATEGORIES, OTHER_TEAM_CATEGORY, SPECIALTIES, OTHER_SPECIALTY } from "@/lib/constants";
@@ -9,13 +9,6 @@ import { createTeam, invitePractitioner, assignToTeam, type ActionState } from "
 
 const initialState: ActionState = { error: null };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = {
-  borderColor: "var(--border)",
-  backgroundColor: "var(--surface)",
-  color: "var(--text)",
-};
 const labelClass = "text-sm font-medium";
 
 const DEPARTMENT_LABEL: Record<string, string> = { medical: "Medical", technical: "Technical" };
@@ -44,7 +37,7 @@ function ErrorBanner({ error }: { error: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-lg border px-4 py-3 text-sm"
+      className={NOTICE}
       style={{
         borderColor: "var(--danger)",
         color: "var(--danger)",
@@ -77,7 +70,7 @@ function CreateTeamForm({ clubId, onDone }: { clubId: string; onDone: () => void
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-4 rounded-lg border p-4"
+      className={`flex flex-col gap-4 ${PANEL} p-4`}
       style={{ borderColor: "var(--border)" }}
       noValidate
     >
@@ -89,7 +82,7 @@ function CreateTeamForm({ clubId, onDone }: { clubId: string; onDone: () => void
           <label htmlFor="team_name" className={labelClass} style={{ color: "var(--text)" }}>
             Team name
           </label>
-          <input id="team_name" name="name" type="text" required className={inputClass} style={inputStyle} />
+          <input id="team_name" name="name" type="text" required className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="team_category" className={labelClass} style={{ color: "var(--text)" }}>
@@ -102,8 +95,8 @@ function CreateTeamForm({ clubId, onDone }: { clubId: string; onDone: () => void
               type="text"
               required
               placeholder="e.g. Academy U13"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           ) : (
             <select
@@ -111,8 +104,8 @@ function CreateTeamForm({ clubId, onDone }: { clubId: string; onDone: () => void
               name="category"
               defaultValue=""
               onChange={(e) => setCategory(e.target.value)}
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             >
               <option value="">Not specified</option>
               {TEAM_CATEGORIES.map((c) => (
@@ -161,7 +154,7 @@ function InvitePractitionerForm({
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 rounded-lg border p-4" style={{ borderColor: "var(--border)" }} noValidate>
+    <form action={formAction} className={`flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
       <input type="hidden" name="club_id" value={clubId} />
       <ErrorBanner error={state.error} />
 
@@ -170,13 +163,13 @@ function InvitePractitionerForm({
           <label htmlFor="first_name" className={labelClass} style={{ color: "var(--text)" }}>
             First name
           </label>
-          <input id="first_name" name="first_name" type="text" required className={inputClass} style={inputStyle} />
+          <input id="first_name" name="first_name" type="text" required className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="last_name" className={labelClass} style={{ color: "var(--text)" }}>
             Last name
           </label>
-          <input id="last_name" name="last_name" type="text" required className={inputClass} style={inputStyle} />
+          <input id="last_name" name="last_name" type="text" required className={INPUT} style={INPUT_STYLE} />
         </div>
       </div>
 
@@ -190,8 +183,8 @@ function InvitePractitionerForm({
           type="email"
           required
           placeholder="practitioner@example.com"
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         />
       </div>
 
@@ -207,8 +200,8 @@ function InvitePractitionerForm({
               type="text"
               required
               placeholder="e.g. Sports Psychologist"
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           ) : (
             <select
@@ -217,8 +210,8 @@ function InvitePractitionerForm({
               required
               value={specialty}
               onChange={(e) => handleSpecialtyChange(e.target.value)}
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             >
               <option value="" disabled>
                 Select a specialty…
@@ -243,8 +236,8 @@ function InvitePractitionerForm({
             required
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           >
             <option value="" disabled>
               Select a department…
@@ -318,7 +311,7 @@ function AssignTeamWidget({
     <form action={formAction} className="mt-2 flex items-center gap-2">
       <input type="hidden" name="club_id" value={clubId} />
       <input type="hidden" name="profile_id" value={profileId} />
-      <select name="team_id" required defaultValue="" className={inputClass} style={{ ...inputStyle, padding: "0.4rem 0.6rem" }}>
+      <select name="team_id" required defaultValue="" className={INPUT} style={{ ...INPUT_STYLE, padding: "0.4rem 0.6rem" }}>
         <option value="" disabled>
           Select a team…
         </option>
@@ -378,11 +371,11 @@ export default function TeamsStaffClient({
         {showTeamForm && <CreateTeamForm clubId={clubId} onDone={() => setShowTeamForm(false)} />}
 
         {teams.length === 0 ? (
-          <div className="rounded-xl border p-8 text-center" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`${CARD} p-8 text-center`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <p style={{ color: "var(--text-muted)" }}>No teams yet.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`overflow-hidden ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -443,11 +436,11 @@ export default function TeamsStaffClient({
         )}
 
         {staff.length === 0 ? (
-          <div className="rounded-xl border p-8 text-center" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`${CARD} p-8 text-center`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <p style={{ color: "var(--text-muted)" }}>No Club Practitioners yet.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`overflow-hidden ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>

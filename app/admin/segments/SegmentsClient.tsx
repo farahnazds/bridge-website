@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY } from "@/lib/ui";
+import { BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { saveSegment, deleteSegment, type SegmentState } from "./actions";
 import { SPORTS, OTHER_SPORT } from "@/lib/constants";
@@ -16,9 +16,6 @@ export interface Segment {
 }
 
 const initial: SegmentState = { error: null, saved: false };
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -44,33 +41,33 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Segment name</label>
           <input name="name" required defaultValue={segment?.name ?? ""} placeholder="e.g. UAE Independent Athletes"
-            className={inputClass} style={inputStyle} />
+            className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>City</label>
-          <input name="city" defaultValue={segment?.city ?? ""} className={inputClass} style={inputStyle} />
+          <input name="city" defaultValue={segment?.city ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Sport</label>
           <select value={sport} onChange={(e) => setSport(e.target.value)}
-            name={sport === OTHER_SPORT ? undefined : "sport"} className={inputClass} style={inputStyle}>
+            name={sport === OTHER_SPORT ? undefined : "sport"} className={INPUT} style={INPUT_STYLE}>
             <option value="">Any sport</option>
             {SPORTS.map((s) => <option key={s} value={s}>{s}</option>)}
             <option value={OTHER_SPORT}>Other…</option>
           </select>
           {sport === OTHER_SPORT && (
-            <input name="sport" required placeholder="Sport name" className={`${inputClass} mt-2`} style={inputStyle} />
+            <input name="sport" required placeholder="Sport name" className={`${INPUT} mt-2`} style={INPUT_STYLE} />
           )}
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Timezone</label>
           <input name="timezone" required defaultValue={segment?.timezone ?? "Asia/Dubai"}
-            className={inputClass} style={inputStyle} />
+            className={INPUT} style={INPUT_STYLE} />
         </div>
       </div>
 
       {state.error && (
-        <p role="alert" className="rounded-lg border px-4 py-3 text-sm"
+        <p role="alert" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{state.error}</p>
       )}
       <div className="flex items-center gap-3">
@@ -103,7 +100,7 @@ export default function SegmentsClient({ segments, canWrite }: { segments: Segme
   return (
     <div className="flex flex-col gap-6">
       {canWrite && (
-        <div className="flex flex-col gap-4 rounded-xl border p-5"
+        <div className={`flex flex-col gap-4 ${CARD} p-5`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
             Add a segment
@@ -113,12 +110,12 @@ export default function SegmentsClient({ segments, canWrite }: { segments: Segme
       )}
 
       {segments.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+        <p className={NOTICE_EMPTY}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
           No segments yet. Athletes with no club need one to receive a prescription brand.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border"
+        <div className={`overflow-hidden ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           {segments.map((s, i) => (
             <div key={s.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>

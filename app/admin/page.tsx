@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs } from "@/lib/adminScope";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Overview — Admin — Bridgetx" };
 
@@ -20,7 +21,7 @@ const STATUS_COLOR: Record<string, string> = {
 function StatCard({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
     <div
-      className="rounded-xl border p-5"
+      className={`${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -122,7 +123,8 @@ export default async function AdminOverviewPage() {
 
       {loadError && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load your overview: {loadError.message}
@@ -131,7 +133,7 @@ export default async function AdminOverviewPage() {
 
       {!loadError && clubIds.length === 0 && (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>
@@ -163,7 +165,7 @@ export default async function AdminOverviewPage() {
             </h2>
             {stoppedClubs.length === 0 && gracePeriodClubs.length === 0 && readOnlyAthletes.length === 0 ? (
               <div
-                className="rounded-xl border p-6"
+                className={`${CARD} p-6`}
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
               >
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -172,7 +174,7 @@ export default async function AdminOverviewPage() {
               </div>
             ) : (
               <div
-                className="flex flex-col rounded-xl border"
+                className={`flex flex-col ${CARD}`}
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
               >
                 {stoppedClubs.map((c) => (
@@ -233,7 +235,7 @@ export default async function AdminOverviewPage() {
               </Link>
             </div>
             <div
-              className="overflow-hidden rounded-xl border"
+              className={`overflow-hidden ${CARD}`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
             >
               <table className="w-full text-left text-sm">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
 import TrendSparkline from "@/components/TrendSparkline";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "My Body Composition — Bridgetx" };
 
@@ -67,7 +68,7 @@ function LatestCard({
   const color = improving === null ? "var(--text-muted)" : improving ? "var(--success)" : "var(--warning)";
   return (
     <div
-      className="rounded-xl border p-5"
+      className={`${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -141,7 +142,8 @@ export default async function MyBodyCompositionPage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load your assessments: {error.message}
@@ -169,7 +171,7 @@ export default async function MyBodyCompositionPage({
             ].map((m) => (
               <div
                 key={m.key}
-                className="flex flex-col gap-3 rounded-xl border p-5"
+                className={`flex flex-col gap-3 ${CARD} p-5`}
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
               >
                 <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
@@ -188,7 +190,7 @@ export default async function MyBodyCompositionPage({
               Assessment history
             </h2>
             <div
-              className="overflow-x-auto rounded-xl border"
+              className={`overflow-x-auto ${CARD}`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
             >
               <table className="w-full min-w-[980px] text-left text-sm">

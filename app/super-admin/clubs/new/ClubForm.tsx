@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_LG } from "@/lib/ui";
+import { BTN_PRIMARY_LG, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { getAllCountries, getTimezonesForCountry } from "countries-and-timezones";
 import { SPORTS, OTHER_SPORT } from "@/lib/constants";
@@ -55,8 +55,8 @@ function TimezoneField() {
             setCountry(e.target.value);
             setRegion("");
           }}
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         >
           {COUNTRIES.map((c) => (
             <option key={c.code} value={c.code}>
@@ -76,8 +76,8 @@ function TimezoneField() {
             required
             value={resolvedRegion}
             onChange={(e) => setRegion(e.target.value)}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           >
             {sortedZones.map((z) => (
               <option key={z.name} value={z.name}>
@@ -93,13 +93,6 @@ function TimezoneField() {
   );
 }
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = {
-  borderColor: "var(--border)",
-  backgroundColor: "var(--surface)",
-  color: "var(--text)",
-};
 const labelClass = "text-sm font-medium";
 
 function SubmitButton() {
@@ -126,7 +119,7 @@ export default function ClubForm() {
       {state.error && (
         <p
           role="alert"
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{
             borderColor: "var(--danger)",
             color: "var(--danger)",
@@ -155,8 +148,8 @@ export default function ClubForm() {
             type="text"
             required
             placeholder="e.g. Al Wasl Academy"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -174,8 +167,8 @@ export default function ClubForm() {
                 onChange={(e) => {
                   if (e.target.value === OTHER_SPORT) setSportMode("other");
                 }}
-                className={inputClass}
-                style={inputStyle}
+                className={INPUT}
+                style={INPUT_STYLE}
               >
                 <option value="" disabled>
                   Select a sport…
@@ -196,8 +189,8 @@ export default function ClubForm() {
                   required
                   autoFocus
                   placeholder="Enter sport name"
-                  className={inputClass}
-                  style={inputStyle}
+                  className={INPUT}
+                  style={INPUT_STYLE}
                 />
                 <button
                   type="button"
@@ -242,8 +235,8 @@ export default function ClubForm() {
               name="manager_first_name"
               type="text"
               required
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
 
@@ -260,8 +253,8 @@ export default function ClubForm() {
               name="manager_last_name"
               type="text"
               required
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
@@ -280,8 +273,8 @@ export default function ClubForm() {
             type="email"
             required
             placeholder="manager@club.com"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       </section>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import CheckInForm from "./CheckInForm";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Daily Check-In — Bridgetx",
@@ -65,7 +66,7 @@ export default async function CheckInPage({
       </div>
 
       <div
-        className="max-w-lg rounded-xl border p-6 shadow-sm"
+        className={`max-w-lg ${CARD} p-6 shadow-sm`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         {pendingDate ? (

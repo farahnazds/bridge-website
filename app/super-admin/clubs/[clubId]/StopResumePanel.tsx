@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { setClubStopped, type ClubStateResult } from "./actions";
-import { BTN_PRIMARY, BTN_SECONDARY } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_SECONDARY, CARD, NOTICE } from "@/lib/ui";
 
 const initial: ClubStateResult = { error: null, stopped: null };
 
@@ -40,7 +40,7 @@ export default function StopResumePanel({
 
   return (
     <div
-      className="flex flex-col gap-4 rounded-xl border p-5"
+      className={`flex flex-col gap-4 ${CARD} p-5`}
       style={{ borderColor: isStopped ? "var(--danger)" : "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <div>
@@ -57,7 +57,7 @@ export default function StopResumePanel({
       {state.error && (
         <p
           role="alert"
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{
             borderColor: "var(--danger)",
             color: "var(--danger)",

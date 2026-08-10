@@ -5,6 +5,7 @@ import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import ReportsClient from "./ReportsClient";
 import ReportHistory from "./ReportHistory";
 import type { RecipientCandidate } from "./ShareReportPanel";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Reports — Bridgetx" };
 
@@ -102,7 +103,7 @@ export default async function TeamReportsPage({
       </div>
 
       <div
-        className="max-w-2xl rounded-xl border p-6 shadow-sm"
+        className={`max-w-2xl ${CARD} p-6 shadow-sm`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         {athletes.length > 0 ? (

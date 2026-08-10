@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AthleteForm from "./AthleteForm";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Register Athlete — Bridgetx",
@@ -46,7 +47,7 @@ export default async function NewAthletePage({
       </div>
 
       <div
-        className="max-w-2xl rounded-xl border p-6 shadow-sm"
+        className={`max-w-2xl ${CARD} p-6 shadow-sm`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <AthleteForm

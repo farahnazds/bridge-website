@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD, NOTICE, PANEL } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "My Protocol — Bridgetx" };
 
@@ -90,7 +90,8 @@ export default async function MyProtocolPage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load your protocol: {error.message}
@@ -103,7 +104,7 @@ export default async function MyProtocolPage({
 
       {!error && !active && rows.length > 0 && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{ borderColor: "var(--warning)", color: "var(--text)", backgroundColor: "color-mix(in srgb, var(--warning) 8%, transparent)" }}
         >
           You have no active protocol right now — your previous one ended on{" "}
@@ -113,7 +114,7 @@ export default async function MyProtocolPage({
 
       {!error && active && (
         <div
-          className="flex flex-col gap-5 rounded-xl border p-6"
+          className={`flex flex-col gap-5 ${CARD} p-6`}
           style={{ borderColor: "var(--brand-teal)", backgroundColor: "var(--surface)" }}
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -168,7 +169,7 @@ export default async function MyProtocolPage({
 
           {active.rationale && (
             <div
-              className="rounded-lg border p-4"
+              className={`${PANEL} p-4`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)" }}
             >
               <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
@@ -191,7 +192,7 @@ export default async function MyProtocolPage({
             Previous protocols
           </h2>
           <div
-            className="overflow-x-auto rounded-xl border"
+            className={`overflow-x-auto ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             <table className="w-full min-w-[880px] text-left text-sm">

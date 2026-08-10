@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import CommentsClient, { type CommentRecord } from "./CommentsClient";
+import { NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Comments — Bridgetx" };
 
@@ -101,7 +102,8 @@ export default async function TeamCommentsPage({
 
       {fetchError && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load comments: {fetchError.message}

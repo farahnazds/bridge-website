@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import ActivateForm from "./ActivateForm";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Activate Your Account — Bridgetx",
@@ -31,7 +32,7 @@ export default function ActivatePage() {
         </div>
 
         <div
-          className="rounded-xl border p-6 shadow-sm"
+          className={`${CARD} p-6 shadow-sm`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <ActivateForm />

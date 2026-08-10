@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import ForgotPasswordForm from "./ForgotPasswordForm";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Reset Password — Bridgetx",
@@ -32,7 +33,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         <div
-          className="rounded-xl border p-6 shadow-sm"
+          className={`${CARD} p-6 shadow-sm`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <ForgotPasswordForm />

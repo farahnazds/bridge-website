@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PANEL } from "@/lib/ui";
 
 // The reusable "All Athletes toggle + multi-select" described in
 // docs/04-user-flows.md Flow 7 step 1. First real implementation — Flow 7's
@@ -71,7 +72,7 @@ export default function AthleteMultiSelect({
 
       {appliesTo === "selected" && (
         <div
-          className="flex flex-col gap-2 rounded-lg border p-3"
+          className={`flex flex-col gap-2 ${PANEL} p-3`}
           style={{ borderColor: "var(--border)" }}
         >
           {athletes.length === 0 ? (

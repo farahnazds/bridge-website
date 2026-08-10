@@ -1,16 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY } from "@/lib/ui";
+import { BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { updateAthleteIdentity, type IdentityState } from "@/app/club/[clubId]/athletes/[athleteId]/actions";
 import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 import type { AthleteIdentity } from "@/lib/athleteProfile";
 
 const initial: IdentityState = { error: null, saved: false };
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -61,7 +58,7 @@ export default function AthleteIdentityForm({
 
   if (!editing) {
     return (
-      <div className="flex flex-col gap-4 rounded-xl border p-5"
+      <div className={`flex flex-col gap-4 ${CARD} p-5`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
@@ -98,7 +95,7 @@ export default function AthleteIdentityForm({
   }
 
   return (
-    <form action={action} className="flex flex-col gap-4 rounded-xl border p-5"
+    <form action={action} className={`flex flex-col gap-4 ${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <input type="hidden" name="athlete_id" value={athlete.id} />
       <input type="hidden" name="club_id" value={clubId ?? ""} />
@@ -108,53 +105,53 @@ export default function AthleteIdentityForm({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="First name">
-          <input name="first_name" required defaultValue={athlete.first_name} className={inputClass} style={inputStyle} />
+          <input name="first_name" required defaultValue={athlete.first_name} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Last name">
-          <input name="last_name" required defaultValue={athlete.last_name} className={inputClass} style={inputStyle} />
+          <input name="last_name" required defaultValue={athlete.last_name} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Sport">
           {/* No empty option: athletes.sport is NOT NULL, so an empty choice
               would fail at the database rather than in validation. */}
           <select value={sport} onChange={(e) => setSport(e.target.value)} required
-            name={sport === OTHER_SPORT ? undefined : "sport"} className={inputClass} style={inputStyle}>
+            name={sport === OTHER_SPORT ? undefined : "sport"} className={INPUT} style={INPUT_STYLE}>
             <option value="" disabled>Select a sport…</option>
             {SPORTS.map((s) => <option key={s} value={s}>{s}</option>)}
             <option value={OTHER_SPORT}>Other…</option>
           </select>
           {sport === OTHER_SPORT && (
-            <input name="sport" required placeholder="Sport" className={`${inputClass} mt-2`} style={inputStyle} />
+            <input name="sport" required placeholder="Sport" className={`${INPUT} mt-2`} style={INPUT_STYLE} />
           )}
         </Field>
         <Field label="Position">
-          <input name="position" defaultValue={athlete.position ?? ""} className={inputClass} style={inputStyle} />
+          <input name="position" defaultValue={athlete.position ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Tier">
-          <select name="tier" defaultValue={athlete.tier ?? ""} className={inputClass} style={inputStyle}>
+          <select name="tier" defaultValue={athlete.tier ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">—</option>
             {TIERS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </Field>
         <Field label="Diet preference">
-          <select name="diet_preference" defaultValue={athlete.diet_preference ?? ""} className={inputClass} style={inputStyle}>
+          <select name="diet_preference" defaultValue={athlete.diet_preference ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">—</option>
             {DIET_PREFERENCES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
           </select>
         </Field>
         <Field label="Date of birth">
-          <input name="dob" type="date" defaultValue={athlete.dob ?? ""} className={inputClass} style={inputStyle} />
+          <input name="dob" type="date" defaultValue={athlete.dob ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Gender">
-          <select name="gender" defaultValue={athlete.gender ?? ""} className={inputClass} style={inputStyle}>
+          <select name="gender" defaultValue={athlete.gender ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">—</option>
             {GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
           </select>
         </Field>
         <Field label="Country">
-          <input name="country" defaultValue={athlete.country ?? ""} className={inputClass} style={inputStyle} />
+          <input name="country" defaultValue={athlete.country ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Status">
-          <select name="status" defaultValue={athlete.status} className={inputClass} style={inputStyle}>
+          <select name="status" defaultValue={athlete.status} className={INPUT} style={INPUT_STYLE}>
             <option value="active">Active</option>
             <option value="read_only">Read-only</option>
           </select>
@@ -162,7 +159,7 @@ export default function AthleteIdentityForm({
         {/* Permanent health fields, not per-session. Blank = not recorded, and
             the nutrition prompt reports that rather than assuming normal. */}
         <Field label="Menstrual status">
-          <select name="menstrual_status" defaultValue={athlete.menstrual_status ?? ""} className={inputClass} style={inputStyle}>
+          <select name="menstrual_status" defaultValue={athlete.menstrual_status ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">Not recorded</option>
             {MENSTRUAL_STATUSES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
@@ -170,15 +167,15 @@ export default function AthleteIdentityForm({
         <Field label="Goal body fat %">
           <input name="goal_body_fat_pct" type="number" min={3} max={60} step={0.1}
             placeholder="No goal set" defaultValue={athlete.goal_body_fat_pct ?? ""}
-            className={inputClass} style={inputStyle} />
+            className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Goal lean mass (kg)">
           <input name="goal_lean_mass_kg" type="number" min={20} max={150} step={0.1}
             placeholder="No goal set" defaultValue={athlete.goal_lean_mass_kg ?? ""}
-            className={inputClass} style={inputStyle} />
+            className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Iron status">
-          <select name="iron_status" defaultValue={athlete.iron_status ?? ""} className={inputClass} style={inputStyle}>
+          <select name="iron_status" defaultValue={athlete.iron_status ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">Not recorded</option>
             {IRON_STATUSES.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
           </select>
@@ -186,7 +183,7 @@ export default function AthleteIdentityForm({
       </div>
 
       {state.error && (
-        <p role="alert" className="rounded-lg border px-4 py-3 text-sm"
+        <p role="alert" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{state.error}</p>
       )}
 

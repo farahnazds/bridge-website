@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_SECONDARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DownloadCsvTemplateButton from "@/components/DownloadCsvTemplateButton";
 import type { MatchedRow } from "@/lib/csvImport";
@@ -12,9 +12,6 @@ import type { MatchedRow } from "@/lib/csvImport";
 // share one implementation. The caller supplies its own server actions and a
 // summary renderer for the value columns.
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 const STATUS_STYLE: Record<string, { label: string; color: string }> = {
   matched: { label: "Matched", color: "var(--success)" },
@@ -36,7 +33,7 @@ function Banner({ error }: { error: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-lg border px-4 py-3 text-sm"
+      className={NOTICE}
       style={{
         borderColor: "var(--danger)",
         color: "var(--danger)",
@@ -91,7 +88,7 @@ export default function DataCsvImportPanel<T>({
     return (
       <div className="flex flex-col gap-4">
         <div
-          className="rounded-xl border p-5"
+          className={`${CARD} p-5`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p className="text-sm font-medium" style={{ color: "var(--success)" }}>
@@ -101,7 +98,7 @@ export default function DataCsvImportPanel<T>({
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="self-start rounded-lg border px-4 py-2.5 text-sm font-medium"
+          className={`self-start ${BTN_SECONDARY}`}
           style={{ borderColor: "var(--border)", color: "var(--text)" }}
         >
           Import another file
@@ -130,7 +127,7 @@ export default function DataCsvImportPanel<T>({
         </div>
 
         <div
-          className="overflow-x-auto rounded-xl border"
+          className={`overflow-x-auto ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <table className="w-full min-w-[820px] text-left text-sm">
@@ -225,7 +222,7 @@ export default function DataCsvImportPanel<T>({
       <form action={previewFormAction} className="flex flex-col gap-3" noValidate>
         <input type="hidden" name="team_id" value={teamId} />
         <Banner error={preview.error} />
-        <input name="csv_file" type="file" accept=".csv" required className={inputClass} style={inputStyle} />
+        <input name="csv_file" type="file" accept=".csv" required className={INPUT} style={INPUT_STYLE} />
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           {requiredNote}
         </p>

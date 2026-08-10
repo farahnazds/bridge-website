@@ -1,5 +1,7 @@
 "use client";
 
+import { BTN_SECONDARY } from "@/lib/ui";
+
 // Reusable across every CSV import type (docs/04-user-flows.md Flow 6, step
 // 1 — "download template button next to the uploader"). Pass different
 // headers/filename/exampleRows for GPS, body composition, etc. — the
@@ -30,7 +32,7 @@ export default function DownloadCsvTemplateButton({
     <button
       type="button"
       onClick={handleDownload}
-      className="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors duration-150"
+      className={BTN_SECONDARY}
       style={{ borderColor: "var(--border)", color: "var(--text)" }}
     >
       Download CSV template

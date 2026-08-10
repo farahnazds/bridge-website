@@ -83,5 +83,70 @@ export const CHIP = "rounded-full px-2.5 py-0.5 text-xs";
  * heavy shadow — docs/06-design-system.md is explicit that the border does the
  * work, not the shadow. Callers still set borderColor/backgroundColor inline
  * because the tokens are CSS variables.
+ *
+ * Radius and border only — padding stays at the call site, because a stat card
+ * (`p-5`), an empty state (`p-10 text-center`) and a table wrapper
+ * (`overflow-x-auto`) are the same surface at different densities.
  */
 export const CARD = "rounded-xl border";
+
+/**
+ * The smaller bordered box that sits INSIDE the page rather than being the page
+ * surface: the inline "add / edit" form panels, a preview box, a scroll list.
+ *
+ * The 8px radius against CARD's 12px is the whole point — it reads as nested,
+ * one level in from the card around it. Same radius-and-border-only shape as
+ * CARD so padding can vary (`p-3` for a dense list, `p-4` for a form).
+ *
+ * Not to be used for a page-level surface. If it is the outermost box on the
+ * page, it is a CARD.
+ */
+export const PANEL = "rounded-lg border";
+
+/**
+ * The one-line message banner: a form error, a warning, a success confirmation,
+ * or a neutral note. Callers set borderColor/color inline, which is what makes
+ * one danger and another informational.
+ *
+ * This was the single most duplicated string in the codebase — 94 identical
+ * copies before it was named.
+ */
+export const NOTICE = "rounded-lg border px-4 py-3 text-sm";
+
+/**
+ * NOTICE's dashed sibling, used exclusively for inline empty states — "No plans
+ * defined yet", "No leads yet". The dashed border is doing real work: it says
+ * "nothing here yet" rather than "something went wrong", which a solid border
+ * in the same position would imply.
+ */
+export const NOTICE_EMPTY = "rounded-lg border border-dashed px-4 py-3 text-sm";
+
+/**
+ * Text inputs, selects and textareas.
+ *
+ * Previously this exact string was re-declared as a local `const inputClass` in
+ * 30 separate files — byte-identical in every one, which is precisely the drift
+ * risk this file exists to remove. The two copies in LeadsClient.tsx and
+ * PlansClient.tsx had already been hand-extracted locally; this is that same
+ * instinct applied once, centrally.
+ *
+ * The focus treatment is deliberately a ring rather than the outline used by
+ * FOCUS above: an input is a filled box, and a ring reads as the field
+ * lighting up where an offset outline reads as a box around a box.
+ */
+export const INPUT =
+  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
+
+/**
+ * The inline style that always accompanies INPUT. A style object rather than
+ * classes because these are CSS custom properties, matching how every other
+ * constant here expects its colours to arrive.
+ *
+ * Exported as a plain object, so spread it (`{...INPUT_STYLE, width: 120}`)
+ * rather than mutating it.
+ */
+export const INPUT_STYLE = {
+  borderColor: "var(--border)",
+  backgroundColor: "var(--surface)",
+  color: "var(--text)",
+} as const;

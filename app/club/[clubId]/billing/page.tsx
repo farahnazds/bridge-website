@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Billing — Bridgetx" };
 
@@ -143,7 +143,8 @@ export default async function ClubBillingPage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load billing details: {error.message}
@@ -153,7 +154,7 @@ export default async function ClubBillingPage({
       {!error && club && state && (
         <>
           <div
-            className="flex flex-col gap-3 rounded-xl border p-6"
+            className={`flex flex-col gap-3 ${CARD} p-6`}
             style={{ borderColor: state.color, backgroundColor: "var(--surface)" }}
           >
             <span
@@ -171,7 +172,7 @@ export default async function ClubBillingPage({
           </div>
 
           <div
-            className="grid grid-cols-1 gap-4 rounded-xl border p-5 sm:grid-cols-2 lg:grid-cols-4"
+            className={`grid grid-cols-1 gap-4 ${CARD} p-5 sm:grid-cols-2 lg:grid-cols-4`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             <Field label="Club" value={club.name} />
@@ -181,7 +182,7 @@ export default async function ClubBillingPage({
           </div>
 
           <p
-            className="rounded-lg border px-4 py-3 text-sm"
+            className={NOTICE}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)", backgroundColor: "var(--bg)" }}
           >
             Bridgetx clubs are billed on a yearly contract arranged directly with us — there&apos;s no

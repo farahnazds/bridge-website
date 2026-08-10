@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BADGE, BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
+import { BADGE, BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { sendMessage, markThreadRead, type ActionState } from "@/app/athlete/[athleteId]/messenger/actions";
 
@@ -10,9 +10,6 @@ import { sendMessage, markThreadRead, type ActionState } from "@/app/athlete/[at
 // practitioner replying to an existing thread has no contact picker at all).
 const initialState: ActionState = { error: null };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 export interface ClientThread {
   threadId: string;
@@ -42,7 +39,7 @@ function ErrorBanner({ error }: { error: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-lg border px-4 py-3 text-sm"
+      className={NOTICE}
       style={{
         borderColor: "var(--danger)",
         color: "var(--danger)",
@@ -92,7 +89,7 @@ function NewThreadForm({
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-4 rounded-lg border p-4"
+      className={`flex flex-col gap-4 ${PANEL} p-4`}
       style={{ borderColor: "var(--border)" }}
       noValidate
     >
@@ -133,8 +130,8 @@ function NewThreadForm({
         rows={3}
         required
         placeholder="Write your message…"
-        className={inputClass}
-        style={inputStyle}
+        className={INPUT}
+        style={INPUT_STYLE}
       />
 
       <div className="flex gap-2">
@@ -170,7 +167,7 @@ function ReplyForm({
         <input key={id} type="hidden" name="recipient_ids" value={id} />
       ))}
       <ErrorBanner error={state.error} />
-      <textarea name="body" rows={2} required placeholder="Reply…" className={inputClass} style={inputStyle} />
+      <textarea name="body" rows={2} required placeholder="Reply…" className={INPUT} style={INPUT_STYLE} />
       <div>
         <SendButton label="Reply" />
       </div>
@@ -203,7 +200,7 @@ function ThreadCard({ thread, revalidatePath }: { thread: ClientThread; revalida
 
   return (
     <div
-      className="rounded-xl border p-5"
+      className={`${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -249,7 +246,7 @@ function ThreadCard({ thread, revalidatePath }: { thread: ClientThread; revalida
             {thread.messages.map((m) => (
               <div
                 key={m.id}
-                className="rounded-lg border p-3"
+                className={`${PANEL} p-3`}
                 style={{
                   borderColor: "var(--border)",
                   backgroundColor: m.isMine ? "var(--bg)" : "transparent",
@@ -325,7 +322,7 @@ export default function MessengerClient({
 
       {threads.length === 0 ? (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>No messages yet.</p>

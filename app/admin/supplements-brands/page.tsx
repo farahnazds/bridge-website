@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import BrandsClient, { type Brand, type Product, type Pairing, type Target } from "./BrandsClient";
+import { NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Supplements & Brands — Admin — Bridgetx" };
 
@@ -66,14 +67,14 @@ export default async function AdminSupplementsBrandsPage() {
       </div>
 
       {loadError && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p role="status" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
           Couldn&apos;t load the catalogue: {loadError.message}
         </p>
       )}
 
       {!canWrite && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p className={NOTICE}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)", backgroundColor: "var(--bg)" }}>
           The brand catalogue is managed by Super Admin. You can see brands and products here, but not change
           them — and brand assignments are not shared with the Admin role, so that list may read as empty even
@@ -82,7 +83,7 @@ export default async function AdminSupplementsBrandsPage() {
       )}
 
       {segments.length === 0 && canWrite && (
-        <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+        <p className={NOTICE_EMPTY}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
           No segments exist yet, so brands can only be assigned to real clubs. Create one under Segments to
           assign a brand to Guided or Independent athletes.

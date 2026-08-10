@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ImportAthletesClient from "./ImportAthletesClient";
+import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Import Athletes — Bridgetx" };
 
@@ -34,7 +35,7 @@ export default async function ImportAthletesPage({
       </div>
 
       <div
-        className="max-w-4xl rounded-xl border p-6 shadow-sm"
+        className={`max-w-4xl ${CARD} p-6 shadow-sm`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <ImportAthletesClient clubId={clubId} />

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
 import TrendSparkline from "@/components/TrendSparkline";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Body Composition — Bridgetx" };
 
@@ -42,7 +43,7 @@ function fmt(v: number | null, unit = ""): string {
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+    <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>{label}</p>
       <p
         className="mt-1 text-2xl font-semibold"
@@ -129,7 +130,8 @@ export default async function ClubBodyCompositionPage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load body composition data: {error}
@@ -158,7 +160,7 @@ export default async function ClubBodyCompositionPage({
           </div>
 
           <div
-            className="overflow-x-auto rounded-xl border"
+            className={`overflow-x-auto ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             <table className="w-full min-w-[900px] text-left text-sm">

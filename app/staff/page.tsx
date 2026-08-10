@@ -5,6 +5,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs } from "@/lib/adminScope";
 import { getLastUsedContextId, pickDefault } from "@/lib/lastUsedContext";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "My Teams — Bridgetx",
@@ -136,7 +137,8 @@ export default async function StaffIndexPage() {
 
         {error && (
           <p
-            className="rounded-lg border px-4 py-3 text-sm"
+            role="status"
+            className={NOTICE}
             style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
           >
             Couldn&apos;t load your teams: {error.message}
@@ -145,7 +147,7 @@ export default async function StaffIndexPage() {
 
         {!error && teams.length === 0 && (
           <div
-            className="rounded-xl border p-10 text-center"
+            className={`${CARD} p-10 text-center`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             <p style={{ color: "var(--text-muted)" }}>
@@ -158,7 +160,7 @@ export default async function StaffIndexPage() {
 
         {!error && teams.length > 0 && (
           <div
-            className="overflow-hidden rounded-xl border"
+            className={`overflow-hidden ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             {teams.map((team, i) => (

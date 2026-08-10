@@ -1,19 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { logAssessment, updateAssessment, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = {
-  borderColor: "var(--border)",
-  backgroundColor: "var(--surface)",
-  color: "var(--text)",
-};
 const labelClass = "text-sm font-medium";
 
 function todayStr(): string {
@@ -50,7 +43,7 @@ function ErrorBanner({ error }: { error: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-lg border px-4 py-3 text-sm"
+      className={NOTICE}
       style={{
         borderColor: "var(--danger)",
         color: "var(--danger)",
@@ -89,8 +82,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
             type="number"
             step="0.1"
             defaultValue={defaults?.weightKg ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -102,8 +95,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
             type="number"
             step="0.1"
             defaultValue={defaults?.heightCm ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -115,8 +108,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
             type="number"
             step="0.1"
             defaultValue={defaults?.bodyFatPct ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       </div>
@@ -131,8 +124,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
             type="number"
             step="0.1"
             defaultValue={defaults?.leanMassKg ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -144,8 +137,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
             type="number"
             step="0.1"
             defaultValue={defaults?.muscleMassKg ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -157,8 +150,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
             type="number"
             step="0.1"
             defaultValue={defaults?.visceralFat ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       </div>
@@ -173,8 +166,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
             type="number"
             step="1"
             defaultValue={defaults?.bmr ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -186,8 +179,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
             type="number"
             step="1"
             defaultValue={defaults?.tdee ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       </div>
@@ -200,8 +193,8 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
           name="notes"
           rows={2}
           defaultValue={defaults?.notes ?? ""}
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         />
       </div>
     </>
@@ -220,7 +213,7 @@ function LogAssessmentForm({
   const [state, formAction] = useActionState(logAssessment, initialState);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 rounded-lg border p-4" style={{ borderColor: "var(--border)" }} noValidate>
+    <form action={formAction} className={`flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
       <input type="hidden" name="team_id" value={teamId} />
       <ErrorBanner error={state.error} />
 
@@ -229,7 +222,7 @@ function LogAssessmentForm({
           <label htmlFor="athlete_id" className={labelClass} style={{ color: "var(--text)" }}>
             Athlete
           </label>
-          <select id="athlete_id" name="athlete_id" required defaultValue="" className={inputClass} style={inputStyle}>
+          <select id="athlete_id" name="athlete_id" required defaultValue="" className={INPUT} style={INPUT_STYLE}>
             <option value="" disabled>
               Select an athlete…
             </option>
@@ -251,8 +244,8 @@ function LogAssessmentForm({
             required
             defaultValue={todayStr()}
             max={todayStr()}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       </div>
@@ -286,7 +279,7 @@ function EditAssessmentForm({
   const [state, formAction] = useActionState(updateAssessment, initialState);
 
   return (
-    <form action={formAction} className="mt-3 flex flex-col gap-4 rounded-lg border p-4" style={{ borderColor: "var(--border)" }} noValidate>
+    <form action={formAction} className={`mt-3 flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
       <input type="hidden" name="team_id" value={teamId} />
       <input type="hidden" name="assessment_id" value={record.id} />
       <ErrorBanner error={state.error} />
@@ -301,8 +294,8 @@ function EditAssessmentForm({
           required
           defaultValue={record.date}
           max={todayStr()}
-          className={inputClass}
-          style={{ ...inputStyle, maxWidth: "12rem" }}
+          className={INPUT}
+          style={{ ...INPUT_STYLE, maxWidth: "12rem" }}
         />
       </div>
 
@@ -408,11 +401,11 @@ export default function AssessmentsClient({
       )}
 
       {assessments.length === 0 ? (
-        <div className="rounded-xl border p-10 text-center" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`${CARD} p-10 text-center`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <p style={{ color: "var(--text-muted)" }}>No assessments logged for this team yet.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`overflow-x-auto ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>

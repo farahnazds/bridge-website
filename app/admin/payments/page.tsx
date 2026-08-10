@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import PlansClient, { type Plan } from "./PlansClient";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Payments — Admin — Bridgetx" };
 
@@ -91,12 +91,12 @@ export default async function AdminPaymentsPage() {
         </div>
 
         {clubSubs.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+          <p className={NOTICE_EMPTY}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             No clubs in {scopeNoun}.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border"
+          <div className={`overflow-x-auto ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>
@@ -166,14 +166,14 @@ export default async function AdminPaymentsPage() {
         </div>
 
         {planError && (
-          <p className="rounded-lg border px-4 py-3 text-sm"
+          <p role="status" className={NOTICE}
             style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
             Couldn&apos;t load plans: {planError.message}
           </p>
         )}
 
         {!canWrite && (
-          <p className="rounded-lg border px-4 py-3 text-sm"
+          <p className={NOTICE}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)", backgroundColor: "var(--bg)" }}>
             Pricing is set by Super Admin. You can see the plans here, but not change them.
           </p>

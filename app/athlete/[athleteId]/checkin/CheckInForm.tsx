@@ -1,19 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
-import { BTN_PRIMARY_FULL } from "@/lib/ui";
+import { BTN_PRIMARY_FULL, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { submitCheckin, type CheckinState } from "./actions";
 
 const initialState: CheckinState = { error: null };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = {
-  borderColor: "var(--border)",
-  backgroundColor: "var(--surface)",
-  color: "var(--text)",
-};
 const labelClass = "text-sm font-medium";
 
 function ScoreSelect({ id, name, label }: { id: string; name: string; label: string }) {
@@ -22,7 +15,7 @@ function ScoreSelect({ id, name, label }: { id: string; name: string; label: str
       <label htmlFor={id} className={labelClass} style={{ color: "var(--text)" }}>
         {label}
       </label>
-      <select id={id} name={name} defaultValue="" className={inputClass} style={inputStyle}>
+      <select id={id} name={name} defaultValue="" className={INPUT} style={INPUT_STYLE}>
         <option value="">—</option>
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
           <option key={n} value={n}>
@@ -65,7 +58,7 @@ export default function CheckInForm({
       {state.error && (
         <p
           role="alert"
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{
             borderColor: "var(--danger)",
             color: "var(--danger)",
@@ -85,8 +78,8 @@ export default function CheckInForm({
           name="supplements_taken"
           type="text"
           placeholder="e.g. Protein shake, creatine"
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         />
       </div>
 
@@ -99,8 +92,8 @@ export default function CheckInForm({
           name="nutrition_score"
           type="text"
           placeholder="How did your eating go today?"
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         />
       </div>
 
@@ -118,8 +111,8 @@ export default function CheckInForm({
           id="notes"
           name="notes"
           rows={3}
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         />
       </div>
 

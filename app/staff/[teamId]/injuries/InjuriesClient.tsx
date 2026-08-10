@@ -1,20 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY, BTN_TERTIARY, CHIP } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_TERTIARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 import { logInjury, updateInjury, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = {
-  borderColor: "var(--border)",
-  backgroundColor: "var(--surface)",
-  color: "var(--text)",
-};
 const labelClass = "text-sm font-medium";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -56,7 +49,7 @@ function ErrorBanner({ error }: { error: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-lg border px-4 py-3 text-sm"
+      className={NOTICE}
       style={{
         borderColor: "var(--danger)",
         color: "var(--danger)",
@@ -94,8 +87,8 @@ function InjuryFields({ defaults }: { defaults?: Partial<InjuryRecord> }) {
           rows={2}
           defaultValue={defaults?.description ?? ""}
           placeholder="Clinical detail — staff only, never shown to the athlete"
-          className={inputClass}
-          style={inputStyle}
+          className={INPUT}
+          style={INPUT_STYLE}
         />
       </div>
 
@@ -104,7 +97,7 @@ function InjuryFields({ defaults }: { defaults?: Partial<InjuryRecord> }) {
           <label className={labelClass} style={{ color: "var(--text)" }}>
             Status
           </label>
-          <select name="status" required defaultValue={defaults?.status ?? "active"} className={inputClass} style={inputStyle}>
+          <select name="status" required defaultValue={defaults?.status ?? "active"} className={INPUT} style={INPUT_STYLE}>
             {INJURY_STATUSES.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
@@ -116,7 +109,7 @@ function InjuryFields({ defaults }: { defaults?: Partial<InjuryRecord> }) {
           <label className={labelClass} style={{ color: "var(--text)" }}>
             RTP phase
           </label>
-          <select name="rtp_phase" defaultValue={defaults?.rtpPhase ?? ""} className={inputClass} style={inputStyle}>
+          <select name="rtp_phase" defaultValue={defaults?.rtpPhase ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">Not specified</option>
             {RTP_PHASES.map((p) => (
               <option key={p.value} value={p.value}>
@@ -136,8 +129,8 @@ function InjuryFields({ defaults }: { defaults?: Partial<InjuryRecord> }) {
             name="target_return_date"
             type="date"
             defaultValue={defaults?.targetReturnDate ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -148,8 +141,8 @@ function InjuryFields({ defaults }: { defaults?: Partial<InjuryRecord> }) {
             name="cleared_date"
             type="date"
             defaultValue={defaults?.clearedDate ?? ""}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       </div>
@@ -169,7 +162,7 @@ function LogInjuryForm({
   const [state, formAction] = useActionState(logInjury, initialState);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 rounded-lg border p-4" style={{ borderColor: "var(--border)" }} noValidate>
+    <form action={formAction} className={`flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
       <input type="hidden" name="team_id" value={teamId} />
       <ErrorBanner error={state.error} />
 
@@ -178,7 +171,7 @@ function LogInjuryForm({
           <label htmlFor="athlete_id" className={labelClass} style={{ color: "var(--text)" }}>
             Athlete
           </label>
-          <select id="athlete_id" name="athlete_id" required defaultValue="" className={inputClass} style={inputStyle}>
+          <select id="athlete_id" name="athlete_id" required defaultValue="" className={INPUT} style={INPUT_STYLE}>
             <option value="" disabled>
               Select an athlete…
             </option>
@@ -200,8 +193,8 @@ function LogInjuryForm({
             required
             defaultValue={todayStr()}
             max={todayStr()}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -214,8 +207,8 @@ function LogInjuryForm({
             type="text"
             required
             placeholder="e.g. Hamstring strain"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       </div>
@@ -249,7 +242,7 @@ function EditInjuryForm({
   const [state, formAction] = useActionState(updateInjury, initialState);
 
   return (
-    <form action={formAction} className="mt-3 flex flex-col gap-4 rounded-lg border p-4" style={{ borderColor: "var(--border)" }} noValidate>
+    <form action={formAction} className={`mt-3 flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
       <input type="hidden" name="team_id" value={teamId} />
       <input type="hidden" name="injury_id" value={record.id} />
       <ErrorBanner error={state.error} />
@@ -259,13 +252,13 @@ function EditInjuryForm({
           <label className={labelClass} style={{ color: "var(--text)" }}>
             Date
           </label>
-          <input name="date" type="date" required defaultValue={record.date} max={todayStr()} className={inputClass} style={inputStyle} />
+          <input name="date" type="date" required defaultValue={record.date} max={todayStr()} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className={labelClass} style={{ color: "var(--text)" }}>
             Injury type
           </label>
-          <input name="type" type="text" required defaultValue={record.type} className={inputClass} style={inputStyle} />
+          <input name="type" type="text" required defaultValue={record.type} className={INPUT} style={INPUT_STYLE} />
         </div>
       </div>
 
@@ -383,11 +376,11 @@ export default function InjuriesClient({
       {showForm && <LogInjuryForm teamId={teamId} athletes={athletes} onDone={() => setShowForm(false)} />}
 
       {injuries.length === 0 ? (
-        <div className="rounded-xl border p-10 text-center" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`${CARD} p-10 text-center`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <p style={{ color: "var(--text-muted)" }}>No injuries logged for this team yet.</p>
         </div>
       ) : (
-        <div className="rounded-xl border px-6" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`${CARD} px-6`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           {injuries.map((record) => (
             <InjuryRow key={record.id} teamId={teamId} record={record} />
           ))}

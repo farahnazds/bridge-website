@@ -3,6 +3,7 @@
 import { useState } from "react";
 import ReportMarkdown from "@/components/ReportMarkdown";
 import ReportPdfLink from "@/components/ReportPdfLink";
+import { CARD, PANEL } from "@/lib/ui";
 
 export interface MyReportEntry {
   id: string;
@@ -20,7 +21,7 @@ function ReportCard({ report }: { report: MyReportEntry }) {
 
   return (
     <div
-      className="rounded-xl border p-5"
+      className={`${CARD} p-5`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -48,7 +49,7 @@ function ReportCard({ report }: { report: MyReportEntry }) {
 
       {expanded && report.summary && (
         <ReportMarkdown
-          className="mt-4 rounded-lg border p-4"
+          className={`mt-4 ${PANEL} p-4`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
         >
           {report.summary}

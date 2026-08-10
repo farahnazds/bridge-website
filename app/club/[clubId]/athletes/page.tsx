@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BTN_PRIMARY } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_SECONDARY, CARD, NOTICE } from "@/lib/ui";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
@@ -44,7 +44,7 @@ export default async function ClubAthletesPage({
         <div className="flex gap-2">
           <Link
             href={`/club/${clubId}/athletes/import`}
-            className="rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors duration-150"
+            className={BTN_SECONDARY}
             style={{ borderColor: "var(--border)", color: "var(--text)" }}
           >
             Import CSV
@@ -61,7 +61,8 @@ export default async function ClubAthletesPage({
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load athletes: {error.message}
@@ -70,7 +71,7 @@ export default async function ClubAthletesPage({
 
       {!error && athletes && athletes.length === 0 && (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>
@@ -81,7 +82,7 @@ export default async function ClubAthletesPage({
 
       {!error && athletes && athletes.length > 0 && (
         <div
-          className="overflow-hidden rounded-xl border"
+          className={`overflow-hidden ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <table className="w-full text-left text-sm">

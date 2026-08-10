@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
 import BrandingForm, { type ClubBranding } from "./BrandingForm";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Club Branding & Report Templates — Super Admin — Bridgetx" };
 
@@ -76,7 +77,8 @@ export default async function BrandingPage() {
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load clubs: {error.message}
@@ -89,7 +91,7 @@ export default async function BrandingPage() {
 
       {!error && clubs.length > 0 && (
         <div
-          className="max-w-3xl rounded-xl border p-6 shadow-sm"
+          className={`max-w-3xl ${CARD} p-6 shadow-sm`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <BrandingForm clubs={clubBranding} />

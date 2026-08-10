@@ -1,16 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
+import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DataCsvImportPanel from "@/components/DataCsvImportPanel";
 import { VALD_TEST_TYPES, OTHER_VALD_TEST_TYPE } from "@/lib/constants";
 import { logVald, updateVald, previewValdCsv, confirmValdCsv, type ActionState, type ValdValues } from "./actions";
 
 const initialState: ActionState = { error: null };
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 const TEST_LABEL: Record<string, string> = Object.fromEntries(VALD_TEST_TYPES.map((t) => [t.value, t.label]));
 
@@ -41,7 +38,7 @@ function Banner({ error }: { error: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-lg border px-4 py-3 text-sm"
+      className={NOTICE}
       style={{
         borderColor: "var(--danger)",
         color: "var(--danger)",
@@ -85,15 +82,15 @@ function MetricRows({ defaults }: { defaults?: Record<string, number | string> }
             name="metric_key"
             defaultValue={row.k}
             placeholder="e.g. peak_force_n"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
           <input
             name="metric_value"
             defaultValue={row.v}
             placeholder="e.g. 1820"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
       ))}
@@ -120,8 +117,8 @@ function TestTypeField({ defaultValue }: { defaultValue?: string }) {
         required
         defaultValue={known ? "" : defaultValue}
         placeholder="e.g. Single-leg hop"
-        className={inputClass}
-        style={inputStyle}
+        className={INPUT}
+        style={INPUT_STYLE}
       />
     );
   }
@@ -131,8 +128,8 @@ function TestTypeField({ defaultValue }: { defaultValue?: string }) {
       required
       value={choice}
       onChange={(e) => setChoice(e.target.value)}
-      className={inputClass}
-      style={inputStyle}
+      className={INPUT}
+      style={INPUT_STYLE}
     >
       <option value="" disabled>
         Select a test…
@@ -152,7 +149,7 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-4 rounded-lg border p-4"
+      className={`flex flex-col gap-4 ${PANEL} p-4`}
       style={{ borderColor: "var(--border)" }}
       noValidate
     >
@@ -163,7 +160,7 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
             Athlete
           </label>
-          <select name="athlete_id" required defaultValue="" className={inputClass} style={inputStyle}>
+          <select name="athlete_id" required defaultValue="" className={INPUT} style={INPUT_STYLE}>
             <option value="" disabled>
               Select…
             </option>
@@ -178,7 +175,7 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
             Test date
           </label>
-          <input name="date" type="date" required defaultValue={today()} max={today()} className={inputClass} style={inputStyle} />
+          <input name="date" type="date" required defaultValue={today()} max={today()} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
@@ -190,7 +187,7 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
             Asymmetry %
           </label>
-          <input name="asymmetry_pct" type="number" step="0.1" className={inputClass} style={inputStyle} />
+          <input name="asymmetry_pct" type="number" step="0.1" className={INPUT} style={INPUT_STYLE} />
         </div>
       </div>
       <MetricRows />
@@ -207,14 +204,14 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
 function EditForm({ teamId, entry, onDone }: { teamId: string; entry: ValdEntry; onDone: () => void }) {
   const [state, formAction] = useActionState(updateVald, initialState);
   return (
-    <form action={formAction} className="mt-3 flex flex-col gap-4 rounded-lg border p-4" style={{ borderColor: "var(--border)" }} noValidate>
+    <form action={formAction} className={`mt-3 flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
       <input type="hidden" name="team_id" value={teamId} />
       <input type="hidden" name="entry_id" value={entry.id} />
       <Banner error={state.error} />
       <div className="grid grid-cols-3 gap-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Test date</label>
-          <input name="date" type="date" required defaultValue={entry.date} max={today()} className={inputClass} style={inputStyle} />
+          <input name="date" type="date" required defaultValue={entry.date} max={today()} className={INPUT} style={INPUT_STYLE} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Test type</label>
@@ -222,7 +219,7 @@ function EditForm({ teamId, entry, onDone }: { teamId: string; entry: ValdEntry;
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Asymmetry %</label>
-          <input name="asymmetry_pct" type="number" step="0.1" defaultValue={entry.values.asymmetry_pct ?? ""} className={inputClass} style={inputStyle} />
+          <input name="asymmetry_pct" type="number" step="0.1" defaultValue={entry.values.asymmetry_pct ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
       </div>
       <MetricRows defaults={entry.values.metric_json} />
@@ -333,11 +330,11 @@ export default function ValdClient({
           </div>
           {showForm && <LogForm teamId={teamId} athletes={athletes} onDone={() => setShowForm(false)} />}
           {entries.length === 0 ? (
-            <div className="rounded-xl border p-10 text-center" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+            <div className={`${CARD} p-10 text-center`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
               <p style={{ color: "var(--text-muted)" }}>No VALD tests logged for this team yet.</p>
             </div>
           ) : (
-            <div className="rounded-xl border px-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+            <div className={`${CARD} px-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
               {entries.map((e) => (
                 <Row key={e.id} teamId={teamId} entry={e} />
               ))}

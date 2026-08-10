@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import SegmentsClient, { type Segment } from "./SegmentsClient";
+import { NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Segments — Admin — Bridgetx" };
 
@@ -50,14 +51,14 @@ export default async function AdminSegmentsPage() {
       </div>
 
       {segmentsRes.error && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p role="status" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
           Couldn&apos;t load segments: {segmentsRes.error.message}
         </p>
       )}
 
       {!canWrite && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p className={NOTICE}
           style={{ borderColor: "var(--border)", color: "var(--text-muted)", backgroundColor: "var(--bg)" }}>
           Segments are managed by Super Admin.
         </p>

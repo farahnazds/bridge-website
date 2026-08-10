@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BADGE, BTN_PRIMARY } from "@/lib/ui";
+import { BADGE, BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import {
   saveBrand, deleteBrand, saveProduct, deleteProduct, savePairing, deletePairing,
@@ -43,9 +43,6 @@ export interface Target {
 }
 
 const initial: BrandState = { error: null, saved: false };
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 const PAYMENT_LABEL = Object.fromEntries(PAYMENT_MODES.map((m) => [m.value, m.label]));
 
 function Submit({ label }: { label: string }) {
@@ -71,7 +68,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function ErrorLine({ error }: { error: string | null }) {
   if (!error) return null;
   return (
-    <p role="alert" className="rounded-lg border px-4 py-3 text-sm"
+    <p role="alert" className={NOTICE}
       style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{error}</p>
   );
 }
@@ -99,16 +96,16 @@ function BrandForm({ brand, onDone }: { brand?: Brand; onDone?: () => void }) {
       {brand && <input type="hidden" name="id" value={brand.id} />}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Brand name">
-          <input name="name" required defaultValue={brand?.name ?? ""} className={inputClass} style={inputStyle} />
+          <input name="name" required defaultValue={brand?.name ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Contact email">
-          <input name="contact_email" type="email" defaultValue={brand?.contact_email ?? ""} className={inputClass} style={inputStyle} />
+          <input name="contact_email" type="email" defaultValue={brand?.contact_email ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Logo URL">
-          <input name="logo_url" defaultValue={brand?.logo_url ?? ""} className={inputClass} style={inputStyle} />
+          <input name="logo_url" defaultValue={brand?.logo_url ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Store URL">
-          <input name="external_store_url" defaultValue={brand?.external_store_url ?? ""} className={inputClass} style={inputStyle} />
+          <input name="external_store_url" defaultValue={brand?.external_store_url ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
       </div>
       <ErrorLine error={state.error} />
@@ -138,41 +135,41 @@ function ProductForm({ brands, product, defaultBrandId, onDone }: {
       {product && <input type="hidden" name="id" value={product.id} />}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Brand">
-          <select name="brand_id" defaultValue={product?.brand_id ?? defaultBrandId ?? ""} className={inputClass} style={inputStyle}>
+          <select name="brand_id" defaultValue={product?.brand_id ?? defaultBrandId ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">Select a brand…</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </Field>
         <Field label="Product name">
-          <input name="name" required defaultValue={product?.name ?? ""} className={inputClass} style={inputStyle} />
+          <input name="name" required defaultValue={product?.name ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Category">
           <select value={category} onChange={(e) => setCategory(e.target.value)}
             name={category === OTHER_PRODUCT_CATEGORY ? undefined : "category"}
-            className={inputClass} style={inputStyle}>
+            className={INPUT} style={INPUT_STYLE}>
             <option value="">Select a category…</option>
             {PRODUCT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             <option value={OTHER_PRODUCT_CATEGORY}>Other…</option>
           </select>
           {category === OTHER_PRODUCT_CATEGORY && (
-            <input name="category" required placeholder="e.g. beta_alanine" className={`${inputClass} mt-2`} style={inputStyle} />
+            <input name="category" required placeholder="e.g. beta_alanine" className={`${INPUT} mt-2`} style={INPUT_STYLE} />
           )}
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Base price">
-            <input name="base_price" type="number" min="0" step="0.01" defaultValue={product?.base_price ?? ""} className={inputClass} style={inputStyle} />
+            <input name="base_price" type="number" min="0" step="0.01" defaultValue={product?.base_price ?? ""} className={INPUT} style={INPUT_STYLE} />
           </Field>
           <Field label="Currency">
-            <input name="currency" maxLength={3} defaultValue={product?.currency ?? "AED"} className={inputClass} style={inputStyle} />
+            <input name="currency" maxLength={3} defaultValue={product?.currency ?? "AED"} className={INPUT} style={INPUT_STYLE} />
           </Field>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Image URL">
-          <input name="image_url" defaultValue={product?.image_url ?? ""} className={inputClass} style={inputStyle} />
+          <input name="image_url" defaultValue={product?.image_url ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Description">
-          <input name="description" defaultValue={product?.description ?? ""} className={inputClass} style={inputStyle} />
+          <input name="description" defaultValue={product?.description ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
       </div>
       <ErrorLine error={state.error} />
@@ -205,29 +202,29 @@ function PairingForm({ brands, targets, pairing, onDone }: {
       {pairing && <input type="hidden" name="id" value={pairing.id} />}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Assign to">
-          <select name="target" defaultValue={currentTarget} className={inputClass} style={inputStyle}>
+          <select name="target" defaultValue={currentTarget} className={INPUT} style={INPUT_STYLE}>
             <option value="">Select a club or segment…</option>
             {targets.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </Field>
         <Field label="Brand">
-          <select name="brand_id" defaultValue={pairing?.brand_id ?? ""} className={inputClass} style={inputStyle}>
+          <select name="brand_id" defaultValue={pairing?.brand_id ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">Select a brand…</option>
             {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </Field>
         <Field label="Discount %">
           <input name="discount_percent" type="number" min="0" max="100" step="0.01"
-            defaultValue={pairing?.discount_percent ?? 0} className={inputClass} style={inputStyle} />
+            defaultValue={pairing?.discount_percent ?? 0} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Discount code">
-          <input name="discount_code" defaultValue={pairing?.discount_code ?? ""} className={inputClass} style={inputStyle} />
+          <input name="discount_code" defaultValue={pairing?.discount_code ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
       </div>
 
       <div className="flex flex-wrap items-end gap-6">
         <Field label="Payment mode">
-          <select name="payment_mode" defaultValue={pairing?.payment_mode ?? "in_person"} className={inputClass} style={inputStyle}>
+          <select name="payment_mode" defaultValue={pairing?.payment_mode ?? "in_person"} className={INPUT} style={INPUT_STYLE}>
             {PAYMENT_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
         </Field>
@@ -296,7 +293,7 @@ export default function BrandsClient({
         </div>
 
         {canWrite && (
-          <div className="flex flex-col gap-4 rounded-xl border p-5"
+          <div className={`flex flex-col gap-4 ${CARD} p-5`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <h3 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
               Add a brand
@@ -306,7 +303,7 @@ export default function BrandsClient({
         )}
 
         {brands.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+          <p className={NOTICE_EMPTY}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             No brands yet.
           </p>
@@ -314,7 +311,7 @@ export default function BrandsClient({
           brands.map((b) => {
             const items = productsByBrand.get(b.id) ?? [];
             return (
-              <div key={b.id} className="overflow-hidden rounded-xl border"
+              <div key={b.id} className={`overflow-hidden ${CARD}`}
                 style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
                 {editingBrand === b.id ? (
                   <div className="p-5"><BrandForm brand={b} onDone={() => setEditingBrand(null)} /></div>
@@ -400,7 +397,7 @@ export default function BrandsClient({
         </div>
 
         {canWrite && (
-          <div className="flex flex-col gap-4 rounded-xl border p-5"
+          <div className={`flex flex-col gap-4 ${CARD} p-5`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <h3 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
               Assign a brand
@@ -410,12 +407,12 @@ export default function BrandsClient({
         )}
 
         {pairings.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+          <p className={NOTICE_EMPTY}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             No brand assignments yet.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-xl border"
+          <div className={`overflow-hidden ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             {pairings.map((p, i) => {
               const key = p.club_id ? `club:${p.club_id}` : `segment:${p.segment_id}`;

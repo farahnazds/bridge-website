@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import { INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 import EmptyState from "@/components/EmptyState";
+import { CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Injury Log / Return to Play — Admin — Bridgetx" };
 
@@ -84,7 +85,8 @@ export default async function AdminInjuriesPage() {
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load the injury log: {error}
@@ -103,7 +105,7 @@ export default async function AdminInjuriesPage() {
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div
-              className="rounded-xl border p-5"
+              className={`${CARD} p-5`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
             >
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -117,7 +119,7 @@ export default async function AdminInjuriesPage() {
               </p>
             </div>
             <div
-              className="rounded-xl border p-5"
+              className={`${CARD} p-5`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
             >
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -131,7 +133,7 @@ export default async function AdminInjuriesPage() {
               </p>
             </div>
             <div
-              className="rounded-xl border p-5"
+              className={`${CARD} p-5`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
             >
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -147,7 +149,7 @@ export default async function AdminInjuriesPage() {
           </div>
 
           <div
-            className="overflow-x-auto rounded-xl border"
+            className={`overflow-x-auto ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
             <table className="w-full min-w-[980px] text-left text-sm">

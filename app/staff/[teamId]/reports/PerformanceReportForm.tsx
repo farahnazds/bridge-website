@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_FULL } from "@/lib/ui";
+import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { generatePerformanceReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
@@ -14,9 +14,6 @@ const initialState: GenerateReportState = {
   reportId: null,
 };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 const labelClass = "text-sm font-medium";
 
 function defaultDate(daysAgo: number): string {
@@ -70,8 +67,8 @@ export default function PerformanceReportForm({
             id="PerformanceReportForm_language"
             name="language"
             defaultValue={defaultLanguage}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           >
             <option value="english">English</option>
             <option value="arabic">Arabic</option>
@@ -96,8 +93,8 @@ export default function PerformanceReportForm({
             required
             value={athleteId}
             onChange={(e) => setAthleteId(e.target.value)}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           >
             <option value="" disabled>
               Select an athlete…
@@ -122,8 +119,8 @@ export default function PerformanceReportForm({
               required
               defaultValue={defaultDate(30)}
               max={defaultDate(0)}
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -137,8 +134,8 @@ export default function PerformanceReportForm({
               required
               defaultValue={defaultDate(0)}
               max={defaultDate(0)}
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
@@ -152,15 +149,15 @@ export default function PerformanceReportForm({
             name="additional_instructions"
             rows={3}
             placeholder="Anything specific to focus on for this athlete…"
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           />
         </div>
 
         {state.error && (
           <p
             role="alert"
-            className="rounded-lg border px-4 py-3 text-sm"
+            className={NOTICE}
             style={{
               borderColor: "var(--danger)",
               color: "var(--danger)",
@@ -182,7 +179,7 @@ export default function PerformanceReportForm({
 
       {state.reportText && (
         <ReportMarkdown
-          className="rounded-xl border p-5"
+          className={`${CARD} p-5`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
         >
           {state.reportText}

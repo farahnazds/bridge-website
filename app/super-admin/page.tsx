@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { BADGE } from "@/lib/ui";
+import { BADGE, CARD, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Overview — Super Admin — Bridgetx" };
 
@@ -40,7 +40,7 @@ interface Alert {
 
 function StatCard({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
   return (
-    <div className="rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+    <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>{label}</p>
       <p className="mt-1 text-2xl font-semibold"
         style={{ fontFamily: "var(--font-heading)", color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
@@ -210,7 +210,7 @@ export default async function SuperAdminOverviewPage() {
       </div>
 
       {loadError && (
-        <p className="rounded-lg border px-4 py-3 text-sm"
+        <p role="status" className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
           Couldn&apos;t load the overview: {loadError.message}
         </p>
@@ -256,11 +256,11 @@ export default async function SuperAdminOverviewPage() {
         </div>
 
         {ordered.length === 0 ? (
-          <div className="rounded-xl border p-6" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`${CARD} p-6`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nothing needs attention right now.</p>
           </div>
         ) : (
-          <div className="flex flex-col overflow-hidden rounded-xl border"
+          <div className={`flex flex-col overflow-hidden ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             {ordered.map((a, i) => {
               const color = a.level === "critical" ? "var(--danger)" : "var(--warning)";
@@ -296,12 +296,12 @@ export default async function SuperAdminOverviewPage() {
         </div>
 
         {clubs.length === 0 ? (
-          <p className="rounded-lg border border-dashed px-4 py-3 text-sm"
+          <p className={NOTICE_EMPTY}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             No clubs registered yet.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border"
+          <div className={`overflow-x-auto ${CARD}`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>

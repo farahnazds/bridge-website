@@ -5,7 +5,7 @@ import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import ReportMarkdown from "@/components/ReportMarkdown";
 import ReportPdfLink from "@/components/ReportPdfLink";
-import { BADGE, CHIP } from "@/lib/ui";
+import { BADGE, CARD, CHIP, PANEL } from "@/lib/ui";
 
 export interface ReportHistoryEntry {
   id: string;
@@ -73,7 +73,7 @@ function ReportRow({
 
       {expanded && report.summary && (
         <ReportMarkdown
-          className="rounded-lg border p-4"
+          className={`${PANEL} p-4`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
         >
           {report.summary}
@@ -124,7 +124,7 @@ export default function ReportHistory({
   if (reports.length === 0) {
     return (
       <div
-        className="rounded-xl border p-10 text-center"
+        className={`${CARD} p-10 text-center`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <p style={{ color: "var(--text-muted)" }}>No reports generated for this team yet.</p>
@@ -134,7 +134,7 @@ export default function ReportHistory({
 
   return (
     <div
-      className="rounded-xl border px-6"
+      className={`${CARD} px-6`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
     >
       {reports.map((report) => (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { BTN_PRIMARY } from "@/lib/ui";
+import { BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { saveClubSettings, type SettingsState } from "./actions";
 
@@ -14,9 +14,6 @@ export interface StaffOption {
 
 const initialState: SettingsState = { error: null, saved: false };
 
-const inputClass =
-  "rounded-lg border px-3.5 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-transparent focus:ring-2 focus:ring-[color:var(--brand-blue)]";
-const inputStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface)", color: "var(--text)" };
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -54,7 +51,7 @@ export default function SettingsForm({
       <input type="hidden" name="club_id" value={clubId} />
 
       <div
-        className="flex flex-col gap-5 rounded-xl border p-5"
+        className={`flex flex-col gap-5 ${CARD} p-5`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <div>
@@ -79,8 +76,8 @@ export default function SettingsForm({
               max={7}
               required
               defaultValue={notifyDays}
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Consecutive missed days before an alert is raised (1–7).
@@ -99,8 +96,8 @@ export default function SettingsForm({
               max={15}
               required
               defaultValue={skipLimit}
-              className={inputClass}
-              style={inputStyle}
+              className={INPUT}
+              style={INPUT_STYLE}
             />
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Skips allowed in a calendar month before an alert is raised (1–15).
@@ -143,7 +140,7 @@ export default function SettingsForm({
       </div>
 
       <div
-        className="flex flex-col gap-4 rounded-xl border p-5"
+        className={`flex flex-col gap-4 ${CARD} p-5`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <div>
@@ -163,8 +160,8 @@ export default function SettingsForm({
             id="default_report_language"
             name="default_report_language"
             defaultValue={language}
-            className={inputClass}
-            style={inputStyle}
+            className={INPUT}
+            style={INPUT_STYLE}
           >
             <option value="english">English</option>
             <option value="arabic">Arabic</option>
@@ -175,7 +172,7 @@ export default function SettingsForm({
       {state.error && (
         <p
           role="alert"
-          className="rounded-lg border px-4 py-3 text-sm"
+          className={NOTICE}
           style={{
             borderColor: "var(--danger)",
             color: "var(--danger)",
@@ -187,7 +184,8 @@ export default function SettingsForm({
       )}
       {state.saved && !state.error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{
             borderColor: "var(--success)",
             color: "var(--success)",

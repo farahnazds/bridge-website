@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import GpsClient, { type GpsEntry, type Athlete } from "./GpsClient";
+import { CARD, NOTICE } from "@/lib/ui";
 
 // Formats an embedded profile row into a display name. The provider name
 // used to require a second round trip (fetch ids, then fetch profiles);
@@ -97,7 +98,8 @@ export default async function TeamGpsPage({ params }: { params: Promise<{ teamId
 
       {error && (
         <p
-          className="rounded-lg border px-4 py-3 text-sm"
+          role="status"
+          className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
           Couldn&apos;t load GPS logs: {error}
@@ -106,7 +108,7 @@ export default async function TeamGpsPage({ params }: { params: Promise<{ teamId
 
       {athletes.length === 0 ? (
         <div
-          className="rounded-xl border p-10 text-center"
+          className={`${CARD} p-10 text-center`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <p style={{ color: "var(--text-muted)" }}>No athletes on this team yet.</p>
