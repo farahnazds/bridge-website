@@ -34,6 +34,31 @@ export interface TrainingLoadContext {
   sweatRateMl: number | null;
 }
 
+/**
+ * Recent training-load signals, pulled only when the practitioner ticks
+ * "Include performance signals" on the generation form. Off by default, so an
+ * ordinary Nutrition report is byte-for-byte unaffected by this feature.
+ *
+ * Rows are the same shapes the Performance report reads (performancePromptBuilder
+ * GpsRow / ValdRow), narrowed to the fields that bear on recovery nutrition —
+ * there is no second query shape to drift.
+ */
+export interface PerformanceSignalsContext {
+  /** Explicit so the prompt can state the window rather than the model guessing. */
+  lookbackDays: number;
+  windowStart: string;
+  windowEnd: string;
+  gps: {
+    date: string;
+    total_distance_m: number | null;
+    high_speed_distance_m: number | null;
+    player_load: number | null;
+    session_duration_min: number | null;
+    max_velocity: number | null;
+  }[];
+  vald: { date: string; test_type: string; asymmetry_pct: number | null }[];
+}
+
 /** An injury that is not yet cleared, for phase-appropriate recovery nutrition. */
 export interface ActiveInjuryContext {
   type: string | null;
@@ -112,6 +137,8 @@ export interface NutritionPromptInput {
   /** Every unresolved injury, not just one: an athlete can sit at several RTP
    *  phases at once, and the most acute one governs recovery nutrition. */
   activeInjuries: ActiveInjuryContext[];
+  /** null when the practitioner did not tick the toggle — the default. */
+  performanceSignals: PerformanceSignalsContext | null;
   prescription: PrescriptionContext | null;
   supplementLibrary: SupplementLibraryEntry[];
   clinicalLibraryEntries: ClinicalLibraryEntry[];
@@ -165,6 +192,8 @@ Clinical reference rules (docs/07-ai-engine.md):
 - IRON REPLETION. Where the athlete block carries the iron clinical flag (status low or deficient), give an explicit iron protocol with vitamin C co-ingestion to aid absorption, state what to separate it from (calcium, tea/coffee) and when, and defer dosing escalation to a physician. Where the library contains an iron entry, cite it — including any ferritin threshold it states.
 - A menstrual or iron status of "not recorded" is NOT the same as normal. Never write as though an unrecorded field were reassuring: name the gap and say what recording it would change. Do not apply RED-S or iron-repletion pathways on an unrecorded field.
 - Menstrual status of "not applicable", and iron status of "normal", are recorded answers: do not flag them as gaps.
+- POSITION PRECEDENCE. The Athlete block gives this athlete's stored position. Where the practitioner's additional instructions specify a different position to plan for THIS report, use the instructed position for the fuelling reasoning, state plainly at that point that you are planning for it at the practitioner's request, and note that it does not change the athlete's recorded position. Where the instructions say nothing about position, use the stored one.
+- PERFORMANCE SIGNALS are opt-in. When the "Recent performance signals" section contains data, factor the accumulated load across the stated window into recovery nutrition and say explicitly that you are doing so. When it says the data was not requested, write the report exactly as you otherwise would and do NOT mention performance data, load trends, or their absence anywhere — an unticked box is not a finding.
 - Unresolved injuries change recovery nutrition. Anchor that guidance to the most limiting RTP phase given, and make the reasoning phase-specific: acute and sub-acute phases prioritise protein sufficiency, energy availability and anti-inflammatory support; return-to-training reintroduces training-load-matched fuelling alongside connective-tissue support. Do not write injury-recovery guidance when no unresolved injury is listed.
 
 Citations — hard rule: only cite entries from the "Clinical + Research library entries" section below, if any are provided. Never cite anything from general training knowledge, even if a relevant paper is known to you. If none are provided, write the point without a citation rather than reaching for an unverified source.
@@ -201,6 +230,7 @@ export function buildNutritionPrompt(input: NutritionPromptInput): string {
     latestAssessment,
     trainingLoad,
     activeInjuries,
+    performanceSignals,
     prescription,
     supplementLibrary,
     clinicalLibraryEntries,
@@ -268,6 +298,52 @@ ${
           })
           .join("\n") +
         `\n\nMost limiting phase: ${phaseLabel(sortedInjuries[0].rtpPhase)}. Anchor recovery nutrition to THIS phase.`;
+
+  // Opt-in only. When the practitioner didn't tick the toggle this renders a
+  // single line saying so, and the report is unchanged from before the feature
+  // existed — the model is told the data wasn't requested, NOT that it is
+  // absent, so it can't mistake an unticked box for an athlete with no data.
+  const signalsBlock = (() => {
+    if (!performanceSignals) {
+      return "Not requested for this report. The practitioner did not tick \"Include performance signals\", so recent GPS and VALD data were deliberately not pulled. Do NOT infer anything about the athlete's recent training load from this absence, and do not state that they have no performance data.";
+    }
+    const { lookbackDays, windowStart, windowEnd, gps, vald } = performanceSignals;
+    const header = `Lookback window: the ${lookbackDays} days from ${windowStart} to ${windowEnd} inclusive. "Recent" means exactly this window and nothing wider — do not reason about, or refer to, load outside it.`;
+
+    if (gps.length === 0 && vald.length === 0) {
+      return `${header}
+
+No GPS sessions and no VALD tests were recorded in this window. Say that plainly. Do not treat an empty window as a light training week — absent data and low load are different things, and only one of them is evidenced here.`;
+    }
+
+    const gpsLines =
+      gps.length === 0
+        ? "No GPS sessions recorded in the window."
+        : gps
+            .map(
+              (g) =>
+                `- ${g.date} | distance ${g.total_distance_m ?? "—"} m | high-speed ${g.high_speed_distance_m ?? "—"} m | player load ${g.player_load ?? "—"} | duration ${g.session_duration_min ?? "—"} min | max velocity ${g.max_velocity ?? "—"}`
+            )
+            .join("\n");
+    const valdLines =
+      vald.length === 0
+        ? "No VALD tests recorded in the window."
+        : vald
+            .map((v) => `- ${v.date} | ${v.test_type} | asymmetry ${v.asymmetry_pct ?? "—"}%`)
+            .join("\n");
+
+    return `${header}
+
+GPS sessions (${gps.length}):
+${gpsLines}
+
+VALD tests (${vald.length}):
+${valdLines}
+
+How to use this: read the ACCUMULATED load across the window, not any single session, and let it modulate recovery nutrition — total carbohydrate for glycogen resynthesis, protein distribution, and the urgency of the post-session window. A dense run of high player-load or high high-speed-distance sessions warrants more aggressive recovery nutrition than the session in isolation would suggest; a sparse or light window warrants less. Where VALD asymmetry is present and rising, treat it as a fatigue/robustness signal that supports protein sufficiency and adequate energy availability — not as a diagnosis.
+
+SAMPLE SIZE HONESTY: with only one or two sessions in the window, say that the sample is too thin to call a trend and give the guidance you can defend from it. State the number of sessions you are reasoning from. Never describe a direction of travel that two points cannot support.`;
+  })();
 
   // Fires only when the plan entry for the target date says Ramadan. Note that
   // season phase lives on the training-load entry, so this is reachable in
@@ -380,6 +456,9 @@ ${periodStart} to ${periodEnd}
 
 ## Latest assessment (body composition basis for targets)
 ${assessmentBlock}
+
+## Recent performance signals (opt-in)
+${signalsBlock}
 
 ## Ramadan context
 ${ramadanBlock}

@@ -30,6 +30,7 @@ import {
   type TrainingLoadContext,
   type PrescriptionContext,
   type SupplementLibraryEntry,
+  type PerformanceSignalsContext,
 } from "./nutritionPromptBuilder";
 import {
   buildPerformancePrompt,
@@ -734,6 +735,57 @@ export async function generateNutritionReport(
     .neq("status", "cleared")
     .order("date", { ascending: false });
 
+  // Opt-in performance signals. Off by default: when the box is unticked we
+  // run no extra queries at all and pass null, so an ordinary Nutrition report
+  // is unchanged by this feature existing.
+  //
+  // The window is strictly BACKWARD-looking, which needs care in this generator:
+  // periodEnd here is not a past boundary. In general mode it is set 27 days
+  // into the FUTURE (this is the one forward-looking report), so anchoring to it
+  // would have produced a window containing no data at all. Anchors instead:
+  //   next_day  -> the 7 days ending the day BEFORE the session, i.e. the load
+  //                actually leading into it. Fixed, so regenerating the same
+  //                report reproduces the same window.
+  //   general   -> the 7 days ending today.
+  const includeSignals = String(formData.get("include_performance_signals") ?? "") === "on";
+  const SIGNAL_LOOKBACK_DAYS = 7;
+  let performanceSignals: PerformanceSignalsContext | null = null;
+  if (includeSignals) {
+    const today = new Date().toISOString().slice(0, 10);
+    const windowEnd =
+      subMode === "next_day" && targetDate
+        ? new Date(new Date(targetDate + "T00:00:00Z").getTime() - 86_400_000).toISOString().slice(0, 10)
+        : today;
+    const windowStart = new Date(new Date(windowEnd + "T00:00:00Z").getTime() - (SIGNAL_LOOKBACK_DAYS - 1) * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+
+    const [gpsRes, valdRes] = await Promise.all([
+      supabase
+        .from("gps_logs")
+        .select("date, total_distance_m, high_speed_distance_m, player_load, session_duration_min, max_velocity")
+        .eq("athlete_id", athleteId)
+        .gte("date", windowStart)
+        .lte("date", windowEnd)
+        .order("date", { ascending: true }),
+      supabase
+        .from("vald_data")
+        .select("date, test_type, asymmetry_pct")
+        .eq("athlete_id", athleteId)
+        .gte("date", windowStart)
+        .lte("date", windowEnd)
+        .order("date", { ascending: true }),
+    ]);
+
+    performanceSignals = {
+      lookbackDays: SIGNAL_LOOKBACK_DAYS,
+      windowStart,
+      windowEnd,
+      gps: (gpsRes.data ?? []) as PerformanceSignalsContext["gps"],
+      vald: (valdRes.data ?? []) as PerformanceSignalsContext["vald"],
+    };
+  }
+
   const activeInjuries = (injuryRows ?? []).map((i) => ({
     type: (i.type as string | null) ?? null,
     status: i.status as string,
@@ -854,6 +906,7 @@ export async function generateNutritionReport(
     subMode,
     athlete,
     activeInjuries,
+    performanceSignals,
     conditions,
     allergies,
     intolerances,

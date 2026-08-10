@@ -172,6 +172,24 @@ export default function NutritionReportForm({
           )}
         </div>
 
+        {/* Opt-in. Unticked is the default and produces exactly the report this
+            form produced before the option existed — no extra queries run. */}
+        <label className="flex items-start gap-2 text-sm" style={{ color: "var(--text)" }}>
+          <input
+            type="checkbox"
+            name="include_performance_signals"
+            className="mt-0.5 h-4 w-4 rounded"
+            style={{ accentColor: "var(--brand-blue)" }}
+          />
+          <span>
+            Include performance signals
+            <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
+              Pulls the last 7 days of GPS and VALD data so recovery nutrition can reflect recent accumulated
+              load. Leave unticked for a plan based on the session and profile alone.
+            </span>
+          </span>
+        </label>
+
         <div className="flex flex-col gap-1.5">
           <label htmlFor="nut_instructions" className={labelClass} style={{ color: "var(--text)" }}>
             Additional instructions (optional)
