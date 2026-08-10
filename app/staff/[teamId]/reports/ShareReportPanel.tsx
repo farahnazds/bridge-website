@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY, BTN_TERTIARY, CHIP } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { shareReport, type ShareState } from "./actions";
 
@@ -17,7 +18,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Sharing…" : "Share"}
@@ -52,7 +53,7 @@ export default function ShareReportPanel({
           shared.map((r) => (
             <span
               key={r.id}
-              className="rounded-full px-2.5 py-0.5"
+              className={CHIP}
               style={{ backgroundColor: "var(--bg)", border: "1px solid var(--border)" }}
             >
               {r.label}
@@ -109,7 +110,7 @@ export default function ShareReportPanel({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-lg px-4 py-2 text-sm font-medium"
+              className={BTN_TERTIARY}
               style={{ color: "var(--text-muted)" }}
             >
               Cancel

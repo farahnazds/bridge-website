@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DownloadCsvTemplateButton from "@/components/DownloadCsvTemplateButton";
 import { previewAthleteCsv, confirmAthleteImport, type PreviewState, type ConfirmState } from "./actions";
@@ -70,7 +71,7 @@ function PreviewButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Parsing…" : "Preview import"}
@@ -84,7 +85,7 @@ function ConfirmButton({ count }: { count: number }) {
     <button
       type="submit"
       disabled={pending || count === 0}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Importing…" : `Confirm import (${count})`}
@@ -225,7 +226,7 @@ export default function ImportAthletesClient({ clubId }: { clubId: string }) {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-lg px-4 py-2.5 text-sm font-medium"
+              className={BTN_TERTIARY}
               style={{ color: "var(--text-muted)" }}
             >
               Choose a different file

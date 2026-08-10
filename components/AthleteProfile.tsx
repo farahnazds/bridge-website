@@ -3,6 +3,7 @@ import AthleteIdentityForm from "@/components/AthleteIdentityForm";
 import { COMPLIANCE_WINDOW, type AthleteProfileData } from "@/lib/athleteProfile";
 import { goalBodyWeightKg, gap } from "@/lib/bodyComposition";
 import { REPORT_TYPE_LABELS, INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
+import { BADGE } from "@/lib/ui";
 
 // The staff-facing athlete profile, rendered identically for the Club Manager
 // route and the Club Practitioner route. Only `links` differs, so each role
@@ -127,7 +128,7 @@ export default function AthleteProfile({
           <h1 className="text-2xl font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
             {athlete.first_name} {athlete.last_name}
           </h1>
-          <span className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+          <span className={BADGE}
             style={{
               backgroundColor: `color-mix(in srgb, ${athlete.status === "read_only" ? "var(--warning)" : "var(--success)"} 12%, transparent)`,
               color: athlete.status === "read_only" ? "var(--warning)" : "var(--success)",
@@ -135,7 +136,7 @@ export default function AthleteProfile({
             {athlete.status === "read_only" ? "Read-only" : "Active"}
           </span>
           {openInjuries.length > 0 && (
-            <span className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+            <span className={BADGE}
               style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}>
               {openInjuries.length} open injur{openInjuries.length === 1 ? "y" : "ies"}
             </span>
@@ -182,7 +183,7 @@ export default function AthleteProfile({
           <div className="rounded-xl border p-5" style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{data.activeProtocol.supplement_name}</p>
-              <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+              <span className={BADGE}
                 style={{ backgroundColor: "color-mix(in srgb, var(--success) 12%, transparent)", color: "var(--success)" }}>
                 Active
               </span>
@@ -265,7 +266,7 @@ export default function AthleteProfile({
                   <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{inj.date}</td>
                   <td className="px-5 py-3 font-medium" style={{ color: "var(--text)" }}>{inj.type ?? "—"}</td>
                   <td className="px-5 py-3">
-                    <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+                    <span className={BADGE}
                       style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
                       {INJURY_STATUSES.find((s) => s.value === inj.status)?.label ?? inj.status ?? "—"}
                     </span>

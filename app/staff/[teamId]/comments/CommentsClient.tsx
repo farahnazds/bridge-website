@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BADGE, BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { createComment, deleteComment, toggleReflection, type ActionState } from "./actions";
 
@@ -55,7 +56,7 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? pendingLabel : label}
@@ -142,7 +143,7 @@ function NewCommentForm({
 
       <div className="flex gap-2">
         <SubmitButton label="Post" pendingLabel="Posting…" />
-        <button type="button" onClick={onDone} className="rounded-lg px-4 py-2.5 text-sm font-medium" style={{ color: "var(--text-muted)" }}>
+        <button type="button" onClick={onDone} className={BTN_TERTIARY} style={{ color: "var(--text-muted)" }}>
           Cancel
         </button>
       </div>
@@ -185,7 +186,7 @@ function CommentRow({ teamId, comment }: { teamId: string; comment: CommentRecor
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs">
           <span
-            className="rounded-full px-2.5 py-0.5 font-medium"
+            className={BADGE}
             style={{
               backgroundColor: isOfficial
                 ? "color-mix(in srgb, var(--brand-blue) 12%, transparent)"
@@ -247,7 +248,7 @@ export default function CommentsClient({
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90"
+            className={BTN_PRIMARY}
             style={{ backgroundImage: "var(--brand-gradient)" }}
           >
             + New Comment

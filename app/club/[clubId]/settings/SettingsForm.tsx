@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { BTN_PRIMARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { saveClubSettings, type SettingsState } from "./actions";
 
@@ -23,7 +24,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-fit rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={`w-fit ${BTN_PRIMARY}`}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Saving…" : "Save settings"}

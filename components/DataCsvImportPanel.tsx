@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DownloadCsvTemplateButton from "@/components/DownloadCsvTemplateButton";
 import type { MatchedRow } from "@/lib/csvImport";
@@ -53,7 +54,7 @@ function Submit({ label, pending: pendingLabel }: { label: string; pending: stri
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? pendingLabel : label}
@@ -197,7 +198,7 @@ export default function DataCsvImportPanel<T>({
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-lg px-4 py-2.5 text-sm font-medium"
+              className={BTN_TERTIARY}
               style={{ color: "var(--text-muted)" }}
             >
               Choose a different file

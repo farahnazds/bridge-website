@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY_LG } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { getAllCountries } from "countries-and-timezones";
 import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
@@ -28,7 +29,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-5 py-3 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY_LG}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Registering…" : "Register athlete & send invite"}

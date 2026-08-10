@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { BTN_PRIMARY_FULL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { submitCheckin, type CheckinState } from "./actions";
 
@@ -39,7 +40,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY_FULL}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Saving…" : "Save check-in"}

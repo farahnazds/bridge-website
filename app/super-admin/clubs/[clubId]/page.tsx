@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import StopResumePanel from "./StopResumePanel";
+import { BADGE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Club — Super Admin — Bridgetx" };
 
@@ -116,7 +117,7 @@ export default async function SuperAdminClubDetailPage({
             {club.name}
           </h1>
           <span
-            className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+            className={BADGE}
             style={{ backgroundColor: `color-mix(in srgb, ${statusColor} 12%, transparent)`, color: statusColor }}
           >
             {statusLabel}

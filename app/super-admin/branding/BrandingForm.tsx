@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { saveBranding, type BrandingState } from "./actions";
 
@@ -38,7 +39,7 @@ function SaveButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Saving…" : "Save branding"}

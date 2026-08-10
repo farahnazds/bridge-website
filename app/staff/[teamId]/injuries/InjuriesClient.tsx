@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY, BTN_TERTIARY, CHIP } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 import { logInjury, updateInjury, type ActionState } from "./actions";
@@ -73,7 +74,7 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? pendingLabel : label}
@@ -226,7 +227,7 @@ function LogInjuryForm({
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium"
+          className={BTN_TERTIARY}
           style={{ color: "var(--text-muted)" }}
         >
           Cancel
@@ -275,7 +276,7 @@ function EditInjuryForm({
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium"
+          className={BTN_TERTIARY}
           style={{ color: "var(--text-muted)" }}
         >
           Cancel
@@ -311,7 +312,7 @@ function InjuryRow({ teamId, record }: { teamId: string; record: InjuryRecord })
           </span>
           {record.rtpPhase && (
             <span
-              className="rounded-full px-2.5 py-0.5 text-xs"
+              className={CHIP}
               style={{ backgroundColor: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
             >
               {RTP_LABEL[record.rtpPhase] ?? record.rtpPhase}
@@ -371,7 +372,7 @@ export default function InjuriesClient({
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90"
+            className={BTN_PRIMARY}
             style={{ backgroundImage: "var(--brand-gradient)" }}
           >
             + Log Injury

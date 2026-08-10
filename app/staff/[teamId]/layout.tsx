@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
+import { Activity, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Users, Zap } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
-import Image from "next/image";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
@@ -63,17 +63,17 @@ export default async function TeamLayout({
   const backLabel = isOversight ? "← All teams" : isManager ? "← Teams & Staff" : "← My Teams";
   const navGroups = [
   { label: null, items: [
-    { label: "Roster", href: `/staff/${teamId}` },
-    { label: "Training Load Plan", href: `/staff/${teamId}/training-load` },
-    { label: "Reports", href: `/staff/${teamId}/reports` },
-    { label: "Messenger", href: `/staff/${teamId}/messenger` },
+    { label: "Roster", href: `/staff/${teamId}`, icon: Users },
+    { label: "Training Load Plan", href: `/staff/${teamId}/training-load`, icon: Gauge },
+    { label: "Reports", href: `/staff/${teamId}/reports`, icon: FileText },
+    { label: "Messenger", href: `/staff/${teamId}/messenger`, icon: MessageSquare },
   ] },
   { label: "ATHLETE DATA", items: [
-    { label: "Assessments", href: `/staff/${teamId}/assessments` },
-    { label: "GPS/Performance", href: `/staff/${teamId}/gps-performance` },
-    { label: "VALD", href: `/staff/${teamId}/vald` },
-    { label: "Injury Log", href: `/staff/${teamId}/injuries` },
-    { label: "Comments", href: `/staff/${teamId}/comments` },
+    { label: "Assessments", href: `/staff/${teamId}/assessments`, icon: ClipboardList },
+    { label: "GPS/Performance", href: `/staff/${teamId}/gps-performance`, icon: Activity },
+    { label: "VALD", href: `/staff/${teamId}/vald`, icon: Zap },
+    { label: "Injury Log", href: `/staff/${teamId}/injuries`, icon: HeartPulse },
+    { label: "Comments", href: `/staff/${teamId}/comments`, icon: MessageCircle },
   ] },
   ];
 

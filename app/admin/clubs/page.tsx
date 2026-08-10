@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs } from "@/lib/adminScope";
+import { CHIP } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Clubs — Admin — Bridgetx" };
 
@@ -175,7 +176,7 @@ export default async function AdminClubsPage() {
                     {club.teams.map((t) => (
                       <span
                         key={t.id}
-                        className="rounded-full px-2.5 py-0.5 text-xs"
+                        className={CHIP}
                         style={{
                           backgroundColor: "var(--bg)",
                           color: "var(--text)",

@@ -4,6 +4,7 @@ import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminSc
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import EmptyState from "@/components/EmptyState";
 import ReportMarkdown from "@/components/ReportMarkdown";
+import { BADGE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Reports — Admin — Bridgetx" };
 
@@ -174,7 +175,7 @@ export default async function AdminReportsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       {r.flagged_for_review && (
                         <span
-                          className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                          className={BADGE}
                           style={{
                             backgroundColor: "color-mix(in srgb, var(--warning) 14%, transparent)",
                             color: "var(--warning)",
@@ -184,7 +185,7 @@ export default async function AdminReportsPage() {
                         </span>
                       )}
                       <span
-                        className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                        className={BADGE}
                         style={
                           r.is_official
                             ? {

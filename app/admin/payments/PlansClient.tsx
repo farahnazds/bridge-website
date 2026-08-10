@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BADGE, BTN_PRIMARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { savePlan, deletePlan, type PlanState } from "./actions";
 import { PLAN_APPLIES_TO, BILLING_PERIODS } from "@/lib/constants";
@@ -29,7 +30,7 @@ function Submit({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="w-fit rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-60"
+      className={`w-fit ${BTN_PRIMARY}`}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Saving…" : label}
@@ -144,7 +145,7 @@ export default function PlansClient({ plans, canWrite }: { plans: Plan[]; canWri
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{p.name}</p>
                       {!p.is_active && (
-                        <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+                        <span className={BADGE}
                           style={{ backgroundColor: "color-mix(in srgb, var(--text-muted) 12%, transparent)", color: "var(--text-muted)" }}>
                           Inactive
                         </span>

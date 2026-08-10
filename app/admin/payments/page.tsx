@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import PlansClient, { type Plan } from "./PlansClient";
+import { BADGE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Payments — Admin — Bridgetx" };
 
@@ -127,7 +128,7 @@ export default async function AdminPaymentsPage() {
                         )}
                       </td>
                       <td className="px-5 py-3">
-                        <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+                        <span className={BADGE}
                           style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
                           {label}
                         </span>

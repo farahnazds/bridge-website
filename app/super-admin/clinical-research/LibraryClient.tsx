@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { createEntry, updateEntry, deleteEntry, type LibraryState } from "./actions";
 import { CLINICAL_TOPIC_TAGS } from "@/lib/constants";
@@ -28,7 +29,7 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
     <button
       type="submit"
       disabled={pending}
-      className="w-fit rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={`w-fit ${BTN_PRIMARY}`}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? pendingLabel : label}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { logAssessment, updateAssessment, type ActionState } from "./actions";
 
@@ -67,7 +68,7 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? pendingLabel : label}
@@ -263,7 +264,7 @@ function LogAssessmentForm({
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium"
+          className={BTN_TERTIARY}
           style={{ color: "var(--text-muted)" }}
         >
           Cancel
@@ -312,7 +313,7 @@ function EditAssessmentForm({
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium"
+          className={BTN_TERTIARY}
           style={{ color: "var(--text-muted)" }}
         >
           Cancel
@@ -394,7 +395,7 @@ export default function AssessmentsClient({
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90"
+            className={BTN_PRIMARY}
             style={{ backgroundImage: "var(--brand-gradient)" }}
           >
             + Log Assessment

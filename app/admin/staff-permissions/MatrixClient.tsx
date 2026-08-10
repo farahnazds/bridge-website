@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { BTN_PRIMARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { saveMatrix, assignAdminToClub, removeAdminAssignment, type MatrixState, type AssignmentState } from "./actions";
 import { ACCESS_LEVELS, PERMISSION_ROLES, PERMISSION_MODULES, NOT_SET } from "@/lib/constants";
@@ -38,7 +39,7 @@ function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending}
-      className="w-fit rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-60"
+      className={`w-fit ${BTN_PRIMARY}`}
       style={{ backgroundImage: "var(--brand-gradient)" }}>
       {pending ? "Saving…" : label}
     </button>

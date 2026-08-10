@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BTN_PRIMARY_FULL } from "@/lib/ui";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getPostResetPath } from "./actions";
@@ -167,7 +168,7 @@ export default function ResetPasswordForm() {
       <button
         type="submit"
         disabled={status === "submitting" || status === "done"}
-        className="w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        className={BTN_PRIMARY_FULL}
         style={{ backgroundImage: "var(--brand-gradient)" }}
       >
         {status === "submitting" || status === "done"

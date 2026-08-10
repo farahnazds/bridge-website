@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BADGE, BTN_PRIMARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import {
   saveBrand, deleteBrand, saveProduct, deleteProduct, savePairing, deletePairing,
@@ -51,7 +52,7 @@ function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending}
-      className="w-fit rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-60"
+      className={`w-fit ${BTN_PRIMARY}`}
       style={{ backgroundImage: "var(--brand-gradient)" }}>
       {pending ? "Saving…" : label}
     </button>
@@ -432,13 +433,13 @@ export default function BrandsClient({
                             {targetLabel.get(key) ?? "Unknown"} → {brandName.get(p.brand_id) ?? "Unknown brand"}
                           </p>
                           {p.is_prescription_brand && (
-                            <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+                            <span className={BADGE}
                               style={{ backgroundColor: "color-mix(in srgb, var(--brand-blue) 12%, transparent)", color: "var(--brand-blue)" }}>
                               Prescription
                             </span>
                           )}
                           {p.show_in_shop && (
-                            <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+                            <span className={BADGE}
                               style={{ backgroundColor: "color-mix(in srgb, var(--success) 12%, transparent)", color: "var(--success)" }}>
                               In shop
                             </span>

@@ -5,6 +5,7 @@ import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import ReportMarkdown from "@/components/ReportMarkdown";
 import ReportPdfLink from "@/components/ReportPdfLink";
+import { BADGE, CHIP } from "@/lib/ui";
 
 export interface ReportHistoryEntry {
   id: string;
@@ -53,7 +54,7 @@ function ReportRow({
           {report.hasPdf && <ReportPdfLink reportId={report.id} />}
           {report.isOfficial && (
             <span
-              className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+              className={BADGE}
               style={{ backgroundColor: "color-mix(in srgb, var(--success) 12%, transparent)", color: "var(--success)" }}
             >
               Official
@@ -97,7 +98,7 @@ function ReportRow({
                 .map((r) => (
                   <span
                     key={r.id}
-                    className="rounded-full px-2.5 py-0.5"
+                    className={CHIP}
                     style={{ backgroundColor: "var(--bg)", border: "1px solid var(--border)" }}
                   >
                     {r.label}

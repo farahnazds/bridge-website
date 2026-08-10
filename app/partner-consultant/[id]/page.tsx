@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { BADGE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Referral Pipeline — Bridgetx" };
 
@@ -152,7 +153,7 @@ export default async function PartnerConsultantPage({
                           {clubNameById.get(r.club_id) ?? "Club (name not shared)"}
                         </td>
                         <td className="px-5 py-3">
-                          <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+                          <span className={BADGE}
                             style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
                             {STAGE_LABEL[r.stage ?? ""] ?? "—"}
                           </span>

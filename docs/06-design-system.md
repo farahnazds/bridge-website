@@ -79,6 +79,63 @@ Motion should feel intentional and quiet, never flashy or bouncy:
 - Avoid: bouncing, spinning, anything that draws attention to itself
   rather than the data
 
+## Shared UI primitives (`lib/ui.ts`)
+
+Buttons, badges and cards live as named class strings in `lib/ui.ts`. Use
+them; do not hand-write the classes at the call site.
+
+This section exists because the opposite happened first: the primary
+action button had been written **eight** slightly different ways across
+~39 files — `px-4 py-2` / `py-2.5` / `px-5 py-3`, some with
+`active:scale-[0.99]`, some with `ease-out`, some with disabled styling.
+Each looked right alone; side by side on one page they were visibly
+different heights.
+
+| Constant | Use for |
+|---|---|
+| `BTN_PRIMARY` | The default action button |
+| `BTN_PRIMARY_LG` | A form's single final submit — taller, otherwise identical |
+| `BTN_PRIMARY_FULL` | `_LG` stretched, for the foot of a single-column form |
+| `BTN_SECONDARY` | Secondary — bordered, not filled |
+| `BTN_TERTIARY` | The quiet "Cancel"/"Done" paired with a primary — no border, no fill |
+| `BADGE` | Tinted status pill — carries a *state* (active, overdue, paid) |
+| `CHIP` | Outlined tag — *labels* rather than states (team name, recipient, phase) |
+| `CARD` | `rounded-xl border` card surface |
+
+`BADGE` and `CHIP` are deliberately two roles, not one. A badge is filled
+with a `color-mix` tint and set in `font-medium` because it reports
+status; a chip is held by a 1px border on `--bg` and left at normal
+weight so a row of them reads as data rather than as a row of alerts.
+Reach for `CHIP` when the pill is a name, not a state.
+
+Callers still set the background inline (`--brand-blue`, `--brand-navy`,
+or `--brand-gradient`) — the constants carry shape, type, motion and the
+focus ring, not colour.
+
+Two conventions worth keeping:
+
+- **In-dashboard cards use the border alone; standalone single-panel
+  form pages add `shadow-sm`.** That difference is deliberate, not
+  drift.
+- **Every interactive element gets a visible `focus-visible` ring** in
+  `--brand-blue`. Never remove it.
+
+## Navigation icons
+
+Nav items carry a [lucide](https://lucide.dev) icon (`lucide-react`),
+passed as the `icon` field on `NavItem` and rendered by `SidebarNav` at
+16px, `strokeWidth={1.75}`, inheriting the label's colour.
+
+Icons are chosen for **meaning, and are shared across dashboards** — the
+same concept gets the same glyph everywhere, so Reports is `FileText` in
+the Practitioner, Athlete and Admin sidebars alike. This is what makes
+the icons scannable rather than decorative; a role-specific glyph for a
+shared concept would defeat the point.
+
+They are `aria-hidden` — the text label is already the accessible name.
+
+No emoji as icons, ever.
+
 ## Logo usage
 
 Place brand assets in `public/brand/`:

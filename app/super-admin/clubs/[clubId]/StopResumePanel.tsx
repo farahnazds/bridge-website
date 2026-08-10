@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { setClubStopped, type ClubStateResult } from "./actions";
+import { BTN_PRIMARY, BTN_SECONDARY } from "@/lib/ui";
 
 const initial: ClubStateResult = { error: null, stopped: null };
 
@@ -12,7 +13,7 @@ function SubmitButton({ label, danger }: { label: string; danger: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="w-fit rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={`w-fit ${BTN_PRIMARY}`}
       style={
         danger
           ? { border: "1px solid var(--danger)", color: "var(--danger)", backgroundColor: "transparent" }
@@ -77,7 +78,7 @@ export default function StopResumePanel({
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="w-fit rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity duration-200 hover:opacity-90"
+          className={`w-fit ${BTN_SECONDARY}`}
           style={{ border: "1px solid var(--danger)", color: "var(--danger)" }}
         >
           Stop this club…

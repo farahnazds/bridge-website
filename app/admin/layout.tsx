@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
+import { Building2, CircleCheckBig, ClipboardList, Contact, CreditCard, FileText, Handshake, HeartPulse, Layers, LayoutDashboard, Newspaper, Package, Settings, ShieldCheck, ShoppingCart, Store, Trophy, Users } from "lucide-react";
 import { getAssignedClubs } from "@/lib/adminScope";
 import ContextSwitcher from "@/components/ContextSwitcher";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
-import Image from "next/image";
-import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 
 // Mirrors the Super Admin section list (docs/03-site-map.md) minus the two
@@ -15,30 +14,30 @@ import { getCurrentProfile } from "@/lib/auth";
 // Grouped per the Phase 2 brief: frequent items first, admin/config last.
 const NAV_GROUPS = [
   { label: null, items: [
-    { label: "Overview", href: "/admin" },
-    { label: "Clubs", href: "/admin/clubs" },
-    { label: "Athletes", href: "/admin/athletes" },
-    { label: "Reports", href: "/admin/reports" },
+    { label: "Overview", href: "/admin", icon: LayoutDashboard },
+    { label: "Clubs", href: "/admin/clubs", icon: Building2 },
+    { label: "Athletes", href: "/admin/athletes", icon: Users },
+    { label: "Reports", href: "/admin/reports", icon: FileText },
   ] },
   { label: "ATHLETE DATA", items: [
-    { label: "Assessments", href: "/admin/assessments" },
-    { label: "Compliance", href: "/admin/compliance" },
-    { label: "Injuries", href: "/admin/injuries" },
-    { label: "Competition Intelligence", href: "/admin/competitions" },
+    { label: "Assessments", href: "/admin/assessments", icon: ClipboardList },
+    { label: "Compliance", href: "/admin/compliance", icon: CircleCheckBig },
+    { label: "Injuries", href: "/admin/injuries", icon: HeartPulse },
+    { label: "Competition Intelligence", href: "/admin/competitions", icon: Trophy },
   ] },
   { label: "COMMERCIAL", items: [
-    { label: "Product Requests", href: "/admin/product-requests" },
-    { label: "Supplements & Brands", href: "/admin/supplements-brands" },
-    { label: "Payments", href: "/admin/payments" },
-    { label: "Leads & CRM", href: "/admin/leads" },
+    { label: "Product Requests", href: "/admin/product-requests", icon: ShoppingCart },
+    { label: "Supplements & Brands", href: "/admin/supplements-brands", icon: Package },
+    { label: "Payments", href: "/admin/payments", icon: CreditCard },
+    { label: "Leads & CRM", href: "/admin/leads", icon: Contact },
   ] },
   { label: "ADMIN", items: [
-    { label: "Segments", href: "/admin/segments" },
-    { label: "Staff & Permissions", href: "/admin/staff-permissions" },
-    { label: "Partnerships", href: "/admin/partnerships" },
-    { label: "Brand Partners", href: "/admin/brand-partners" },
-    { label: "Content/Relay", href: "/admin/content" },
-    { label: "Settings", href: "/admin/settings" },
+    { label: "Segments", href: "/admin/segments", icon: Layers },
+    { label: "Staff & Permissions", href: "/admin/staff-permissions", icon: ShieldCheck },
+    { label: "Partnerships", href: "/admin/partnerships", icon: Handshake },
+    { label: "Brand Partners", href: "/admin/brand-partners", icon: Store },
+    { label: "Content/Relay", href: "/admin/content", icon: Newspaper },
+    { label: "Settings", href: "/admin/settings", icon: Settings },
   ] },
 ];
 

@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
+import { BookOpen, Building2, LayoutDashboard, Palette, Telescope } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
-import Image from "next/image";
-import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import SuperAdminClubSwitcher from "./SuperAdminClubSwitcher";
@@ -12,15 +11,15 @@ import SuperAdminClubSwitcher from "./SuperAdminClubSwitcher";
 // a consistent shape everywhere is worth more than a bespoke top nav.
 const NAV_GROUPS = [
   { label: null, items: [
-    { label: "Overview", href: "/super-admin" },
-    { label: "Clubs", href: "/super-admin/clubs" },
+    { label: "Overview", href: "/super-admin", icon: LayoutDashboard },
+    { label: "Clubs", href: "/super-admin/clubs", icon: Building2 },
   ] },
   { label: "PLATFORM", items: [
-    { label: "Clinical + Research", href: "/super-admin/clinical-research" },
-    { label: "Branding & Templates", href: "/super-admin/branding" },
+    { label: "Clinical + Research", href: "/super-admin/clinical-research", icon: BookOpen },
+    { label: "Branding & Templates", href: "/super-admin/branding", icon: Palette },
   ] },
   { label: "OVERSIGHT", items: [
-    { label: "All club data", href: "/admin" },
+    { label: "All club data", href: "/admin", icon: Telescope },
   ] },
 ];
 

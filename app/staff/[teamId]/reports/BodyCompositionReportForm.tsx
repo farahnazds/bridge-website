@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY_FULL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { generateBodyCompositionReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
@@ -34,7 +35,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg px-4 py-3 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY_FULL}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Generating… usually 15–60 seconds" : "Generate body composition report"}

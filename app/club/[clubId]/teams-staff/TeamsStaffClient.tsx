@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BTN_PRIMARY, BTN_TERTIARY, CHIP } from "@/lib/ui";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { TEAM_CATEGORIES, OTHER_TEAM_CATEGORY, SPECIALTIES, OTHER_SPECIALTY } from "@/lib/constants";
@@ -61,7 +62,7 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? pendingLabel : label}
@@ -130,7 +131,7 @@ function CreateTeamForm({ clubId, onDone }: { clubId: string; onDone: () => void
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium"
+          className={BTN_TERTIARY}
           style={{ color: "var(--text-muted)" }}
         >
           Cancel
@@ -278,7 +279,7 @@ function InvitePractitionerForm({
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium"
+          className={BTN_TERTIARY}
           style={{ color: "var(--text-muted)" }}
         >
           Cancel
@@ -366,7 +367,7 @@ export default function TeamsStaffClient({
             <button
               type="button"
               onClick={() => setShowTeamForm(true)}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90"
+              className={BTN_PRIMARY}
               style={{ backgroundImage: "var(--brand-gradient)" }}
             >
               + New Team
@@ -429,7 +430,7 @@ export default function TeamsStaffClient({
             <button
               type="button"
               onClick={() => setShowInviteForm(true)}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90"
+              className={BTN_PRIMARY}
               style={{ backgroundImage: "var(--brand-gradient)" }}
             >
               + Invite Practitioner
@@ -485,7 +486,7 @@ export default function TeamsStaffClient({
                           s.assignedTeams.map((t) => (
                             <span
                               key={t.team_id}
-                              className="rounded-full px-2.5 py-0.5 text-xs"
+                              className={CHIP}
                               style={{ backgroundColor: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
                             >
                               {t.team_name}

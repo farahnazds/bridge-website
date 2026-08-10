@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { BTN_PRIMARY } from "@/lib/ui";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,7 +44,7 @@ export default async function ClubsPage() {
         </div>
         <Link
           href="/super-admin/clubs/new"
-          className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 ease-out hover:opacity-90"
+          className={BTN_PRIMARY}
           style={{ backgroundImage: "var(--brand-gradient)" }}
         >
           + New Club

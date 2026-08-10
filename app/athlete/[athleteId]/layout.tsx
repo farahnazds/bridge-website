@@ -1,8 +1,7 @@
 import { redirect, notFound } from "next/navigation";
+import { CircleCheckBig, CircleUser, FileText, LayoutDashboard, MessageSquare, Pill, Scale } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
-import Image from "next/image";
-import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -38,18 +37,18 @@ export default async function AthleteLayout({
   if (!athlete) notFound();
   const navGroups = [
   { label: null, items: [
-    { label: "Home", href: `/athlete/${athleteId}` },
-    { label: "Daily Check-In", href: `/athlete/${athleteId}/checkin` },
-    { label: "My Reports", href: `/athlete/${athleteId}/reports` },
-    { label: "Messenger", href: `/athlete/${athleteId}/messenger` },
+    { label: "Home", href: `/athlete/${athleteId}`, icon: LayoutDashboard },
+    { label: "Daily Check-In", href: `/athlete/${athleteId}/checkin`, icon: CircleCheckBig },
+    { label: "My Reports", href: `/athlete/${athleteId}/reports`, icon: FileText },
+    { label: "Messenger", href: `/athlete/${athleteId}/messenger`, icon: MessageSquare },
   ] },
   { label: "MY DATA", items: [
-    { label: "My Compliance", href: `/athlete/${athleteId}/compliance` },
-    { label: "My Body Composition", href: `/athlete/${athleteId}/body-composition` },
-    { label: "My Protocol", href: `/athlete/${athleteId}/protocol` },
+    { label: "My Compliance", href: `/athlete/${athleteId}/compliance`, icon: CircleCheckBig },
+    { label: "My Body Composition", href: `/athlete/${athleteId}/body-composition`, icon: Scale },
+    { label: "My Protocol", href: `/athlete/${athleteId}/protocol`, icon: Pill },
   ] },
   { label: "ACCOUNT", items: [
-    { label: "Profile", href: `/athlete/${athleteId}/profile` },
+    { label: "Profile", href: `/athlete/${athleteId}/profile`, icon: CircleUser },
   ] },
   ];
 

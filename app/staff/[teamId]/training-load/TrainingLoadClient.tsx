@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY, BTN_TERTIARY, CHIP } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { INTENSITIES, SEASON_PHASES, OTHER_SEASON_PHASE, SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
 import AthleteMultiSelect, { type SelectableAthlete } from "@/components/AthleteMultiSelect";
@@ -60,7 +61,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Saving…" : "Add to plan"}
@@ -251,7 +252,7 @@ function PlanForm({
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium"
+          className={BTN_TERTIARY}
           style={{ color: "var(--text-muted)" }}
         >
           Cancel
@@ -305,7 +306,7 @@ function EntryRow({ teamId, entry }: { teamId: string; entry: PlanEntry }) {
         )}
         {entry.seasonPhase && (
           <span
-            className="rounded-full px-2.5 py-0.5 text-xs"
+            className={CHIP}
             style={{ backgroundColor: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
           >
             {PHASE_LABEL[entry.seasonPhase] ?? entry.seasonPhase}
@@ -354,7 +355,7 @@ export default function TrainingLoadClient({
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90"
+            className={BTN_PRIMARY}
             style={{ backgroundImage: "var(--brand-gradient)" }}
           >
             + Add to plan

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
+import { BADGE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Content/Relay — Admin — Bridgetx" };
 
@@ -117,7 +118,7 @@ export default async function AdminContentPage() {
                   </p>
                 </div>
                 <span
-                  className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                  className={BADGE}
                   style={
                     r.target_type === "all"
                       ? { backgroundColor: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }

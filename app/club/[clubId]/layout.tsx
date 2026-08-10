@@ -1,7 +1,7 @@
 import { redirect, notFound } from "next/navigation";
+import { Activity, CalendarRange, CircleCheckBig, ClipboardList, CreditCard, FileText, HeartPulse, LayoutDashboard, MessageSquare, Newspaper, Scale, Settings, ShoppingCart, Trophy, Users, UsersRound, Zap } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
-import Image from "next/image";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -76,29 +76,29 @@ export default async function ClubLayout({
   }
   const navGroups = [
   { label: null, items: [
-    { label: "Overview", href: `/club/${clubId}` },
-    { label: "Athletes", href: `/club/${clubId}/athletes` },
-    { label: "Reports", href: `/club/${clubId}/reports` },
-    { label: "Messenger", href: `/club/${clubId}/messenger` },
+    { label: "Overview", href: `/club/${clubId}`, icon: LayoutDashboard },
+    { label: "Athletes", href: `/club/${clubId}/athletes`, icon: Users },
+    { label: "Reports", href: `/club/${clubId}/reports`, icon: FileText },
+    { label: "Messenger", href: `/club/${clubId}/messenger`, icon: MessageSquare },
   ] },
   { label: "ATHLETE DATA", items: [
-    { label: "Assessments", href: `/club/${clubId}/assessments` },
-    { label: "Compliance", href: `/club/${clubId}/compliance` },
-    { label: "Body Composition", href: `/club/${clubId}/body-composition` },
-    { label: "GPS/Performance", href: `/club/${clubId}/gps-performance` },
-    { label: "VALD", href: `/club/${clubId}/vald` },
-    { label: "Injuries", href: `/club/${clubId}/injuries` },
+    { label: "Assessments", href: `/club/${clubId}/assessments`, icon: ClipboardList },
+    { label: "Compliance", href: `/club/${clubId}/compliance`, icon: CircleCheckBig },
+    { label: "Body Composition", href: `/club/${clubId}/body-composition`, icon: Scale },
+    { label: "GPS/Performance", href: `/club/${clubId}/gps-performance`, icon: Activity },
+    { label: "VALD", href: `/club/${clubId}/vald`, icon: Zap },
+    { label: "Injuries", href: `/club/${clubId}/injuries`, icon: HeartPulse },
   ] },
   { label: "PLANNING", items: [
-    { label: "Periodization", href: `/club/${clubId}/periodization` },
-    { label: "Competitions", href: `/club/${clubId}/competitions` },
-    { label: "Content", href: `/club/${clubId}/content` },
+    { label: "Periodization", href: `/club/${clubId}/periodization`, icon: CalendarRange },
+    { label: "Competitions", href: `/club/${clubId}/competitions`, icon: Trophy },
+    { label: "Content", href: `/club/${clubId}/content`, icon: Newspaper },
   ] },
   { label: "ADMIN", items: [
-    { label: "Teams & Staff", href: `/club/${clubId}/teams-staff` },
-    { label: "Product Requests", href: `/club/${clubId}/product-requests` },
-    { label: "Settings", href: `/club/${clubId}/settings` },
-    { label: "Billing", href: `/club/${clubId}/billing` },
+    { label: "Teams & Staff", href: `/club/${clubId}/teams-staff`, icon: UsersRound },
+    { label: "Product Requests", href: `/club/${clubId}/product-requests`, icon: ShoppingCart },
+    { label: "Settings", href: `/club/${clubId}/settings`, icon: Settings },
+    { label: "Billing", href: `/club/${clubId}/billing`, icon: CreditCard },
   ] },
   ];
 

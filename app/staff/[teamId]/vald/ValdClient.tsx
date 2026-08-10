@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DataCsvImportPanel from "@/components/DataCsvImportPanel";
 import { VALD_TEST_TYPES, OTHER_VALD_TEST_TYPE } from "@/lib/constants";
@@ -57,7 +58,7 @@ function Submit({ label, pending: p }: { label: string; pending: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? p : label}
@@ -195,7 +196,7 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
       <MetricRows />
       <div className="flex gap-2">
         <Submit label="Save test" pending="Saving…" />
-        <button type="button" onClick={onDone} className="rounded-lg px-4 py-2.5 text-sm font-medium" style={{ color: "var(--text-muted)" }}>
+        <button type="button" onClick={onDone} className={BTN_TERTIARY} style={{ color: "var(--text-muted)" }}>
           Cancel
         </button>
       </div>
@@ -227,7 +228,7 @@ function EditForm({ teamId, entry, onDone }: { teamId: string; entry: ValdEntry;
       <MetricRows defaults={entry.values.metric_json} />
       <div className="flex gap-2">
         <Submit label="Save changes" pending="Saving…" />
-        <button type="button" onClick={onDone} className="rounded-lg px-4 py-2.5 text-sm font-medium" style={{ color: "var(--text-muted)" }}>
+        <button type="button" onClick={onDone} className={BTN_TERTIARY} style={{ color: "var(--text-muted)" }}>
           Cancel
         </button>
       </div>
@@ -323,7 +324,7 @@ export default function ValdClient({
               <button
                 type="button"
                 onClick={() => setShowForm(true)}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90"
+                className={BTN_PRIMARY}
                 style={{ backgroundImage: "var(--brand-gradient)" }}
               >
                 + Log test

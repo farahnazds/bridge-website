@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BTN_PRIMARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { updateAthleteIdentity, type IdentityState } from "@/app/club/[clubId]/athletes/[athleteId]/actions";
 import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
@@ -15,7 +16,7 @@ function Submit() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending}
-      className="w-fit rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:opacity-60"
+      className={`w-fit ${BTN_PRIMARY}`}
       style={{ backgroundImage: "var(--brand-gradient)" }}>
       {pending ? "Saving…" : "Save changes"}
     </button>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
 
 // Grouped sidebar navigation, shared by every dashboard.
 //
@@ -15,6 +16,8 @@ import Link from "next/link";
 export interface NavItem {
   label: string;
   href: string;
+  /** lucide icon, chosen for meaning rather than decoration. */
+  icon: LucideIcon;
 }
 
 export interface NavGroup {
@@ -39,15 +42,22 @@ export default function SidebarNav({ groups }: { groups: NavGroup[] }) {
               <span aria-hidden="true" className="h-px flex-1" style={{ background: "rgba(255,255,255,.09)" }} />
             </div>
           )}
-          {group.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-lg px-3 py-2 text-sm text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
+          {group.items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+              >
+                {/* 16px, 1.75 stroke, inheriting colour: the icon supports the
+                    label rather than competing with it. Decorative because the
+                    label is already the accessible name. */}
+                <Icon size={16} strokeWidth={1.75} aria-hidden="true" className="flex-none opacity-80" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
         </div>
       ))}
     </nav>

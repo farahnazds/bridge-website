@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { BADGE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Overview — Super Admin — Bridgetx" };
 
@@ -244,7 +245,7 @@ export default async function SuperAdminOverviewPage() {
             Alerts
           </h2>
           {ordered.length > 0 && (
-            <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+            <span className={BADGE}
               style={{
                 backgroundColor: `color-mix(in srgb, ${critical.length > 0 ? "var(--danger)" : "var(--warning)"} 12%, transparent)`,
                 color: critical.length > 0 ? "var(--danger)" : "var(--warning)",

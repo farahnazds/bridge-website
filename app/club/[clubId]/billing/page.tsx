@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { BADGE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Billing — Bridgetx" };
 
@@ -156,7 +157,7 @@ export default async function ClubBillingPage({
             style={{ borderColor: state.color, backgroundColor: "var(--surface)" }}
           >
             <span
-              className="w-fit rounded-full px-2.5 py-0.5 text-xs font-medium"
+              className={`w-fit ${BADGE}`}
               style={{
                 backgroundColor: `color-mix(in srgb, ${state.color} 12%, transparent)`,
                 color: state.color,

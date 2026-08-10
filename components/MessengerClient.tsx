@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BADGE, BTN_PRIMARY, BTN_TERTIARY } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { sendMessage, markThreadRead, type ActionState } from "@/app/athlete/[athleteId]/messenger/actions";
 
@@ -59,7 +60,7 @@ function SendButton({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      className={BTN_PRIMARY}
       style={{ backgroundImage: "var(--brand-gradient)" }}
     >
       {pending ? "Sending…" : label}
@@ -141,7 +142,7 @@ function NewThreadForm({
         <button
           type="button"
           onClick={onDone}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium"
+          className={BTN_TERTIARY}
           style={{ color: "var(--text-muted)" }}
         >
           Cancel
@@ -222,7 +223,7 @@ function ThreadCard({ thread, revalidatePath }: { thread: ClientThread; revalida
         <div className="flex items-center gap-3">
           {thread.unreadCount > 0 && (
             <span
-              className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
+              className={`${BADGE} text-white`}
               style={{ backgroundColor: "var(--brand-blue)" }}
             >
               {thread.unreadCount} new
@@ -305,7 +306,7 @@ export default function MessengerClient({
             <button
               type="button"
               onClick={() => setComposing(true)}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity duration-200 hover:opacity-90"
+              className={BTN_PRIMARY}
               style={{ backgroundImage: "var(--brand-gradient)" }}
             >
               + New message

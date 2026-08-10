@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
+import { BADGE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "My Protocol — Bridgetx" };
 
@@ -118,7 +119,7 @@ export default async function MyProtocolPage({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <span
-                className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                className={BADGE}
                 style={{
                   backgroundColor: "color-mix(in srgb, var(--success) 12%, transparent)",
                   color: "var(--success)",
