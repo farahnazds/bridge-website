@@ -156,7 +156,8 @@ Clinical reference rules (docs/07-ai-engine.md):
 - Never prescribe an aggressive deficit for an athlete already at or past their body-fat goal, and check any deficit against the RED-S guidance below before recommending it.
 - WHERE NO GOAL IS SET, say so plainly and recommend that the practitioner set one. Do not invent a target, and do not present current values as though they were on target.
 - Age, diet preference and declared conditions filter what may be recommended at all.
-- Where cultural or seasonal context is relevant (Ramadan, regional heat, travel), apply it to timing and hydration guidance.
+- Where cultural or seasonal context is relevant (regional heat, travel), apply it to timing and hydration guidance.
+- RAMADAN. When the season phase is Ramadan, a "Ramadan context" section appears in the data below. Follow it: the whole day's fuelling collapses into two windows, so generic "eat within 30 minutes post-session" advice is wrong and must not be given. Anchor every recommendation to Iftar or Suhoor rather than to clock times, because this athlete's actual fasting times are not recorded anywhere in the platform — say that plainly rather than assuming a sunset or dawn hour. Cite the library's Ramadan entry for the specific figures rather than inventing your own.
 - Session type and duration drive the MACRO split, not just the total. A strength session and an endurance session of the same RPE need different carbohydrate and protein handling; a match or a double session is not the same fuelling problem as a skill session; a recovery session should not be fuelled as though it were a hard one. Duration band sets the fuelling window — whether intra-session carbohydrate is warranted at all, and how the pre/post split should sit around it.
 - Estimated sweat rate, when recorded, drives INDIVIDUALISED fluid and sodium targets in ml per hour rather than generic advice. When it is not recorded, say plainly that hydration guidance is generic because no sweat rate was measured, and state what measuring it would change. Never invent a sweat rate figure.
 - Where any of session type, duration or sweat rate is marked "not recorded", do not silently assume a value. Give the best guidance available without it and name the gap.
@@ -268,6 +269,30 @@ ${
           .join("\n") +
         `\n\nMost limiting phase: ${phaseLabel(sortedInjuries[0].rtpPhase)}. Anchor recovery nutrition to THIS phase.`;
 
+  // Fires only when the plan entry for the target date says Ramadan. Note that
+  // season phase lives on the training-load entry, so this is reachable in
+  // next-day mode only — in general mode there is no plan entry and therefore
+  // no season phase to react to.
+  //
+  // The content here is FRAMING, not clinical figures: what to reason about and
+  // in what order. Every number (fluid volumes, electrolyte content) must come
+  // from the library's Ramadan entry, which is supplied separately in the
+  // nutrition-tagged library section. That keeps the citation rule intact.
+  const isRamadan = trainingLoad?.seasonPhase === "ramadan";
+  const ramadanBlock = isRamadan
+    ? `Season phase for the target date is RAMADAN. The athlete is fasting between dawn and sunset, so build the plan around these points:
+
+1. TRAINING TIMING RELATIVE TO THE FAST. Say where this session most likely sits — shortly before Iftar (fasted and depleted, the hardest case), shortly after Iftar (fuelled but with digestion to manage), or late evening between Iftar and Suhoor (the best-fuelled window) — and give the fuelling plan for the placement the practitioner has actually scheduled. If the session's placement relative to Iftar is not stated in the data, give the plan for each realistic placement rather than assuming one.
+
+2. SUHOOR IS THE LAST NUTRITIONAL WINDOW BEFORE THE FAST. Treat it as such: emphasise a slowly-digested protein source to protect lean mass across the fasting day, and fluid plus electrolytes rather than fluid alone. Use the volumes and composition given in the library's Ramadan entry; do not substitute your own figures.
+
+3. PRE-DAWN HYDRATION STRATEGY. The pre-dawn window is the only opportunity to hydrate before a full fasting day, so state how to use it and why spreading intake across the evening beats a single large volume at Suhoor.
+
+4. POST-IFTAR RECOVERY. Where the session finishes while still fasting, the recovery window opens at Iftar rather than immediately — say so explicitly instead of giving a standard post-session timing.
+
+DATA GAP — state this plainly in the report: this platform does not record the athlete's local Iftar and Suhoor times, or their intended session time relative to those. Anchor all guidance to "at Iftar", "at Suhoor" and "between the two" rather than to clock times, and recommend the practitioner confirm the athlete's actual timings. Never invent a sunset or dawn time.`
+    : "Not applicable — the season phase for the target date is not Ramadan.";
+
   const goalBlock = goalSummaryLine(
     latestAssessment
       ? { bodyFatPct: latestAssessment.body_fat_pct, leanMassKg: latestAssessment.lean_mass_kg, weightKg: latestAssessment.weight_kg }
@@ -355,6 +380,9 @@ ${periodStart} to ${periodEnd}
 
 ## Latest assessment (body composition basis for targets)
 ${assessmentBlock}
+
+## Ramadan context
+${ramadanBlock}
 
 ## Body-composition goal and gap to it
 ${goalBlock}
