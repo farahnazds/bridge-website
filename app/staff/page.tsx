@@ -79,6 +79,20 @@ export default async function StaffIndexPage() {
       club: team.clubs,
     }));
 
+  // Mirrors /club (app/club/page.tsx): a chooser listing exactly one option is
+  // an interstitial, not a choice. resolvePostLoginPath() sends every
+  // practitioner here on sign-in, so without this a single-team practitioner
+  // read a one-item list on every login while a single-club manager went
+  // straight in — the same situation handled two different ways.
+  //
+  // Scoped to practitioners on purpose. For a manager or an oversight viewer
+  // this list is "teams in my scope" rather than "my teams", and skipping into
+  // one because their scope happens to contain one team would be a different,
+  // more surprising behaviour.
+  if (isPractitioner && teams.length === 1) {
+    redirect(`/staff/${teams[0].id}`);
+  }
+
   return (
     <div
       className="flex min-h-screen flex-col items-center justify-center px-6 py-16"

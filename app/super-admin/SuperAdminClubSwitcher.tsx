@@ -29,6 +29,7 @@ export default function SuperAdminClubSwitcher({ clubs }: { clubs: SwitcherOptio
         fallbackBase="/super-admin/clubs"
         label="Switch club"
         emptyLabel="Jump to club…"
+        collapseSingle={false}
       />
     </div>
   );

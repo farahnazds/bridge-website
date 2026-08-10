@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { getAssignedClubs } from "@/lib/adminScope";
+import ContextSwitcher from "@/components/ContextSwitcher";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import Image from "next/image";
@@ -59,6 +61,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const isSuperAdmin = profile.role === "super_admin";
   if (profile.role !== "admin" && !isSuperAdmin) redirect("/");
 
+  // Admin and Super Admin can enter /club/[clubId] since the role-cascade fix,
+  // but /admin offered no way to get there except the Clubs list. This is a
+  // JUMP-TO control, not a current-context switcher: /admin pages are not
+  // scoped to one club, so there is no current id to show.
+  const switcherClubs = await getAssignedClubs();
+
   return (
     <div className="flex min-h-screen flex-col">
       <DashboardHeader
@@ -67,7 +75,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         role={isSuperAdmin ? "Super Admin" : "Admin"}
         context={isSuperAdmin ? "All clubs" : "Assigned clubs"}
         homeHref={isSuperAdmin ? "/super-admin" : "/admin"}
-      />
+      >
+        <ContextSwitcher
+          currentId={null}
+          options={switcherClubs.map((c) => ({ id: c.id, label: c.name, sublabel: null }))}
+          fallbackBase="/club"
+          label="Open a club"
+          emptyLabel="Open a club…"
+          collapseSingle={false}
+        />
+      </DashboardHeader>
       <div className="flex flex-1">
       <aside
         className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"

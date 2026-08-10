@@ -35,6 +35,7 @@ export default function ContextSwitcher({
   fallbackBase,
   label,
   emptyLabel = "Select…",
+  collapseSingle = true,
 }: {
   /** Null when the current page isn't scoped to one (e.g. a list page). */
   currentId: string | null;
@@ -44,6 +45,14 @@ export default function ContextSwitcher({
   /** Accessible name for the trigger, e.g. "Switch team". */
   label: string;
   emptyLabel?: string;
+  /**
+   * A CURRENT-CONTEXT switcher with one option is noise — the dropdown can only
+   * return you where you already are — so it collapses to plain text.
+   * A JUMP-TO control must stay clickable even with one option: it is not
+   * telling you where you are, it is the way to get somewhere. Those callers
+   * pass false.
+   */
+  collapseSingle?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -123,7 +132,7 @@ export default function ContextSwitcher({
 
   // A single option is not a switcher — showing a dropdown that can only
   // return you where you already are is noise. Render the label as plain text.
-  if (options.length <= 1) {
+  if (collapseSingle && options.length <= 1) {
     return (
       <div className="px-2">
         <p className="truncate text-sm font-semibold text-white">{current?.label ?? emptyLabel}</p>
