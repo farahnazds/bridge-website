@@ -1,3 +1,4 @@
+import { goalSummaryLine } from "@/lib/bodyComposition";
 // Builds the Body Composition report prompt exactly per
 // prompts/report-generation.md and docs/07-ai-engine.md. Kept separate from
 // actions.ts so the prompt text itself is easy to review against those two
@@ -44,6 +45,8 @@ export interface BodyCompositionPromptInput {
     gender: string | null;
     ethnicity: string | null;
     diet_preference: string;
+    goal_body_fat_pct: number | null;
+    goal_lean_mass_kg: number | null;
   };
   conditions: string[];
   allergies: string[];
@@ -95,6 +98,9 @@ Elite benchmark handling — hard rules:
 - If a benchmark row is provided, you may reference it directly as this athlete's sport/gender/age-band elite benchmark for body fat %, lean mass ratio, and kcal/kg lean mass.
 - Any benchmark figure provided has an accompanying source_note describing it as a starting reference value, not yet clinically validated for this platform. Do not present the benchmark comparison as a definitive clinical verdict — frame it as a reference point for the practitioner's own judgment, and do not omit that framing.
 - If no benchmark row is provided, do not estimate or fabricate one — state the gap plainly instead.
+- The athlete's OWN goal is separate from the elite benchmark and matters more. Where a goal is set, the "Body-composition goal and gap to it" section gives the target body fat, target lean mass, derived goal body weight, and the gap from the latest assessment — all already computed. Use those figures rather than recalculating, and make the trend analysis and the "Goals for next period" section follow from that gap: how far off the athlete is, in which direction, and whether the trend across the assessments provided is moving toward or away from it.
+- Distinguish the two comparisons explicitly. An athlete can sit below the elite benchmark yet above their own goal, or the reverse; do not merge them into a single verdict.
+- Where no goal is set, say so plainly and recommend the practitioner set one. Never invent a target, and never present current values as though they were on target.
 
 Citations — hard rule: only cite entries from the "Clinical + Research library entries" section in the data below, if any are provided. Never cite anything from general training knowledge, even if a relevant paper is "known" to you. If no library entries are provided, do not include any citation for that point — write it without one rather than reaching for an unverified source.
 
@@ -162,6 +168,13 @@ Source note: ${benchmark.source_note ?? "—"}`
           .join("\n")
       : "None found in the library for this topic — do not cite any source in this report.";
 
+  // Newest assessment drives the gap, matching how the profile page shows it.
+  const newest = [...assessments].sort((a, b) => (a.date < b.date ? 1 : -1))[0] ?? null;
+  const goalBlock = goalSummaryLine(
+    newest ? { bodyFatPct: newest.body_fat_pct, leanMassKg: newest.lean_mass_kg, weightKg: newest.weight_kg } : null,
+    { goalBodyFatPct: athlete.goal_body_fat_pct, goalLeanMassKg: athlete.goal_lean_mass_kg }
+  );
+
   return `## Athlete
 Name: ${athlete.first_name} ${athlete.last_name}
 Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ?? "not specified"}
@@ -171,6 +184,9 @@ Declared allergies: ${listOrNone(allergies)}
 Declared intolerances: ${listOrNone(intolerances)}
 Declared medical/operational conditions: ${listOrNone(conditions)}
 ${athlete.ethnicity ? `Ethnicity: ${athlete.ethnicity} — include only if clinically relevant to this analysis` : ""}
+
+## Body-composition goal and gap to it
+${goalBlock}
 
 ## Report period
 ${periodStart} to ${periodEnd}

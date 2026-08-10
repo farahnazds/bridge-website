@@ -86,6 +86,8 @@ export default function AthleteIdentityForm({
           <Read label="Status" value={athlete.status === "read_only" ? "Read-only" : "Active"} />
           <Read label="Menstrual status" value={menstrualLabel} />
           <Read label="Iron status" value={ironLabel} />
+          <Read label="Goal body fat" value={athlete.goal_body_fat_pct !== null ? athlete.goal_body_fat_pct + "%" : "No goal set"} />
+          <Read label="Goal lean mass" value={athlete.goal_lean_mass_kg !== null ? athlete.goal_lean_mass_kg + " kg" : "No goal set"} />
         </div>
         {state.saved && (
           <p className="text-sm" style={{ color: "var(--success)" }}>Saved.</p>
@@ -163,6 +165,16 @@ export default function AthleteIdentityForm({
             <option value="">Not recorded</option>
             {MENSTRUAL_STATUSES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
+        </Field>
+        <Field label="Goal body fat %">
+          <input name="goal_body_fat_pct" type="number" min={3} max={60} step={0.1}
+            placeholder="No goal set" defaultValue={athlete.goal_body_fat_pct ?? ""}
+            className={inputClass} style={inputStyle} />
+        </Field>
+        <Field label="Goal lean mass (kg)">
+          <input name="goal_lean_mass_kg" type="number" min={20} max={150} step={0.1}
+            placeholder="No goal set" defaultValue={athlete.goal_lean_mass_kg ?? ""}
+            className={inputClass} style={inputStyle} />
         </Field>
         <Field label="Iron status">
           <select name="iron_status" defaultValue={athlete.iron_status ?? ""} className={inputClass} style={inputStyle}>

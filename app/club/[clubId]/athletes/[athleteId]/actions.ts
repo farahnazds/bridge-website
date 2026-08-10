@@ -87,6 +87,28 @@ export async function updateAthleteIdentity(
     return { error: `Iron status must be one of: ${VALID_IRON.join(", ")}.`, saved: false };
   }
 
+  // Body-composition goals (migration 029). Bounds mirror the DB CHECK so a
+  // unit slip gives a readable message instead of a raw violation. Blank means
+  // "no goal set" and is stored as NULL — never coerced to 0, which would be a
+  // real target rather than an absent one.
+  const readGoal = (
+    field: string,
+    label: string,
+    min: number,
+    max: number
+  ): { value: number | null; error?: undefined } | { error: string; value?: undefined } => {
+    const raw = String(formData.get(field) ?? "").trim();
+    if (!raw) return { value: null };
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return { error: label + " must be a number." };
+    if (parsed < min || parsed > max) return { error: `${label} must be between ${min} and ${max}.` };
+    return { value: Math.round(parsed * 10) / 10 };
+  };
+  const goalBf = readGoal("goal_body_fat_pct", "Goal body fat %", 3, 60);
+  if (goalBf.error) return { error: goalBf.error, saved: false };
+  const goalLm = readGoal("goal_lean_mass_kg", "Goal lean mass (kg)", 20, 150);
+  if (goalLm.error) return { error: goalLm.error, saved: false };
+
   const status = String(formData.get("status") ?? "").trim();
   if (status && !["active", "read_only"].includes(status)) {
     return { error: "Status must be active or read_only.", saved: false };
@@ -116,6 +138,8 @@ export async function updateAthleteIdentity(
     status: status || "active",
     menstrual_status: menstrualStatus || null,
     iron_status: ironStatus || null,
+    goal_body_fat_pct: goalBf.value ?? null,
+    goal_lean_mass_kg: goalLm.value ?? null,
     updated_at: new Date().toISOString(),
   };
 

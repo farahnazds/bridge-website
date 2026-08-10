@@ -31,6 +31,8 @@ export interface AthleteIdentity {
   profile_photo_url: string | null;
   menstrual_status: string | null;
   iron_status: string | null;
+  goal_body_fat_pct: number | null;
+  goal_lean_mass_kg: number | null;
   is_subscribed: boolean;
   created_at: string;
   updated_at: string | null;
@@ -96,7 +98,7 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
   const { data: athlete } = await supabase
     .from("athletes")
     .select(
-      "id, club_id, first_name, last_name, code, sport, position, tier, diet_preference, country, dob, gender, ethnicity, status, profile_photo_url, menstrual_status, iron_status, is_subscribed, created_at, updated_at"
+      "id, club_id, first_name, last_name, code, sport, position, tier, diet_preference, country, dob, gender, ethnicity, status, profile_photo_url, menstrual_status, iron_status, goal_body_fat_pct, goal_lean_mass_kg, is_subscribed, created_at, updated_at"
     )
     .eq("id", athleteId)
     .maybeSingle();

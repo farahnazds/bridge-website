@@ -5,6 +5,7 @@
 // bodyCompositionPromptBuilder.ts.
 
 import { SESSION_TYPES, SESSION_DURATION_BANDS, RTP_PHASES, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
+import { goalSummaryLine } from "@/lib/bodyComposition";
 
 export type NutritionSubMode = "next_day" | "general";
 
@@ -100,6 +101,8 @@ export interface NutritionPromptInput {
      *  distinct from "normal" and must never be reported as such. */
     menstrual_status: string | null;
     iron_status: string | null;
+    goal_body_fat_pct: number | null;
+    goal_lean_mass_kg: number | null;
   };
   conditions: string[];
   allergies: string[];
@@ -148,7 +151,10 @@ SAFETY CROSS-CHECK — mandatory before recommending anything: cross-check every
 
 Clinical reference rules (docs/07-ai-engine.md):
 - Protein target: lean mass x 2.2 g/day where lean mass is known.
-- Goal body weight: goal_ffm / (1 - goal_bf/100).
+- Goal body weight: goal_ffm / (1 - goal_bf/100). The "Body-composition goal and gap to it" section below has already computed this and the gap from the athlete's latest assessment — use those figures rather than recalculating, and never restate them differently.
+- WHERE A GOAL IS SET, anchor the energy and macro recommendations to the GAP, not to maintenance. State the direction and size of the gap, say roughly what rate of change is appropriate, and make the calorie and protein targets follow from it — a 2 kg fat-loss gap and a 6 kg lean-gain gap are different prescriptions, and a report that ignores the gap while a goal exists has failed its main job.
+- Never prescribe an aggressive deficit for an athlete already at or past their body-fat goal, and check any deficit against the RED-S guidance below before recommending it.
+- WHERE NO GOAL IS SET, say so plainly and recommend that the practitioner set one. Do not invent a target, and do not present current values as though they were on target.
 - Age, diet preference and declared conditions filter what may be recommended at all.
 - Where cultural or seasonal context is relevant (Ramadan, regional heat, travel), apply it to timing and hydration guidance.
 - Session type and duration drive the MACRO split, not just the total. A strength session and an endurance session of the same RPE need different carbohydrate and protein handling; a match or a double session is not the same fuelling problem as a skill session; a recovery session should not be fuelled as though it were a hard one. Duration band sets the fuelling window — whether intra-session carbohydrate is warranted at all, and how the pre/post split should sit around it.
@@ -262,6 +268,13 @@ ${
           .join("\n") +
         `\n\nMost limiting phase: ${phaseLabel(sortedInjuries[0].rtpPhase)}. Anchor recovery nutrition to THIS phase.`;
 
+  const goalBlock = goalSummaryLine(
+    latestAssessment
+      ? { bodyFatPct: latestAssessment.body_fat_pct, leanMassKg: latestAssessment.lean_mass_kg, weightKg: latestAssessment.weight_kg }
+      : null,
+    { goalBodyFatPct: athlete.goal_body_fat_pct, goalLeanMassKg: athlete.goal_lean_mass_kg }
+  );
+
   const loadBlock =
     subMode === "next_day"
       ? trainingLoad
@@ -342,6 +355,9 @@ ${periodStart} to ${periodEnd}
 
 ## Latest assessment (body composition basis for targets)
 ${assessmentBlock}
+
+## Body-composition goal and gap to it
+${goalBlock}
 
 ## Training load for the target date
 ${loadBlock}

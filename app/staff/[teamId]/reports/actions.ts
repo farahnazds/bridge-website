@@ -301,7 +301,7 @@ export async function generateBodyCompositionReport(
   // ---- Gather data (docs/07-ai-engine.md "Data pulled before generating") ----
   const { data: athlete, error: athleteError } = await supabase
     .from("athletes")
-    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference")
+    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference, goal_body_fat_pct, goal_lean_mass_kg")
     .eq("id", athleteId)
     .single();
   if (athleteError || !athlete) {
@@ -673,7 +673,7 @@ export async function generateNutritionReport(
 
   const { data: athlete, error: athleteError } = await supabase
     .from("athletes")
-    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference, menstrual_status, iron_status, club_id, segment_id")
+    .select("id, first_name, last_name, sport, position, tier, dob, gender, ethnicity, diet_preference, menstrual_status, iron_status, goal_body_fat_pct, goal_lean_mass_kg, club_id, segment_id")
     .eq("id", athleteId)
     .single();
   if (athleteError || !athlete) return { ...base, error: "Couldn't load that athlete." };

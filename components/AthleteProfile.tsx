@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AthleteIdentityForm from "@/components/AthleteIdentityForm";
 import { COMPLIANCE_WINDOW, type AthleteProfileData } from "@/lib/athleteProfile";
+import { goalBodyWeightKg, gap } from "@/lib/bodyComposition";
 import { REPORT_TYPE_LABELS, INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 
 // The staff-facing athlete profile, rendered identically for the Club Manager
@@ -105,6 +106,15 @@ export default function AthleteProfile({
     typeof a === "number" && typeof b === "number" ? a - b : null;
   const bfDelta = delta(latest?.body_fat_pct, previous?.body_fat_pct);
   const wtDelta = delta(latest?.weight_kg, previous?.weight_kg);
+
+  const hasGoal = athlete.goal_body_fat_pct !== null || athlete.goal_lean_mass_kg !== null;
+  const goalWeight = goalBodyWeightKg({
+    goalBodyFatPct: athlete.goal_body_fat_pct,
+    goalLeanMassKg: athlete.goal_lean_mass_kg,
+  });
+  const bfToGoal = gap(latest?.body_fat_pct ?? null, athlete.goal_body_fat_pct);
+  const lmToGoal = gap(latest?.lean_mass_kg ?? null, athlete.goal_lean_mass_kg);
+  const wtToGoal = gap(latest?.weight_kg ?? null, goalWeight);
   const openInjuries = injuries.filter((i) => i.status !== "cleared");
 
   return (
@@ -207,6 +217,26 @@ export default function AthleteProfile({
           </div>
         ) : (
           <Empty>No assessments recorded.</Empty>
+        )}
+
+        {/* Goal row, deliberately beside the current figures rather than in the
+            identity block — a goal is only meaningful next to where the athlete
+            actually is. Derived weight uses the shared helper so the profile and
+            both prompts can never disagree on the formula. */}
+        {hasGoal ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Card label="Goal body fat"
+              value={athlete.goal_body_fat_pct !== null ? `${athlete.goal_body_fat_pct}%` : "—"}
+              hint={bfToGoal === null ? "no current reading" : bfToGoal === 0 ? "at goal" : `${Math.abs(bfToGoal)} pts ${bfToGoal > 0 ? "to lose" : "below goal"}`} />
+            <Card label="Goal lean mass"
+              value={athlete.goal_lean_mass_kg !== null ? `${athlete.goal_lean_mass_kg} kg` : "—"}
+              hint={lmToGoal === null ? "no current reading" : lmToGoal === 0 ? "at goal" : `${Math.abs(lmToGoal)} kg ${lmToGoal < 0 ? "to gain" : "above goal"}`} />
+            <Card label="Goal body weight"
+              value={goalWeight !== null ? `${goalWeight} kg` : "—"}
+              hint={goalWeight === null ? "needs both goal values" : wtToGoal === null ? "no current weight" : wtToGoal === 0 ? "at goal" : `${Math.abs(wtToGoal)} kg ${wtToGoal > 0 ? "to lose" : "to gain"}`} />
+          </div>
+        ) : (
+          <Empty>No body-composition goal set for this athlete.</Empty>
         )}
       </Section>
 
