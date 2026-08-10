@@ -60,7 +60,7 @@ first.
 | Club Manager | Their own club (can also be a practitioner) | Super Admin/Admin |
 | Club Practitioner | Team(s) assigned, within their club(s) — can work across multiple clubs simultaneously | Club Manager |
 | Independent Practitioner | Their own guided athletes + approved club-athlete access | Self (invite-only signup) |
-| Club Athlete | Own data, view-only | Club Manager/Practitioner registers them |
+| Club Athlete | Own data, view-only | Club Manager registers them |
 | Guided Athlete | Own data, view-only unless subscribed | Independent Practitioner adds them |
 | Independent Athlete | Own data, self-managed | Self (subscription-gated) |
 | Brand Partner | One brand, aggregate data | Super Admin |
@@ -145,6 +145,19 @@ days on entries any club staff member made (their own or a colleague's);
 after 7 days, only Admin can edit. Full data provenance always preserved
 through edits (edited entries stay attributed to original entrant, with
 a visible "edited by X" history event).
+
+**Does not register athletes.** Onboarding a Club Athlete — one-by-one or
+by CSV — is a Club Manager action, because it creates the athlete record,
+issues the athlete code, and sends an account invite. A practitioner picks
+up the athlete once they are on one of their teams. This is consistent with
+the role cascade: everything a practitioner can do, a manager can do too.
+
+A practitioner *can* edit the identity details of an athlete on their own
+team, from the athlete profile page — that is an edit, not an onboarding.
+
+Scope note: a practitioner reaches an athlete only through team assignment,
+enforced in the database (migration 026), not merely in the UI. Being at the
+same club is not enough.
 
 ### Independent Practitioner
 Manages their own Guided Athletes directly. Can request access to a

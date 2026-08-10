@@ -752,3 +752,56 @@ club they referred and not the club they did not, verified with a real pipeline
 row present so the deny is not vacuous. No other role's `clubs` access changed —
 Super Admin 2, Admin 1, Club Manager 1, Brand Partner 0, athlete 0, measured
 before and after.
+
+## Changed: `athletes` team-scoped for Club Practitioners (2026-08-09)
+
+Migration 026. A Club Practitioner could read and update the `athletes`
+identity row for any athlete at their club, including athletes on teams they
+were not assigned to.
+
+Scope was much narrower than it first appeared. Every athlete DATA table
+(assessments, gps_logs, vald_data, injuries, checkins, supplement_protocols,
+athlete_conditions/allergies/intolerances, comments, athlete_teams) already
+gated on `is_assigned_to_athlete_via_team()`, which is team-based for
+practitioners and club-wide for managers. Only the `athletes` row itself used
+the club-wide `is_club_staff_for_club()`, so identity was reachable across
+teams while every attached clinical record was not.
+
+`is_club_staff_for_club()` was deliberately NOT narrowed — it has 17
+references, most of them club-level (clubs, teams, club_settings, branding
+storage, content, product_requests) where club-wide is correct.
+
+Measured before, with a seeded athlete on team "u22" and a seeded assessment
+(fixtures asserted present first — an earlier run's assessment insert failed on
+a NOT NULL `validity_tier` and made the whole test vacuous):
+
+| practitioner | reads athlete row | reads assessments | updates identity |
+|---|---|---|---|
+| not on the team | YES (gap) | 0 | YES (gap) |
+| on the team | YES | 1 | YES |
+
+After: the off-team practitioner reads nothing and writes nothing; the on-team
+practitioner is unchanged; Club Manager keeps club-wide read and write despite
+holding no team assignment; Admin, Super Admin and athlete self-access are
+untouched.
+
+**USING vs WITH CHECK is load-bearing.** Postgres applies USING to
+SELECT/UPDATE/DELETE and WITH CHECK to INSERT/UPDATE. Registration inserts the
+athlete, reads it back, then inserts `athlete_teams` — so a team rule on INSERT
+(or on the RETURNING clause's implicit SELECT) would break both the form and
+the CSV import. INSERT therefore stays club-wide via WITH CHECK, and the
+`not athlete_has_any_team(id)` branch keeps a teamless athlete visible to club
+staff so they can be assigned. Verified: manager insert → read back → assign
+still works end to end.
+
+`athlete_has_any_team()` is SECURITY DEFINER with a pinned search_path: a
+policy on `athletes` that inline-queried `athlete_teams` would evaluate that
+table's policies, one of which reads `athletes` — the 42P17 recursion this
+schema hit in migrations 001 and 014.
+
+Bypass testing, since a UI check proves nothing here: the off-team
+practitioner's write was refused through the server action called directly over
+HTTP (both the /staff and /club routes, no page load involved) and through raw
+PostgREST with supabase-js, with the row read back unchanged each time. The
+on-team practitioner's identical direct call succeeds and does change the row,
+so the denials are a real boundary rather than an unrelated failure.

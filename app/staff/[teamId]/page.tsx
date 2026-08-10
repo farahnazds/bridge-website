@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -119,8 +120,10 @@ export default async function TeamRosterPage({
                 const display = status ? STATUS_STYLE[status] ?? NOT_LOGGED : NOT_LOGGED;
                 return (
                   <tr key={athlete.id} style={{ borderTop: "1px solid var(--border)" }}>
-                    <td className="px-5 py-3 font-medium" style={{ color: "var(--text)" }}>
-                      {athlete.first_name} {athlete.last_name}
+                    <td className="px-5 py-3 font-medium">
+                      <Link href={`/staff/${teamId}/athletes/${athlete.id}`} style={{ color: "var(--brand-blue)" }}>
+                        {athlete.first_name} {athlete.last_name}
+                      </Link>
                     </td>
                     <td
                       className="px-5 py-3"

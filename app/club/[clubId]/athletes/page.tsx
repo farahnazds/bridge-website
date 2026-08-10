@@ -109,8 +109,10 @@ export default async function ClubAthletesPage({
             <tbody>
               {athletes.map((athlete) => (
                 <tr key={athlete.id} style={{ borderTop: "1px solid var(--border)" }}>
-                  <td className="px-5 py-3 font-medium" style={{ color: "var(--text)" }}>
-                    {athlete.first_name} {athlete.last_name}
+                  <td className="px-5 py-3 font-medium">
+                    <Link href={`/club/${clubId}/athletes/${athlete.id}`} style={{ color: "var(--brand-blue)" }}>
+                      {athlete.first_name} {athlete.last_name}
+                    </Link>
                   </td>
                   <td
                     className="px-5 py-3"
