@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs } from "@/lib/adminScope";
+import { getLastUsedContextId, pickDefault } from "@/lib/lastUsedContext";
 
 export const metadata: Metadata = {
   title: "My Teams — Bridgetx",
@@ -79,18 +80,25 @@ export default async function StaffIndexPage() {
       club: team.clubs,
     }));
 
-  // Mirrors /club (app/club/page.tsx): a chooser listing exactly one option is
-  // an interstitial, not a choice. resolvePostLoginPath() sends every
-  // practitioner here on sign-in, so without this a single-team practitioner
-  // read a one-item list on every login while a single-club manager went
-  // straight in — the same situation handled two different ways.
+  // A practitioner never sees a chooser here, at ANY team count — they land in
+  // their last-used team (first alphabetically the first time) and change teams
+  // with the switcher in the header. This route stays reachable directly, so
+  // the same rule is applied here and not only in resolvePostLoginPath();
+  // otherwise navigating to /staff by hand would resurrect the picker that was
+  // just removed.
   //
-  // Scoped to practitioners on purpose. For a manager or an oversight viewer
-  // this list is "teams in my scope" rather than "my teams", and skipping into
-  // one because their scope happens to contain one team would be a different,
-  // more surprising behaviour.
-  if (isPractitioner && teams.length === 1) {
-    redirect(`/staff/${teams[0].id}`);
+  // Still scoped to practitioners on purpose. For a manager or an oversight
+  // viewer this list is "teams in my scope" rather than "my teams" — a browse
+  // view they reach deliberately, not a login interstitial, and neither role is
+  // ever sent here by resolvePostLoginPath(). Auto-entering someone's whole
+  // club scope would be the surprising behaviour.
+  //
+  // Zero teams falls through to the empty state below: there is nothing to
+  // enter, and that is a message, not a choice.
+  if (isPractitioner && teams.length > 0) {
+    const sorted = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+    const target = pickDefault(sorted, await getLastUsedContextId(profile.id, "team"));
+    if (target) redirect(`/staff/${target.id}`);
   }
 
   return (

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getLastUsedContextId, pickDefault } from "@/lib/lastUsedContext";
 
 export const metadata: Metadata = {
   title: "Your Clubs — Bridgetx",
@@ -35,11 +36,17 @@ export default async function ClubIndexPage() {
     .map((row) => row.clubs as unknown as ClubSummary | null)
     .filter((club): club is ClubSummary => club !== null);
 
-  // resolvePostLoginPath() only sends someone here when their club count
-  // isn't exactly 1, but this route is reachable directly too — if that
-  // happens to resolve to exactly one club now, skip the chooser.
-  if (clubs.length === 1) {
-    redirect(`/club/${clubs[0].id}`);
+  // Same rule as /staff: a manager never picks a club first, at any count.
+  // They land in the last-used one (first alphabetically the first time) and
+  // change clubs with the switcher in the header. Applied here as well as in
+  // resolvePostLoginPath() because this route is reachable directly, and a
+  // hand-typed /club would otherwise resurrect the removed picker.
+  //
+  // Zero clubs falls through to the empty state below — nothing to enter.
+  if (clubs.length > 0) {
+    const sorted = [...clubs].sort((a, b) => a.name.localeCompare(b.name));
+    const target = pickDefault(sorted, await getLastUsedContextId(profile.id, "club"));
+    if (target) redirect(`/club/${target.id}`);
   }
 
   return (

@@ -50,3 +50,20 @@ schema.sql matches this.
 - Every `data_entries`-style table needs `validity_tier` and
   `provider_id` — this is the single most load-bearing piece of the
   whole v4 model.
+---
+
+### `user_last_context`
+
+Remembers the last team and the last club each person opened, so signing in
+lands them back where they work instead of on a "choose one" list.
+
+One row per person per scope — a Club Practitioner who works across two clubs
+has at most one `team` row and one `club` row, not one per assignment. Columns
+are `profile_id`, `context_type` (`'team'` or `'club'`), `context_id`, and
+`last_used_at`; it is upserted whenever someone opens a team or club dashboard.
+
+It is a **preference, not a permission**. `context_id` deliberately has no
+foreign key (it points at either `teams` or `clubs`), and the app re-checks the
+stored id against what the person may actually open today before using it —
+falling back to the first option alphabetically. Deleting this table's contents
+would cost people their default landing spot and nothing else.

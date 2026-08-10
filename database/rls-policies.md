@@ -805,3 +805,36 @@ HTTP (both the /staff and /club routes, no page load involved) and through raw
 PostgREST with supabase-js, with the row read back unchanged each time. The
 on-team practitioner's identical direct call succeeds and does change the row,
 so the denials are a real boundary rather than an unrelated failure.
+
+---
+
+## `user_last_context` — everyone's own row, nobody else's
+
+Backs the removal of the "pick one first" landing pages: a Club Practitioner
+opens the team they were last in, a Club Manager the club they were last in,
+instead of a chooser. One row per `(profile_id, context_type)`.
+
+A single `for all` policy, both sides bound to the caller:
+
+```sql
+create policy "own last context" on user_last_context for all
+  using (profile_id = current_profile_id())
+  with check (profile_id = current_profile_id());
+```
+
+`with check` is not redundant here. `using` filters the rows a caller can see
+and modify, but without `with check` the same caller could upsert a row naming
+somebody else's `profile_id` — writing a default into another person's account.
+
+**This table is a preference, never a grant.** It stores a `context_id` with no
+foreign key, because the column points at `teams.id` or `clubs.id` depending on
+`context_type` and Postgres has no polymorphic FK. Nothing may treat a stored
+id as permission to open anything: `pickDefault()` in `lib/lastUsedContext.ts`
+re-validates it against the caller's *current* permitted list on every resolve
+and falls back to first-alphabetically on a miss. So a practitioner unassigned
+from a team, or a team since deleted, resolves to a different team rather than
+into one they no longer hold. Authorisation still comes from
+`getStaffTeamContext()` and the policies on the underlying tables — this table
+only ever chooses *between options the caller already has*.
+
+See `database/migrations/030_last_used_context.sql`.

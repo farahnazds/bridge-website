@@ -8,13 +8,26 @@ a person can be tied to more than one record. Resolution per role:
 
 - **Super Admin / Admin** — no lookup needed, static routes
   (`/super-admin`, `/admin`)
-- **Club Manager** — look up their club(s) via `club_staff`. Exactly one
-  → redirect straight to `/club/[club-id]`. Zero or multiple → land on
-  `/club` (index/chooser), don't guess
-- **Club Practitioner** — always land on `/staff` (index, "My Teams")
-  first, regardless of how many teams they have — this role is
-  explicitly designed to span multiple clubs/teams, never assume just
-  one
+- **Club Manager** — look up their club(s) via `club_staff`, then
+  redirect straight to `/club/[club-id]`: the one they most recently
+  opened, or the first alphabetically if they have never opened one.
+  Only a manager with **zero** clubs lands on `/club`, which in that
+  state is an empty state, not a chooser
+- **Club Practitioner** — same rule against their `staff_team_assignments`:
+  straight into `/staff/[team-id]`, being the team they most recently
+  opened, or the first alphabetically on their very first sign-in. This
+  role still spans multiple clubs/teams by design — that is why it gets
+  a *remembered* default rather than an assumed single team. Only a
+  practitioner with **zero** teams lands on `/staff`
+
+  > **No role picks a context before reaching a dashboard.** Signing in
+  > puts you back where you work; the header's context switcher changes
+  > team or club from inside. The last-used value lives in
+  > `user_last_context` and is a preference, never a permission — it is
+  > re-checked against what the caller may open *now*, falling back to
+  > first-alphabetically if it no longer qualifies. `/staff` and `/club`
+  > apply the same rule themselves, so navigating to them by hand cannot
+  > resurrect the picker.
 - **Independent Practitioner** — no lookup needed. `practitioner_id` is
   always their own `profile.id`, so redirect straight to
   `/practice/[their-profile-id]`

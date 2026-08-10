@@ -1,4 +1,7 @@
 import { redirect, notFound } from "next/navigation";
+import { after } from "next/server";
+import { cookies } from "next/headers";
+import { recordLastUsedContext } from "@/lib/lastUsedContext";
 import { Activity, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Users, Zap } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -42,6 +45,23 @@ export default async function TeamLayout({
 
   const { profile, team, isManager, isOversight, availableTeams } = context;
 
+  // Remember this team as their default for next sign-in. Deliberately placed
+  // AFTER the authorisation check above, so an unauthorised teamId can never
+  // be recorded, and inside after() so the write happens once the response has
+  // been sent — it must not add latency to a dashboard that is already the
+  // slowest path in the app.
+  //
+  // Recorded for every role that can open a team, not just practitioners: a
+  // Club Manager reaching a team through /club and an Admin arriving via the
+  // role cascade both benefit, and pickDefault() is what decides whether the
+  // stored value is ever honoured.
+  // Cookies must be read HERE, during render — Next.js throws on cookies()
+  // inside after() from a Server Component, and because the write is
+  // deliberately failure-tolerant that throw would be swallowed and the
+  // preference would silently never save.
+  const cookieSnapshot = (await cookies()).getAll();
+  after(() => recordLastUsedContext(cookieSnapshot, profile.id, "team", team.id));
+
   // Admin and Super Admin are included per the role cascade in
   // docs/02-roles-and-permissions.md. getStaffTeamContext() has already
   // resolved their scope and returned null (-> notFound above) for a team
@@ -55,12 +75,13 @@ export default async function TeamLayout({
     redirect("/");
   }
 
-  const backHref = isOversight
-    ? "/staff"
-    : isManager
-      ? `/club/${team.club_id}/teams-staff`
-      : "/staff";
-  const backLabel = isOversight ? "← All teams" : isManager ? "← Teams & Staff" : "← My Teams";
+  // A practitioner no longer has a "My Teams" page to go back TO — /staff now
+  // sends them straight back into a team, so the old "← My Teams" link led in
+  // a circle. They change teams with the switcher in the header instead, so
+  // the link is simply absent for them. Manager and oversight both still have
+  // real destinations (their club's staff page, and the teams browse list).
+  const backHref = isOversight ? "/staff" : isManager ? `/club/${team.club_id}/teams-staff` : null;
+  const backLabel = isOversight ? "← All teams" : "← Teams & Staff";
   const navGroups = [
   { label: null, items: [
     { label: "Roster", href: `/staff/${teamId}`, icon: Users },
@@ -83,7 +104,7 @@ export default async function TeamLayout({
         name={profile.first_name ?? profile.email}
         email={profile.email}
         role={ROLE_LABEL[profile.role] ?? "Staff"}
-        homeHref={isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : "/staff"}
+        homeHref={isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : `/staff/${teamId}`}
       >
         <ContextSwitcher
           currentId={team.id}
@@ -98,14 +119,16 @@ export default async function TeamLayout({
         style={{ backgroundColor: "var(--brand-navy)" }}
       >
 
-        <div className="px-2">
-          <Link
-            href={backHref}
-            className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
-          >
-            {backLabel}
-          </Link>
-        </div>
+        {backHref && (
+          <div className="px-2">
+            <Link
+              href={backHref}
+              className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
+            >
+              {backLabel}
+            </Link>
+          </div>
+        )}
 
         <SidebarNav groups={navGroups} />
         {/* Identity now lives in the shared header; what remains here is the

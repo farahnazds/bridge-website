@@ -1,4 +1,7 @@
 import { redirect, notFound } from "next/navigation";
+import { after } from "next/server";
+import { cookies } from "next/headers";
+import { recordLastUsedContext } from "@/lib/lastUsedContext";
 import { Activity, CalendarRange, CircleCheckBig, ClipboardList, CreditCard, FileText, HeartPulse, LayoutDashboard, MessageSquare, Newspaper, Scale, Settings, ShoppingCart, Trophy, Users, UsersRound, Zap } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -51,6 +54,15 @@ export default async function ClubLayout({
     .single();
 
   if (!club) notFound();
+
+  // Remember this club as their default for next sign-in — after the
+  // authorisation checks above, and in after() so it costs the response
+  // nothing. Mirrors app/staff/[teamId]/layout.tsx; see
+  // database/migrations/030_last_used_context.sql for the shape.
+  // Read during render — cookies() is illegal inside after() here. See the
+  // matching comment in app/staff/[teamId]/layout.tsx.
+  const cookieSnapshot = (await cookies()).getAll();
+  after(() => recordLastUsedContext(cookieSnapshot, profile.id, "club", clubId));
 
   // Switcher contents depend on how the caller reaches clubs at all.
   // A Club Manager switches between clubs they hold a club_manager row at;

@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getLastUsedContextId, pickDefault } from "@/lib/lastUsedContext";
 
 // Matches the `role` check constraint on `profiles` in database/schema.sql.
 // Athletes all share role = 'athlete' — whether one is currently a Club,
@@ -120,20 +121,52 @@ export async function resolvePostLoginPath(): Promise<string> {
     case "admin":
       return "/admin";
 
+    // Both multi-option roles below land straight in a dashboard, never on a
+    // chooser. The last-used context is a preference, so it is re-validated
+    // against the rows just fetched — pickDefault() falls back to first
+    // alphabetically when it no longer matches. Only a caller with NO options
+    // at all still sees the index page, which in that state is an empty state
+    // rather than a chooser.
     case "club_manager": {
       const { data } = await supabase
         .from("club_staff")
-        .select("club_id")
+        .select("club_id, clubs(name)")
         .eq("profile_id", profile.id)
         .eq("staff_role", "club_manager");
-      const clubIds = new Set((data ?? []).map((row) => row.club_id));
-      return clubIds.size === 1 ? `/club/${[...clubIds][0]}` : "/club";
+
+      // club_staff.club_id -> clubs.id is many-to-one, so this embed is a
+      // single object at runtime; supabase-js infers an array without
+      // generated Database types. Same cast used by app/club/page.tsx.
+      type ManagedRow = { club_id: string; clubs: { name: string } | null };
+      const seen = new Map<string, string>();
+      for (const row of (data ?? []) as unknown as ManagedRow[]) {
+        if (!seen.has(row.club_id)) seen.set(row.club_id, row.clubs?.name ?? "");
+      }
+      const clubs = [...seen.entries()]
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const target = pickDefault(clubs, await getLastUsedContextId(profile.id, "club"));
+      return target ? `/club/${target.id}` : "/club";
     }
 
-    case "club_practitioner":
-      // Always the "My Teams" index — this role spans multiple
-      // clubs/teams by design, never assume just one.
-      return "/staff";
+    case "club_practitioner": {
+      // This role spans multiple clubs/teams by design. It used to always land
+      // on the "My Teams" index; now it opens the team they were last in.
+      const { data } = await supabase
+        .from("staff_team_assignments")
+        .select("team_id, teams(id, name)")
+        .eq("staff_profile_id", profile.id);
+
+      type AssignmentRow = { team_id: string; teams: { id: string; name: string } | null };
+      const teams = ((data ?? []) as unknown as AssignmentRow[])
+        .map((row) => row.teams)
+        .filter((t): t is { id: string; name: string } => t !== null)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const target = pickDefault(teams, await getLastUsedContextId(profile.id, "team"));
+      return target ? `/staff/${target.id}` : "/staff";
+    }
 
     case "independent_practitioner":
       // practitioner_id is always their own profile.id, no lookup needed.
