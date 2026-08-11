@@ -1,25 +1,20 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import DataModal from "@/components/DataModal";
 import ReportMarkdown from "@/components/ReportMarkdown";
 import ReportPdfLink from "@/components/ReportPdfLink";
 import {
-  INJURY_STATUSES,
-  RTP_PHASES,
-  VALD_TEST_TYPES,
-  REPORT_TYPE_LABELS,
-  EDIT_WINDOW_DAYS,
-  EDIT_WINDOW_CLOSED_LABEL,
-} from "@/lib/constants";
-import { BADGE, BTN_PRIMARY, NOTICE, NOTICE_EMPTY, PANEL } from "@/lib/ui";
+  InjuryDetailModal,
+  GpsDetailModal,
+  ValdDetailModal,
+  AssessmentDetailModal,
+  type EntryEditContext,
+} from "@/components/EntryDetailModals";
+import { INJURY_STATUSES, RTP_PHASES, VALD_TEST_TYPES, REPORT_TYPE_LABELS } from "@/lib/constants";
+import { BADGE, NOTICE_EMPTY, PANEL } from "@/lib/ui";
 import type { InjuryRecord, AssessmentRecord, GpsEntry, ValdEntry, ReportDetail } from "@/lib/athleteProfile";
-import { EditInjuryForm } from "@/app/staff/[teamId]/injuries/InjuriesClient";
-import { EditAssessmentForm } from "@/app/staff/[teamId]/assessments/AssessmentsClient";
-import { EditGpsForm } from "@/app/staff/[teamId]/gps-performance/GpsClient";
-import { EditValdForm } from "@/app/staff/[teamId]/vald/ValdClient";
 
 // The clickable half of the Athlete Profile: every data row opens a modal
 // showing that entry in full, and — where the rules already allow it — the
@@ -53,7 +48,9 @@ import { EditValdForm } from "@/app/staff/[teamId]/vald/ValdClient";
 // window alone and let each action's own permission check answer for role.
 // Anything stricter here would be a second, divergent rule.
 
-export type EntryEditContext = { teamId: string } | null;
+// Re-exported: the type now lives with the modals that consume it, but the
+// Athlete Profile already imports it from here.
+export type { EntryEditContext };
 
 const STATUS_COLOR: Record<string, string> = {
   active: "var(--danger)",
@@ -118,131 +115,6 @@ function ClickableRow({
   );
 }
 
-/** Label/value grid for the read-only half of a modal. */
-function Fields({ rows }: { rows: [string, ReactNode][] }) {
-  return (
-    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
-      {rows.map(([label, value]) => (
-        <div key={label}>
-          <dt className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {label}
-          </dt>
-          <dd className="mt-0.5 text-sm" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-            {value}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-/**
- * The footer under a modal's detail view: an Edit button, or the same
- * "Edit window closed" wording the dedicated pages use, or a note that this
- * route is read-only. Never silently omits the reason.
- */
-function EditAffordance({
-  isEditable,
-  edit,
-  noun,
-  onEdit,
-}: {
-  isEditable: boolean;
-  edit: EntryEditContext;
-  noun: string;
-  onEdit: () => void;
-}) {
-  if (!edit) {
-    return (
-      <p className={NOTICE_EMPTY} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-        Read-only here. This {noun} is edited from the team workspace.
-      </p>
-    );
-  }
-
-  if (!isEditable) {
-    return (
-      <p
-        role="status"
-        className={NOTICE}
-        style={{
-          borderColor: "var(--warning)",
-          color: "var(--text-muted)",
-          backgroundColor: "color-mix(in srgb, var(--warning) 8%, transparent)",
-        }}
-      >
-        <span className="font-medium" style={{ color: "var(--text)" }}>
-          {EDIT_WINDOW_CLOSED_LABEL}.
-        </span>{" "}
-        Any club staff member can edit an entry within {EDIT_WINDOW_DAYS} days of it being logged;
-        after that only an Admin can.
-      </p>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onEdit}
-      className={`${BTN_PRIMARY} self-start`}
-      style={{ backgroundImage: "var(--brand-gradient-action)" }}
-    >
-      Edit {noun}
-    </button>
-  );
-}
-
-/**
- * Detail-then-edit, the same two steps the dedicated pages use (a row, then
- * an Edit button that reveals the form) — just inside a popup.
- *
- * On a successful save the modal closes and router.refresh() re-runs the
- * profile's server components. The update action's own revalidatePath points
- * at the dedicated data page, which is correct for that page and simply does
- * not cover this one; refreshing the current route is what keeps the table
- * behind the modal from showing the pre-edit values.
- */
-function EntryModal({
-  title,
-  subtitle,
-  detail,
-  form,
-  isEditable,
-  edit,
-  noun,
-  onClose,
-}: {
-  title: string;
-  subtitle: string;
-  detail: ReactNode;
-  form: (props: { onDone: () => void; onSaved: () => void }) => ReactNode;
-  isEditable: boolean;
-  edit: EntryEditContext;
-  noun: string;
-  onClose: () => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const router = useRouter();
-
-  const handleSaved = () => {
-    onClose();
-    router.refresh();
-  };
-
-  return (
-    <DataModal title={title} subtitle={subtitle} onClose={onClose}>
-      <div className="flex flex-col gap-5">
-        {detail}
-        {editing ? (
-          form({ onDone: () => setEditing(false), onSaved: handleSaved })
-        ) : (
-          <EditAffordance isEditable={isEditable} edit={edit} noun={noun} onEdit={() => setEditing(true)} />
-        )}
-      </div>
-    </DataModal>
-  );
-}
-
 /** Shared open/close state for a section's rows. */
 function useOpenEntry<T extends { id: string }>(entries: T[]) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -287,41 +159,7 @@ export function InjuryRows({ entries, edit }: { entries: InjuryRecord[]; edit: E
       })}
 
       {open && (
-        <EntryModal
-          title={open.type || "Injury"}
-          subtitle={`${open.date} · logged by ${open.providerName}`}
-          noun="injury"
-          isEditable={open.isEditable}
-          edit={edit}
-          onClose={() => setOpenId(null)}
-          detail={
-            <div className="flex flex-col gap-4">
-              <Fields
-                rows={[
-                  ["Date", open.date],
-                  ["Type", open.type || "—"],
-                  ["Status", STATUS_LABEL[open.status] ?? open.status ?? "—"],
-                  ["RTP phase", RTP_LABEL[open.rtpPhase ?? ""] ?? open.rtpPhase ?? "—"],
-                  ["Target return", open.targetReturnDate ?? "—"],
-                  ["Cleared", open.clearedDate ?? "—"],
-                ]}
-              />
-              {/* Clinical detail is staff-only — the athlete's own view never
-                  renders this field (docs/02-roles-and-permissions.md). */}
-              <div>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Description
-                </p>
-                <p className="mt-0.5 text-sm" style={{ color: open.description ? "var(--text)" : "var(--text-muted)" }}>
-                  {open.description || "None recorded"}
-                </p>
-              </div>
-            </div>
-          }
-          form={({ onDone, onSaved }) =>
-            edit && <EditInjuryForm teamId={edit.teamId} record={open} onDone={onDone} onSaved={onSaved} />
-          }
-        />
+        <InjuryDetailModal record={open} edit={edit} onClose={() => setOpenId(null)} />
       )}
     </>
   );
@@ -357,34 +195,7 @@ export function GpsRows({ entries, edit }: { entries: GpsEntry[]; edit: EntryEdi
       ))}
 
       {open && (
-        <EntryModal
-          title={`GPS session · ${open.date}`}
-          subtitle={`logged by ${open.providerName}`}
-          noun="GPS session"
-          isEditable={open.isEditable}
-          edit={edit}
-          onClose={() => setOpenId(null)}
-          detail={
-            <Fields
-              rows={[
-                ["Total distance", num(open.values.total_distance_m, 0, " m")],
-                ["Meters / min", num(open.values.meters_per_min)],
-                ["High-speed distance", num(open.values.high_speed_distance_m, 0, " m")],
-                ["Sprint distance", num(open.values.sprint_distance_m, 0, " m")],
-                ["Accelerations", open.values.accel_count ?? "—"],
-                ["Decelerations", open.values.decel_count ?? "—"],
-                ["Explosive efforts", open.values.explosive_efforts ?? "—"],
-                ["Sprints", open.values.sprint_count ?? "—"],
-                ["Max velocity", num(open.values.max_velocity, 2, " m/s")],
-                ["Player load", num(open.values.player_load)],
-                ["Session duration", open.values.session_duration_min === null ? "—" : `${open.values.session_duration_min} min`],
-              ]}
-            />
-          }
-          form={({ onDone, onSaved }) =>
-            edit && <EditGpsForm teamId={edit.teamId} entry={open} onDone={onDone} onSaved={onSaved} />
-          }
-        />
+        <GpsDetailModal entry={open} edit={edit} onClose={() => setOpenId(null)} />
       )}
     </>
   );
@@ -420,53 +231,7 @@ export function ValdRows({ entries, edit }: { entries: ValdEntry[]; edit: EntryE
       })}
 
       {open && (
-        <EntryModal
-          title={`${VALD_LABEL[open.values.test_type] ?? open.values.test_type ?? "VALD test"} · ${open.date}`}
-          subtitle={`logged by ${open.providerName}`}
-          noun="VALD test"
-          isEditable={open.isEditable}
-          edit={edit}
-          onClose={() => setOpenId(null)}
-          detail={
-            <div className="flex flex-col gap-4">
-              <Fields
-                rows={[
-                  ["Date", open.date],
-                  ["Test type", VALD_LABEL[open.values.test_type] ?? open.values.test_type ?? "—"],
-                  ["Asymmetry", num(open.values.asymmetry_pct, 1, "%")],
-                ]}
-              />
-              {/* metric_json is free-form by design, so this lists whatever
-                  keys the entry actually carries rather than a fixed set. */}
-              <div>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Test metrics
-                </p>
-                {Object.keys(open.values.metric_json ?? {}).length === 0 ? (
-                  <p className="mt-0.5 text-sm" style={{ color: "var(--text-muted)" }}>
-                    No metrics recorded
-                  </p>
-                ) : (
-                  <dl className={`${PANEL} mt-2 divide-y p-0`} style={{ borderColor: "var(--border)" }}>
-                    {Object.entries(open.values.metric_json).map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-4 px-3 py-2" style={{ borderColor: "var(--border)" }}>
-                        <dt className="text-sm" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: ".8rem" }}>
-                          {k}
-                        </dt>
-                        <dd className="text-sm" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-                          {String(v)}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-              </div>
-            </div>
-          }
-          form={({ onDone, onSaved }) =>
-            edit && <EditValdForm teamId={edit.teamId} entry={open} onDone={onDone} onSaved={onSaved} />
-          }
-        />
+        <ValdDetailModal entry={open} edit={edit} onClose={() => setOpenId(null)} />
       )}
     </>
   );
@@ -505,41 +270,7 @@ export function AssessmentRows({ entries, edit }: { entries: AssessmentRecord[];
       ))}
 
       {open && (
-        <EntryModal
-          title={`Assessment · ${open.date}`}
-          subtitle={`logged by ${open.providerName}`}
-          noun="assessment"
-          isEditable={open.isEditable}
-          edit={edit}
-          onClose={() => setOpenId(null)}
-          detail={
-            <div className="flex flex-col gap-4">
-              <Fields
-                rows={[
-                  ["Weight", num(open.weightKg, 1, " kg")],
-                  ["Height", num(open.heightCm, 1, " cm")],
-                  ["Body fat", num(open.bodyFatPct, 1, "%")],
-                  ["Lean mass", num(open.leanMassKg, 1, " kg")],
-                  ["Muscle mass", num(open.muscleMassKg, 1, " kg")],
-                  ["Visceral fat", num(open.visceralFat)],
-                  ["BMR", open.bmr ?? "—"],
-                  ["TDEE", open.tdee ?? "—"],
-                ]}
-              />
-              <div>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Notes
-                </p>
-                <p className="mt-0.5 text-sm" style={{ color: open.notes ? "var(--text)" : "var(--text-muted)" }}>
-                  {open.notes || "None recorded"}
-                </p>
-              </div>
-            </div>
-          }
-          form={({ onDone, onSaved }) =>
-            edit && <EditAssessmentForm teamId={edit.teamId} record={open} onDone={onDone} onSaved={onSaved} />
-          }
-        />
+        <AssessmentDetailModal record={open} edit={edit} onClose={() => setOpenId(null)} />
       )}
     </>
   );
