@@ -30,6 +30,17 @@ export interface NavGroup {
 // components, which cannot cross into a Client Component. The active-state
 // logic lives in SidebarNavItem, which receives the already-rendered icon.
 export default function SidebarNav({ groups }: { groups: NavGroup[] }) {
+  // Which items must match the path EXACTLY: any whose href is a prefix of
+  // another item's. That is computable here, from the nav shape alone, with no
+  // knowledge of the current route — which is what lets the decision live on
+  // the server while the match itself happens in the client leaf.
+  //
+  // Every dashboard has one such item (its index: Roster, Overview, Home…),
+  // and before this they stayed highlighted on every page in their tree.
+  const allHrefs = groups.flatMap((g) => g.items.map((i) => i.href));
+  const isPrefixOfSibling = (href: string) =>
+    allHrefs.some((other) => other !== href && other.startsWith(`${href}/`));
+
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Dashboard sections">
       {groups.map((group, gi) => (
@@ -52,6 +63,7 @@ export default function SidebarNav({ groups }: { groups: NavGroup[] }) {
                 key={item.href}
                 href={item.href}
                 label={item.label}
+                exact={isPrefixOfSibling(item.href)}
                 // Rendered here, on the server. No `color` prop: the icon
                 // inherits currentColor from SidebarNavItem's wrapper, which is
                 // what lets the active state tint it without this component

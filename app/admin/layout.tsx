@@ -74,7 +74,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         role={isSuperAdmin ? "Super Admin" : "Admin"}
         context={isSuperAdmin ? "All clubs" : "Assigned clubs"}
         homeHref={isSuperAdmin ? "/super-admin" : "/admin"}
+      />
+      <div className="flex flex-1">
+      <aside
+        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
+        style={{ backgroundColor: "var(--surface)" }}
       >
+        {/* A JUMP-TO control rather than a current-context one — an Admin is
+            not "inside" a club here — so collapseSingle stays false. Same
+            sidebar position as the others regardless. */}
         <ContextSwitcher
           currentId={null}
           options={switcherClubs.map((c) => ({ id: c.id, label: c.name, sublabel: null }))}
@@ -83,12 +91,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           emptyLabel="Open a club…"
           collapseSingle={false}
         />
-      </DashboardHeader>
-      <div className="flex flex-1">
-      <aside
-        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--surface)" }}
-      >
 
         <SidebarNav groups={NAV_GROUPS} />
       </aside>

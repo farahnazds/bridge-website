@@ -24,6 +24,15 @@ export interface DashboardHeaderProps {
   role: string;
   context?: string | null;
   /** Rendered between the role line and the account menu — the club/team switcher. */
+  /**
+   * Optional slot to the left of the account menu.
+   *
+   * Currently unused: the club/team switchers all moved into the sidebar,
+   * directly under the logo and above the nav, per the design file. Kept
+   * because it is the natural home for a future header-level control (a
+   * global search, say) — but if nothing claims it, delete it rather than
+   * letting it rot.
+   */
   children?: React.ReactNode;
   homeHref?: string;
 }

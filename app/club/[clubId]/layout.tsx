@@ -121,19 +121,20 @@ export default async function ClubLayout({
         email={profile.email}
         role={isOversight ? (profile.role === "super_admin" ? "Super Admin" : "Admin") : "Club Manager"}
         homeHref={isOversight ? (profile.role === "super_admin" ? "/super-admin" : "/admin") : `/club/${clubId}`}
+      />
+      <div className="flex flex-1">
+      <aside
+        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
+        style={{ backgroundColor: "var(--surface)" }}
       >
+        {/* Top of the sidebar, above the nav — same position as /staff and
+            /admin. See the note in app/staff/[teamId]/layout.tsx. */}
         <ContextSwitcher
           currentId={clubId}
           options={availableClubs}
           fallbackBase="/club"
           label="Switch club"
         />
-      </DashboardHeader>
-      <div className="flex flex-1">
-      <aside
-        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--surface)" }}
-      >
 
         {isOversight && (
           <div className="px-2">

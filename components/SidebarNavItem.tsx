@@ -21,17 +21,31 @@ export default function SidebarNavItem({
   href,
   label,
   icon,
+  exact = false,
 }: {
   href: string;
   label: string;
   icon: ReactNode;
+  /**
+   * Match this href EXACTLY rather than by prefix.
+   *
+   * Set by SidebarNav for any item that is a path-prefix of one of its
+   * siblings — in practice each dashboard's index (Roster at /staff/[teamId],
+   * Overview at /club/[clubId], and so on).
+   *
+   * Without it, `/staff/x` prefix-matches `/staff/x/assessments` and the index
+   * item stays highlighted on every page in the tree. That was a real bug: the
+   * first nav item appeared permanently active on all five dashboards.
+   */
+  exact?: boolean;
 }) {
   const pathname = usePathname();
 
-  // Prefix match so /staff/x/assessments highlights Assessments, with an
-  // exact-match escape for each tree's index href (e.g. /staff/x), which
-  // would otherwise prefix-match every one of its siblings.
-  const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+  // Prefix matching is still wanted for non-index items, so that a detail page
+  // (e.g. /staff/x/reports/123) keeps its section highlighted.
+  const active = exact
+    ? pathname === href
+    : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <Link

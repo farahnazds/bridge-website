@@ -111,19 +111,22 @@ export default async function TeamLayout({
         email={profile.email}
         role={ROLE_LABELS[profile.role] ?? "Staff"}
         homeHref={isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : `/staff/${teamId}`}
+      />
+      <div className="flex flex-1">
+      <aside
+        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
+        style={{ backgroundColor: "var(--surface)" }}
       >
+        {/* Directly under the header's logo and above the nav, matching the
+            design file: the switcher states WHICH context you are in, so it
+            belongs at the top of the thing it scopes rather than off in the
+            header next to the account menu. */}
         <ContextSwitcher
           currentId={team.id}
           options={availableTeams.map((t) => ({ id: t.id, label: t.name, sublabel: t.clubName }))}
           fallbackBase="/staff"
           label="Switch team"
         />
-      </DashboardHeader>
-      <div className="flex flex-1">
-      <aside
-        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--surface)" }}
-      >
 
         {backHref && (
           <div className="px-2">

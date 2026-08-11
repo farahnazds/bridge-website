@@ -142,10 +142,41 @@ export default function ContextSwitcher({
   // A single option is not a switcher — showing a dropdown that can only
   // return you where you already are is noise. Render the label as plain text.
   if (collapseSingle && options.length <= 1) {
+    // Same card as the interactive trigger below, minus the chevron and the
+    // button semantics — it states the context without implying you can
+    // change it. Previously this branch rendered bare text, which was fine
+    // when the switcher lived in the header but reads as an orphaned heading
+    // now that it sits at the top of the sidebar where every other dashboard
+    // shows a bordered card.
     return (
       <div className="px-2">
-        <p className="truncate text-sm font-semibold text-white">{current?.label ?? emptyLabel}</p>
-        {current?.sublabel && <p className="truncate text-xs text-white/50">{current.sublabel}</p>}
+        <div
+          className="flex items-center gap-2.5 rounded-[11px] border px-3 py-2.5"
+          style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }}
+        >
+          {current && (
+            <span
+              aria-hidden="true"
+              className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg text-[10px] font-medium text-white"
+              style={{ fontFamily: "var(--font-mono)", backgroundImage: "var(--brand-gradient-action)" }}
+            >
+              {initialsOf(current.label)}
+            </span>
+          )}
+          <span className="min-w-0">
+            <span className="block truncate text-[13.5px] font-semibold text-white">
+              {current?.label ?? emptyLabel}
+            </span>
+            {current?.sublabel && (
+              <span
+                className="block truncate uppercase"
+                style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, letterSpacing: ".12em", color: "var(--text-muted)" }}
+              >
+                {current.sublabel}
+              </span>
+            )}
+          </span>
+        </div>
       </div>
     );
   }
@@ -171,13 +202,19 @@ export default function ContextSwitcher({
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }}
       >
         <span className="flex min-w-0 items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg text-[10px] font-medium text-white"
-            style={{ fontFamily: "var(--font-mono)", backgroundImage: "var(--brand-gradient-action)" }}
-          >
-            {initialsOf(current?.label ?? emptyLabel)}
-          </span>
+          {/* Only when something is actually selected. In JUMP-TO mode
+              (currentId={null} on /admin and /super-admin) there is no current
+              context, and badging the placeholder rendered "Jump to club…" as
+              a confident gradient "JT" — initials of nothing. */}
+          {current && (
+            <span
+              aria-hidden="true"
+              className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg text-[10px] font-medium text-white"
+              style={{ fontFamily: "var(--font-mono)", backgroundImage: "var(--brand-gradient-action)" }}
+            >
+              {initialsOf(current.label)}
+            </span>
+          )}
           <span className="min-w-0">
             <span className="block truncate text-[13.5px] font-semibold text-white">
               {current?.label ?? emptyLabel}
