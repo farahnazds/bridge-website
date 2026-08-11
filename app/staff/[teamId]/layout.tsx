@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { after } from "next/server";
 import { cookies } from "next/headers";
 import { recordLastUsedContext } from "@/lib/lastUsedContext";
-import { Activity, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Users, Zap } from "lucide-react";
+import { Activity, CircleUser, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Users, Zap } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import Link from "next/link";
@@ -93,6 +93,15 @@ export default async function TeamLayout({
     { label: "Injury Log", href: `/staff/${teamId}/injuries`, icon: HeartPulse },
     { label: "Comments", href: `/staff/${teamId}/comments`, icon: MessageCircle },
   ] },
+  // My Profile is the practitioner's work-history timeline (/staff/profile),
+  // NOT their account settings — those moved to /account in the header
+  // dropdown. It used to hang below <SidebarNav> in a bespoke bordered block
+  // left over from when identity lived at the foot of the sidebar, which put
+  // it outside the nav flow and outside the accessible <nav> landmark. It is
+  // an ACCOUNT group now, the same shape the athlete sidebar already uses.
+  ...(!isManager && !isOversight
+    ? [{ label: "ACCOUNT", items: [{ label: "My Profile", href: "/staff/profile", icon: CircleUser }] }]
+    : []),
   ];
 
   return (
@@ -128,18 +137,6 @@ export default async function TeamLayout({
         )}
 
         <SidebarNav groups={navGroups} />
-        {/* Identity now lives in the shared header; what remains here is the
-            practitioner-only link to their own staff profile. */}
-        {!isManager && !isOversight && (
-          <div className="border-t border-white/10 px-2 pt-4">
-            <Link
-              href="/staff/profile"
-              className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
-            >
-              My profile
-            </Link>
-          </div>
-        )}
       </aside>
         <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
           {children}

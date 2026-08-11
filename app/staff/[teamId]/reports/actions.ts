@@ -9,23 +9,24 @@ import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
 import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
 import { resolveReportLanguage } from "@/lib/reportLanguage";
+import { resolveReportAudience } from "@/lib/reportAudience";
 import { getClinicalLibraryEntries } from "@/lib/clinicalLibrary";
 import {
   buildCompliancePrompt,
-  COMPLIANCE_SYSTEM_PROMPT,
+  complianceSystemPrompt,
   type CheckinRow,
   type ClinicalLibraryEntry,
 } from "./promptBuilder";
 import {
   buildBodyCompositionPrompt,
-  BODY_COMPOSITION_SYSTEM_PROMPT,
+  bodyCompositionSystemPrompt,
   ageInYears,
   type AssessmentRow,
   type EliteBenchmark,
 } from "./bodyCompositionPromptBuilder";
 import {
   buildNutritionPrompt,
-  NUTRITION_SYSTEM_PROMPT,
+  nutritionSystemPrompt,
   type NutritionSubMode,
   type TrainingLoadContext,
   type PrescriptionContext,
@@ -34,13 +35,13 @@ import {
 } from "./nutritionPromptBuilder";
 import {
   buildPerformancePrompt,
-  PERFORMANCE_SYSTEM_PROMPT,
+  performanceSystemPrompt,
   type GpsRow,
   type ValdRow,
 } from "./performancePromptBuilder";
 import {
   buildInjuryPrompt,
-  INJURY_SYSTEM_PROMPT,
+  injurySystemPrompt,
   type InjuryRow,
 } from "./injuryPromptBuilder";
 
@@ -68,6 +69,9 @@ export async function generateComplianceReport(
   // Falls back to the club's default_report_language when the practitioner
   // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
   const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
+  // Resolved server-side, never trusted from the form — a direct call that
+  // omits the field still produces a labelled report. See lib/reportAudience.ts.
+  const audience = resolveReportAudience(formData.get("audience") as string | null);
 
   if (!teamId || !athleteId || !periodStart || !periodEnd) {
     return {
@@ -179,7 +183,7 @@ export async function generateComplianceReport(
         max_tokens: 8000,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
-        system: COMPLIANCE_SYSTEM_PROMPT,
+        system: complianceSystemPrompt(audience),
         messages: [{ role: "user", content: userPrompt }],
       })
       .finalMessage();
@@ -216,10 +220,14 @@ export async function generateComplianceReport(
     return { error: safety.message, reportText, dataCheckNote, reportId: null };
   }
   // ---- Store (reports table) ----
-  // audience stays "practitioner" — sharing (shared_with/is_official) is a
-  // separate concept from audience, which only governs how combined
-  // multi-athlete/multi-type documents get merged, a feature not built
-  // yet. .select().single() is safe here (unlike the profiles-insert
+  // `audience` is the practitioner's selection, resolved above. It records who
+  // the document was WRITTEN for, which is not the same as who it is later
+  // shared with (shared_with/is_official) — a practitioner-audience report can
+  // still be shared with the athlete and talked through in person.
+  //
+  // docs/07-ai-engine.md also defines audience as governing how COMBINED
+  // multi-athlete documents merge; that half is still unbuilt, so today the
+  // column means register only. .select().single() is safe here (unlike the profiles-insert
   // gotcha elsewhere in this codebase): generated_by is set to profile.id
   // in this same insert, which always equals current_profile_id() for the
   // caller, so the RETURNING row always satisfies "generator manages own
@@ -230,7 +238,7 @@ export async function generateComplianceReport(
     .insert({
       generated_by: profile.id,
       report_types: ["compliance"],
-      audience: "practitioner",
+      audience,
       team_id: teamId,
       athlete_ids: [athleteId],
       report_period_start: periodStart,
@@ -287,6 +295,9 @@ export async function generateBodyCompositionReport(
   // Falls back to the club's default_report_language when the practitioner
   // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
   const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
+  // Resolved server-side, never trusted from the form — a direct call that
+  // omits the field still produces a labelled report. See lib/reportAudience.ts.
+  const audience = resolveReportAudience(formData.get("audience") as string | null);
 
   if (!teamId || !athleteId || !periodStart || !periodEnd) {
     return {
@@ -437,7 +448,7 @@ export async function generateBodyCompositionReport(
         max_tokens: 8000,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
-        system: BODY_COMPOSITION_SYSTEM_PROMPT,
+        system: bodyCompositionSystemPrompt(audience),
         messages: [{ role: "user", content: userPrompt }],
       })
       .finalMessage();
@@ -481,7 +492,7 @@ export async function generateBodyCompositionReport(
     .insert({
       generated_by: profile.id,
       report_types: ["body_composition"],
-      audience: "practitioner",
+      audience,
       team_id: teamId,
       athlete_ids: [athleteId],
       report_period_start: periodStart,
@@ -665,6 +676,9 @@ export async function generateNutritionReport(
   // Falls back to the club's default_report_language when the practitioner
   // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
   const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
+  // Resolved server-side, never trusted from the form — a direct call that
+  // omits the field still produces a labelled report. See lib/reportAudience.ts.
+  const audience = resolveReportAudience(formData.get("audience") as string | null);
 
   if (!teamId || !athleteId) return { ...base, error: "Athlete is required." };
   if (subMode !== "next_day" && subMode !== "general") return { ...base, error: "Invalid report mode." };
@@ -940,7 +954,7 @@ export async function generateNutritionReport(
         max_tokens: 8000,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
-        system: NUTRITION_SYSTEM_PROMPT,
+        system: nutritionSystemPrompt(audience),
         messages: [{ role: "user", content: userPrompt }],
       })
       .finalMessage();
@@ -973,7 +987,7 @@ export async function generateNutritionReport(
     .insert({
       generated_by: profile.id,
       report_types: ["nutrition"],
-      audience: "practitioner",
+      audience,
       team_id: teamId,
       athlete_ids: [athleteId],
       report_period_start: periodStart,
@@ -1030,6 +1044,9 @@ export async function generatePerformanceReport(
   // Falls back to the club's default_report_language when the practitioner
   // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
   const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
+  // Resolved server-side, never trusted from the form — a direct call that
+  // omits the field still produces a labelled report. See lib/reportAudience.ts.
+  const audience = resolveReportAudience(formData.get("audience") as string | null);
 
   if (!teamId || !athleteId || !periodStart || !periodEnd) {
     return { ...base, error: "Athlete and report period are required." };
@@ -1128,7 +1145,7 @@ export async function generatePerformanceReport(
         max_tokens: 8000,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
-        system: PERFORMANCE_SYSTEM_PROMPT,
+        system: performanceSystemPrompt(audience),
         messages: [{ role: "user", content: userPrompt }],
       })
       .finalMessage();
@@ -1159,7 +1176,7 @@ export async function generatePerformanceReport(
     .insert({
       generated_by: profile.id,
       report_types: ["performance"],
-      audience: "practitioner",
+      audience,
       team_id: teamId,
       athlete_ids: [athleteId],
       report_period_start: periodStart,
@@ -1219,6 +1236,9 @@ export async function generateInjuryReport(
   // Falls back to the club's default_report_language when the practitioner
   // didn't explicitly choose one (docs/05-business-rules.md, "Languages").
   const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
+  // Resolved server-side, never trusted from the form — a direct call that
+  // omits the field still produces a labelled report. See lib/reportAudience.ts.
+  const audience = resolveReportAudience(formData.get("audience") as string | null);
 
   if (!teamId || !athleteId || !periodStart || !periodEnd) {
     return { ...base, error: "Athlete and report period are required." };
@@ -1319,7 +1339,7 @@ export async function generateInjuryReport(
         max_tokens: 8000,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
-        system: INJURY_SYSTEM_PROMPT,
+        system: injurySystemPrompt(audience),
         messages: [{ role: "user", content: userPrompt }],
       })
       .finalMessage();
@@ -1350,7 +1370,7 @@ export async function generateInjuryReport(
     .insert({
       generated_by: profile.id,
       report_types: ["injury"],
-      audience: "practitioner",
+      audience,
       team_id: teamId,
       athlete_ids: [athleteId],
       report_period_start: periodStart,

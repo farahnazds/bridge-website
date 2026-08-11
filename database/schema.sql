@@ -614,7 +614,7 @@ create table reports (
   created_at timestamptz not null default now()
 );
 comment on table reports is
-  'audience=athlete generates one row per athlete (athlete_ids has 1 entry). audience=practitioner generates one row covering the whole team. No confirmation-gate field — removed in v4, see docs/05-business-rules.md.';
+  'audience records who the document was WRITTEN for and drives the register the AI writes in (lib/reportAudience.ts) — clinical content and safety flags are identical either way; only depth, emphasis and framing differ. It is NOT who the report is shared with (see shared_with/is_official). The merge semantics originally planned for this column — audience=athlete one row per athlete, audience=practitioner one row covering the whole team — are NOT built: generation is one athlete at a time, so athlete_ids always has 1 entry. See docs/07-ai-engine.md. No confirmation-gate field — removed in v4, see docs/05-business-rules.md.';
 
 -- ============================================================================
 -- SECTION 11 — SUBSCRIPTIONS & PLANS (independent tier, foundation only)

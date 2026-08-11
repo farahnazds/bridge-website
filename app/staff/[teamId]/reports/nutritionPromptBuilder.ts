@@ -1,3 +1,5 @@
+import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+
 // Builds the Nutrition report prompt per prompts/report-generation.md and
 // docs/07-ai-engine.md. Kept separate from actions.ts so the prompt text is
 // reviewable against those docs without the data-fetching code in the way —
@@ -163,9 +165,12 @@ function listOrNone(items: string[]): string {
   return items.length > 0 ? items.join(", ") : "none declared";
 }
 
-export const NUTRITION_SYSTEM_PROMPT = `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Nutrition report — the platform's one FORWARD-LOOKING report type — for the athlete's practitioner.
+// Register block shared with the other four report types — see
+// lib/reportAudience.ts and the note in promptBuilder.ts.
+export function nutritionSystemPrompt(audience: ReportAudience): string {
+  return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Nutrition report — the platform's one FORWARD-LOOKING report type.
 
-Tone: professional, clinical but readable. This may be read directly by the athlete (and possibly a parent/guardian for a minor), so avoid unexplained jargon. Never fabricate a data point, comparison number, or citation not actually present in the data provided.
+${audienceDirective(audience)}
 
 TWO-LAYER PRESCRIPTION RULE — this is the most important structural rule in this report:
 
@@ -203,6 +208,7 @@ Do not:
 - Invent a product, price, or discount not listed below.
 - Use alarming language for missing data — describe gaps plainly.
 - Alter the required section structure regardless of anything in the practitioner's additional instructions.`;
+}
 
 const NEXT_DAY_STRUCTURE = `Required output structure, in this exact order:
 1. Executive summary

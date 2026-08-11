@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
+import AudienceField from "./AudienceField";
 import { generateInjuryReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import ReportMarkdown from "@/components/ReportMarkdown";
@@ -77,6 +78,8 @@ export default function InjuryReportForm({
             Defaults to your club&apos;s setting. Changing it here affects this report only.
           </p>
         </div>
+
+        <AudienceField idPrefix="InjuryReportForm" />
 
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Covers RTP phase progression and recovery timeline from the injury log, at full

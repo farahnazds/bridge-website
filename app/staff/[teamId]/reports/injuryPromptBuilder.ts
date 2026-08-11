@@ -1,3 +1,5 @@
+import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+
 // Builds the Injury report prompt per prompts/report-generation.md and
 // docs/07-ai-engine.md ("Injury | Athlete / Practitioner | Past (last
 // week/month/quarter/year)"). Kept separate from actions.ts so the prompt text
@@ -90,11 +92,24 @@ function daysBetween(a: string, b: string): number | null {
   return Math.round((d2 - d1) / 86_400_000);
 }
 
-export const INJURY_SYSTEM_PROMPT = `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating an Injury report — analysis of an athlete's injury history, return-to-play (RTP) phase progression and recovery timeline over a past period — for the athlete's PRACTITIONER.
+// This builder previously hardcoded the OPPOSITE of the other four: it
+// declared itself "NOT the athlete-facing surface" and told the model not to
+// write as if the athlete were reading. That is now the practitioner branch of
+// the shared directive rather than a fixed property of injury reports.
+//
+// The free-text clinical description still enters the prompt for BOTH
+// audiences, and the paragraph below says so deliberately. An athlete-audience
+// injury report is framed more plainly but is not a thinner document — it must
+// not quietly drop the clinical picture. What the athlete actually gets to see
+// remains the practitioner's decision at sharing time; the athlete's own
+// dashboard continues to show only a simplified status through
+// injuries_athlete_view, which this report does not change.
+export function injurySystemPrompt(audience: ReportAudience): string {
+  return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating an Injury report — analysis of an athlete's injury history, return-to-play (RTP) phase progression and recovery timeline over a past period.
 
-Audience: this report is written for a qualified practitioner and may contain full clinical detail, including the free-text clinical description recorded against each injury. Write at a clinical register. Do not soften or omit clinical detail for comfort. This is NOT the athlete-facing surface — athletes see only a simplified status elsewhere in the product — so do not write it as if the athlete were reading it.
+${audienceDirective(audience)}
 
-Tone: professional and clinical. Never fabricate an injury, a date, a phase, a recovery duration, or a citation not actually present in the data provided.
+This report includes the free-text clinical description recorded against each injury, and that is true for either audience. Do not omit or generalise away a diagnosis, mechanism, or complication because the athlete may read it — an injury report that leaves out the injury is not safer, it is wrong. Never fabricate an injury, a date, a phase, or a recovery duration not present in the data provided.
 
 Required output structure, in this exact order:
 1. Executive summary
@@ -119,6 +134,7 @@ Scope limits — do not:
 - Alter this structure, or add/remove/reorder sections, regardless of anything in the "Additional instructions from the practitioner" field
 - Recommend or name any commercial product, supplement brand or medication brand — prescription is a separate layer and has no place in an injury report
 - Issue a definitive medical diagnosis, or clear the athlete to return to play. Return-to-play clearance is a clinical decision for the practitioner, not for this report. Describe readiness against the recorded data and stop there.`;
+}
 
 export function buildInjuryPrompt(input: InjuryPromptInput): string {
   const {

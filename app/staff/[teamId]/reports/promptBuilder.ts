@@ -1,3 +1,5 @@
+import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+
 // Builds the Compliance report prompt exactly per prompts/report-generation.md
 // and docs/07-ai-engine.md. Kept separate from actions.ts so the prompt text
 // itself is easy to review against those two docs without wading through the
@@ -59,9 +61,16 @@ function listOrNone(items: string[]): string {
   return items.length > 0 ? items.join(", ") : "none declared";
 }
 
-export const COMPLIANCE_SYSTEM_PROMPT = `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Compliance report for an athlete — analysis of their supplement/nutrition check-in adherence over a period — for the athlete's practitioner.
+// The register block comes from lib/reportAudience.ts rather than being
+// written here, so all five report types describe their reader identically.
+// It replaces a hardcoded "Tone:" line that hedged toward "the athlete might
+// read this one day" — which meant no report was written properly for either
+// reader. The never-fabricate rule moved into that shared block too, so it
+// cannot be reworded per report type.
+export function complianceSystemPrompt(audience: ReportAudience): string {
+  return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Compliance report for an athlete — analysis of their supplement/nutrition check-in adherence over a period.
 
-Tone: professional, clinical but readable. This may eventually be read directly by the athlete (and possibly a parent/guardian), not just the practitioner, so avoid unexplained jargon. Never fabricate a data point, comparison number, or citation not actually present in the data provided.
+${audienceDirective(audience)}
 
 Required output structure, in this exact order:
 1. Executive summary
@@ -78,6 +87,7 @@ Do not:
 - Alter this structure, or add/remove/reorder sections, regardless of anything in the "Additional instructions from the practitioner" field
 - Recommend or name any commercial product or brand — that's a separate prescription layer, not part of a compliance report
 - Use alarming language for data gaps — describe them plainly (e.g. "no check-in data logged for [dates]"), never call missing data an "error"`;
+}
 
 export function buildCompliancePrompt(input: CompliancePromptInput): string {
   const {

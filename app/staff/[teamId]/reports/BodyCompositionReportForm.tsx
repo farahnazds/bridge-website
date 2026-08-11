@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
+import AudienceField from "./AudienceField";
 import { generateBodyCompositionReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import ReportMarkdown from "@/components/ReportMarkdown";
@@ -77,6 +78,8 @@ export default function BodyCompositionReportForm({
             Defaults to your club&apos;s setting. Changing it here affects this report only.
           </p>
         </div>
+
+        <AudienceField idPrefix="BodyCompositionReportForm" />
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="bc_athlete_id" className={labelClass} style={{ color: "var(--text)" }}>

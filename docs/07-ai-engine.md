@@ -17,6 +17,105 @@ athlete(s)/timeframe. Combined output rule:
 - **Audience = practitioner:** one merged document for the **whole
   team**, every selected athlete's summary inside it
 
+## Audience
+
+`audience` has two jobs in the original design. **Only the first is
+implemented.**
+
+### Audience is not sharing
+
+These are separate concepts and the code keeps them separate:
+
+| | Audience | Sharing |
+|---|---|---|
+| What it decides | How the document is **written** | Who may **read** it |
+| Where it lives | `reports.audience` | `reports.shared_with`, `is_official` |
+| When it is fixed | At generation, permanently | Any time after, changeable |
+
+A practitioner-audience report can still be shared with the athlete — the
+practitioner then talks them through it, which is the model
+`02-roles-and-permissions.md` already describes. Choosing "Athlete" does
+not share anything with anyone.
+
+### Implemented — writing register
+
+An Audience selector sits on all five generation forms
+(`AudienceField.tsx`, one shared component). **Practitioner is the
+default**, in three places that must agree: it is first in
+`REPORT_AUDIENCES` (so the first `<option>`), it is `FALLBACK_AUDIENCE`
+for server-side resolution, and it is the field's initial state.
+
+- **Practitioner (full clinical detail)** — full clinical register,
+  precise terminology unglossed, citation depth a practitioner expects,
+  mechanism-level reasoning. Assumes the reader can interpret a validity
+  tier, an asymmetry percentage and an RTP phase unaided.
+- **Athlete (plain-language)** — the same findings in plainer framing.
+  Clinical terms that matter are kept but explained on first use, numbers
+  are given meaning, direct address, encouraging where the data supports
+  it and plain where it does not.
+
+Resolution happens **server-side** in every report action
+(`resolveReportAudience`), never trusted from the form — a server action
+is independently addressable, so a request that omits the field or sends
+junk still produces a correctly labelled report at the clinical register.
+
+### The safety-block architecture
+
+This is the part worth understanding before editing any prompt builder.
+
+`audienceDirective(audience)` in `lib/reportAudience.ts` returns **two
+concatenated blocks**, and the split is the whole design:
+
+```
+audienceDirective(audience)
+├── register block   ← CONDITIONAL on audience (tone, depth, framing)
+└── shared block     ← IDENTICAL text in both branches, always injected
+```
+
+Only the register block branches. The shared block is a single string
+constant in both paths, so it is impossible to produce a prompt without
+it. It carries:
+
+- **Never soften or omit a clinical safety flag** because the athlete is
+  the reader — RED-S / low energy availability, iron status, an
+  unresolved or worsening injury, a contraindicated or
+  allergen-conflicting supplement, a red-flag symptom.
+- **Risk language stays risk language** — no downgrading "should be
+  investigated" to "keep an eye on", no reassurance the data does not
+  support.
+- **Never fabricate** a data point, comparison, threshold or citation;
+  state missing data plainly rather than filling the gap.
+
+It is placed **after** the register block deliberately, so the model reads
+the non-negotiables last.
+
+Three consequences worth stating explicitly:
+
+1. **Clinical accuracy is not a function of audience.** Depth, emphasis
+   and framing adapt; findings do not. An athlete-audience report is not
+   a shorter report.
+2. **Injury reports include the free-text clinical description for both
+   audiences.** An injury report that omits the injury is not safer, it
+   is wrong. The athlete's own dashboard still shows only a simplified
+   status via `injuries_athlete_view` — that is unchanged and unrelated.
+3. **Citation and safety rules are audience-independent by
+   construction**, not by five prompt builders each remembering to
+   include them. Before this existed the five builders already disagreed:
+   four hedged with "may eventually be read by the athlete… avoid
+   unexplained jargon" while the injury builder insisted "this is NOT the
+   athlete-facing surface".
+
+`assertReportSafe()` still runs pre-save on every generation regardless of
+audience — the prompt-level rules above are the first layer, not the only
+one.
+
+### Not implemented — merge behaviour
+
+The per-athlete vs per-team merge rule above is still unbuilt: generation
+is one athlete at a time (`athlete_ids` always has one entry). Until that
+exists, the column means register only. The `reports` table comment in
+`schema.sql` says the same, so neither overstates it.
+
 Annual reporting is not a separate feature — just the Report Period
 calendar set to a full year.
 

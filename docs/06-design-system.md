@@ -24,7 +24,7 @@ logo itself).
 | `--brand-blue` | `#0057FF` | Primary actions, links, active states, focus rings |
 | `--brand-blue-deep` | `#0A2D8F` | Gradient toward dark end, hover states on primary blue |
 | `--brand-navy` | `#0D1B4C` | Headings, primary text, nav bars, dark UI surfaces |
-| `--bg` | `#FFFFFF` / `#F7F9FC` | Page background (light-first) |
+| `--bg` | `#F7F9FC` | Page background (light-first) |
 | `--surface` | `#FFFFFF` | Cards, panels (on the off-white background) |
 | `--border` | `#E4E9F2` | Dividers, card borders, input borders |
 | `--text` | `#0D1B4C` | Primary text (reuse brand-navy) |
@@ -32,6 +32,15 @@ logo itself).
 | `--danger` | `#E5484D` | Errors, missed compliance, overdue flags |
 | `--warning` | `#F5A524` | Caution states, mid-range compliance |
 | `--success` | `#00B3A6` | Reuse brand teal for positive/on-track states |
+
+`--bg` previously read `#FFFFFF / #F7F9FC`, which made the page background
+look like a choice between two values. It is not: the page is the off-white
+`#F7F9FC` and pure white belongs to `--surface`, the cards sitting on it. That
+contrast is what lets a card read as a raised surface held by a 1px border
+rather than a heavy shadow. `app/globals.css` has only ever defined
+`--bg: #f7f9fc`, and all five dashboards' `<main>` elements use it — the
+ambiguity was in this table alone, which is how it would have got copied into
+a page eventually.
 
 **The gradient itself** (`linear-gradient(135deg, #00B3A6, #0091D6,
 #0057FF, #0A2D8F, #0D1B4C)`) is used for: the logo, primary CTA buttons

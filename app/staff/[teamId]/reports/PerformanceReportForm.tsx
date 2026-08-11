@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
+import AudienceField from "./AudienceField";
 import { generatePerformanceReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import ReportMarkdown from "@/components/ReportMarkdown";
@@ -77,6 +78,8 @@ export default function PerformanceReportForm({
             Defaults to your club&apos;s setting. Changing it here affects this report only.
           </p>
         </div>
+
+        <AudienceField idPrefix="PerformanceReportForm" />
 
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Covers GPS session data and VALD neuromuscular tests together. Either source alone is

@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
+import AudienceField from "./AudienceField";
 import { generateNutritionReport, type NutritionReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import ReportMarkdown from "@/components/ReportMarkdown";
@@ -82,6 +83,8 @@ export default function NutritionReportForm({
             Defaults to your club&apos;s setting. Changing it here affects this report only.
           </p>
         </div>
+
+        <AudienceField idPrefix="NutritionReportForm" />
         <input type="hidden" name="sub_mode" value={subMode} />
 
         <fieldset className="flex flex-col gap-2">

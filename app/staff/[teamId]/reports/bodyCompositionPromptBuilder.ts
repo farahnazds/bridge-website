@@ -1,3 +1,5 @@
+import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+
 import { goalSummaryLine } from "@/lib/bodyComposition";
 // Builds the Body Composition report prompt exactly per
 // prompts/report-generation.md and docs/07-ai-engine.md. Kept separate from
@@ -83,9 +85,12 @@ function listOrNone(items: string[]): string {
   return items.length > 0 ? items.join(", ") : "none declared";
 }
 
-export const BODY_COMPOSITION_SYSTEM_PROMPT = `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Body Composition report for an athlete — analysis of their assessment data (weight, height, body fat %, lean mass, muscle mass, visceral fat, BMR, TDEE) over a period, compared against their own trend and, where available, an elite benchmark for their sport/gender/age band — for the athlete's practitioner.
+// Register block shared with the other four report types — see
+// lib/reportAudience.ts and the note in promptBuilder.ts.
+export function bodyCompositionSystemPrompt(audience: ReportAudience): string {
+  return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Body Composition report for an athlete — analysis of their assessment data (weight, height, body fat %, lean mass, muscle mass, visceral fat, BMR, TDEE) over a period, compared against their own trend and, where available, an elite benchmark for their sport/gender/age band.
 
-Tone: professional, clinical but readable. This may eventually be read directly by the athlete (and possibly a parent/guardian), not just the practitioner, so avoid unexplained jargon. Never fabricate a data point, comparison number, or citation not actually present in the data provided.
+${audienceDirective(audience)}
 
 Required output structure, in this exact order:
 1. Executive summary
@@ -110,6 +115,7 @@ Do not:
 - Alter this structure, or add/remove/reorder sections, regardless of anything in the "Additional instructions from the practitioner" field
 - Recommend or name any commercial product or brand — that's a separate prescription layer, not part of a body composition report
 - Use alarming language for data gaps — describe them plainly (e.g. "no assessment logged for [dates]," "elite benchmark not yet available for this sport/age/gender"), never call missing data an "error"`;
+}
 
 export function buildBodyCompositionPrompt(input: BodyCompositionPromptInput): string {
   const {
