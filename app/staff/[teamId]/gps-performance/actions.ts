@@ -8,6 +8,10 @@ import { matchRowsByAthleteCode, parseNum, parseInt10, type MatchedRow } from "@
 
 export interface ActionState {
   error: string | null;
+  /** Set only on a successful save — see the note in
+   *  app/staff/[teamId]/injuries/actions.ts. `{ error: null }` doubles as the
+   *  initial state, so a timestamp is what lets a caller detect a save. */
+  savedAt?: number;
 }
 
 export interface GpsValues {
@@ -74,7 +78,7 @@ export async function logGps(_prevState: ActionState, formData: FormData): Promi
   if (error) return { error: `Couldn't save the GPS log: ${error.message}` };
 
   revalidatePath(`/staff/${teamId}/gps-performance`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 // 7-day edit window enforced by RLS ("club staff edit within 7 days").
@@ -106,7 +110,7 @@ export async function updateGps(_prevState: ActionState, formData: FormData): Pr
   }
 
   revalidatePath(`/staff/${teamId}/gps-performance`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 // ---------------- CSV import: phase 1, preview (nothing saved) ----------------

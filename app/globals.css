@@ -67,6 +67,47 @@ h6 {
 }
 
 /* ==========================================================================
+   Modal / drawer (components/DataModal.tsx)
+
+   Only the parts that cannot be an inline style live here. ::backdrop is a
+   pseudo-element, so React cannot reach it, and `body:has()` is what keeps
+   the page behind a modal from scrolling without a JS scroll-lock that has to
+   remember and restore the previous overflow value.
+
+   Navy at 45% rather than black: docs/06-design-system.md reserves --brand-navy
+   for the "premium anchor" surfaces, and a neutral black scrim under a navy
+   dashboard reads grey and cheap next to it. Motion is the design system's
+   200ms ease-out, and settles rather than disappears under reduced-motion.
+   ========================================================================== */
+.bx-modal {
+  /* A <dialog> centres itself in the top layer with the UA's `margin: auto`.
+     Tailwind's preflight resets margin to 0 on every element, which silently
+     pins the modal to the top-left corner — so it is restored here. */
+  margin: auto;
+  overscroll-behavior: contain;
+}
+.bx-modal::backdrop {
+  background: color-mix(in srgb, #0d1b4c 45%, transparent);
+  animation: bx-modal-fade 200ms ease-out;
+}
+.bx-modal[open] {
+  animation: bx-modal-in 200ms ease-out;
+}
+body:has(.bx-modal[open]) {
+  overflow: hidden;
+}
+
+@keyframes bx-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bx-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bx-modal[open], .bx-modal::backdrop { animation-duration: .001ms; }
+}
+
+/* ==========================================================================
    Landing page (app/page.tsx) — imported from the "Bridgetx brand guidelines"
    design project, file "Bridgetx Landing v2.dc.html".
    Everything here is scoped under .lp so the dark marketing surface cannot

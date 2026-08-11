@@ -1,17 +1,27 @@
 import Link from "next/link";
 import AthleteIdentityForm from "@/components/AthleteIdentityForm";
+import {
+  InjuryRows,
+  GpsRows,
+  ValdRows,
+  AssessmentRows,
+  ReportRows,
+  type EntryEditContext,
+} from "@/components/AthleteEntryRows";
 import { COMPLIANCE_WINDOW, type AthleteProfileData } from "@/lib/athleteProfile";
 import { goalBodyWeightKg, gap } from "@/lib/bodyComposition";
-import { REPORT_TYPE_LABELS, INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 import { BADGE, CARD, NOTICE_EMPTY } from "@/lib/ui";
 
 // The staff-facing athlete profile, rendered identically for the Club Manager
-// route and the Club Practitioner route. Only `links` differs, so each role
-// deep-links into the dedicated pages its own dashboard actually has.
+// route and the Club Practitioner route. Only `links` and `edit` differ, so
+// each role deep-links into the dedicated pages its own dashboard actually has.
 //
-// Every section below is READ-ONLY except identity. Data entry stays in the
-// existing validated pages — this view links out to them rather than
-// reimplementing their forms, which is what would drift.
+// Every data row here opens a modal with the full entry, and — on the team
+// workspace route — the dedicated page's REAL edit form inside it. That form
+// is imported, not rebuilt: see the header of components/AthleteEntryRows.tsx
+// for what that buys and where editing is offered at all. This file stays a
+// server component; only the row bodies are client, which is why the table
+// shells and section headings still live here.
 
 export interface ProfileLinks {
   assessments: string | null;
@@ -22,12 +32,6 @@ export interface ProfileLinks {
   protocol: string | null;
   back: { href: string; label: string };
 }
-
-const STATUS_COLOR: Record<string, string> = {
-  active: "var(--danger)",
-  recovering: "var(--warning)",
-  cleared: "var(--success)",
-};
 
 function Section({
   title, href, hint, children,
@@ -75,6 +79,9 @@ function Card({ label, value, hint }: { label: string; value: string | number; h
   );
 }
 
+// The trailing empty header cell is the column the row components put their
+// "open" chevron in — declared here so the header and body stay the same
+// width, and given a scope-less blank label rather than a visible one.
 function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
     <div className={`overflow-x-auto ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
@@ -84,6 +91,9 @@ function Table({ head, children }: { head: string[]; children: React.ReactNode }
             {head.map((h) => (
               <th key={h} className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>{h}</th>
             ))}
+            <th className="py-3 pl-1 pr-3">
+              <span className="sr-only">Open</span>
+            </th>
           </tr>
         </thead>
         <tbody>{children}</tbody>
@@ -96,26 +106,33 @@ const num = (v: number | null, digits = 1, suffix = "") =>
   v === null || v === undefined ? "—" : `${Number(v).toFixed(digits)}${suffix}`;
 
 export default function AthleteProfile({
-  data, links, canEdit, viewerNote,
+  data, links, canEdit, edit, viewerNote,
 }: {
-  data: AthleteProfileData; links: ProfileLinks; canEdit: boolean; viewerNote?: string;
+  data: AthleteProfileData;
+  links: ProfileLinks;
+  canEdit: boolean;
+  /** The team workspace whose edit forms the row modals may submit under, or
+   *  null for a route that has no team in scope (the club dashboard), where
+   *  the modals stay read-only. See components/AthleteEntryRows.tsx. */
+  edit: EntryEditContext;
+  viewerNote?: string;
 }) {
   const { athlete, compliance, assessments, injuries, vald, gps, reports } = data;
   const latest = assessments[0] ?? null;
   const previous = assessments[1] ?? null;
   const delta = (a: number | null | undefined, b: number | null | undefined) =>
     typeof a === "number" && typeof b === "number" ? a - b : null;
-  const bfDelta = delta(latest?.body_fat_pct, previous?.body_fat_pct);
-  const wtDelta = delta(latest?.weight_kg, previous?.weight_kg);
+  const bfDelta = delta(latest?.bodyFatPct, previous?.bodyFatPct);
+  const wtDelta = delta(latest?.weightKg, previous?.weightKg);
 
   const hasGoal = athlete.goal_body_fat_pct !== null || athlete.goal_lean_mass_kg !== null;
   const goalWeight = goalBodyWeightKg({
     goalBodyFatPct: athlete.goal_body_fat_pct,
     goalLeanMassKg: athlete.goal_lean_mass_kg,
   });
-  const bfToGoal = gap(latest?.body_fat_pct ?? null, athlete.goal_body_fat_pct);
-  const lmToGoal = gap(latest?.lean_mass_kg ?? null, athlete.goal_lean_mass_kg);
-  const wtToGoal = gap(latest?.weight_kg ?? null, goalWeight);
+  const bfToGoal = gap(latest?.bodyFatPct ?? null, athlete.goal_body_fat_pct);
+  const lmToGoal = gap(latest?.leanMassKg ?? null, athlete.goal_lean_mass_kg);
+  const wtToGoal = gap(latest?.weightKg ?? null, goalWeight);
   const openInjuries = injuries.filter((i) => i.status !== "cleared");
 
   return (
@@ -209,11 +226,11 @@ export default function AthleteProfile({
       <Section title="Body composition" href={links.assessments} hint="Latest assessment, and the change since the one before it.">
         {latest ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Card label="Weight" value={num(latest.weight_kg, 1, " kg")}
+            <Card label="Weight" value={num(latest.weightKg, 1, " kg")}
               hint={wtDelta === null ? `as of ${latest.date}` : `${wtDelta >= 0 ? "+" : ""}${wtDelta.toFixed(1)} kg since ${previous?.date}`} />
-            <Card label="Body fat" value={num(latest.body_fat_pct, 1, "%")}
+            <Card label="Body fat" value={num(latest.bodyFatPct, 1, "%")}
               hint={bfDelta === null ? `as of ${latest.date}` : `${bfDelta >= 0 ? "+" : ""}${bfDelta.toFixed(1)} pts since ${previous?.date}`} />
-            <Card label="Lean mass" value={num(latest.lean_mass_kg, 1, " kg")} />
+            <Card label="Lean mass" value={num(latest.leanMassKg, 1, " kg")} />
             <Card label="Assessments" value={assessments.length} hint={`latest ${latest.date}`} />
           </div>
         ) : (
@@ -241,6 +258,19 @@ export default function AthleteProfile({
         )}
       </Section>
 
+      {/* The assessment history the cards above summarise. It exists as its
+          own table because the cards can only ever show the latest two, and
+          because a row is what opens the real assessment edit form. */}
+      <Section title="Assessment history" href={links.assessments} hint="Ten most recent assessments.">
+        {assessments.length === 0 ? (
+          <Empty>No assessments recorded.</Empty>
+        ) : (
+          <Table head={["Date", "Weight", "Body fat", "Lean mass", "Logged by"]}>
+            <AssessmentRows entries={assessments} edit={edit} />
+          </Table>
+        )}
+      </Section>
+
       <Section title="Compliance" href={null} hint={`Daily check-ins over the last ${COMPLIANCE_WINDOW} days.`}>
         {compliance.total > 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -259,27 +289,7 @@ export default function AthleteProfile({
           <Empty>No injuries recorded.</Empty>
         ) : (
           <Table head={["Date", "Type", "Status", "RTP phase", "Target return"]}>
-            {injuries.map((inj, i) => {
-              const color = STATUS_COLOR[inj.status ?? ""] ?? "var(--text-muted)";
-              return (
-                <tr key={inj.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
-                  <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{inj.date}</td>
-                  <td className="px-5 py-3 font-medium" style={{ color: "var(--text)" }}>{inj.type ?? "—"}</td>
-                  <td className="px-5 py-3">
-                    <span className={BADGE}
-                      style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
-                      {INJURY_STATUSES.find((s) => s.value === inj.status)?.label ?? inj.status ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3" style={{ color: "var(--text)" }}>
-                    {RTP_PHASES.find((p) => p.value === inj.rtp_phase)?.label ?? inj.rtp_phase ?? "—"}
-                  </td>
-                  <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
-                    {inj.cleared_date ? `cleared ${inj.cleared_date}` : inj.target_return_date ?? "—"}
-                  </td>
-                </tr>
-              );
-            })}
+            <InjuryRows entries={injuries} edit={edit} />
           </Table>
         )}
       </Section>
@@ -288,14 +298,7 @@ export default function AthleteProfile({
         <Section title="GPS" href={links.gps} hint="Five most recent sessions.">
           {gps.length === 0 ? <Empty>No GPS sessions recorded.</Empty> : (
             <Table head={["Date", "Distance", "m/min", "Max vel."]}>
-              {gps.map((g, i) => (
-                <tr key={g.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
-                  <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{g.date}</td>
-                  <td className="px-5 py-3" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{num(g.total_distance_m, 0, " m")}</td>
-                  <td className="px-5 py-3" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{num(g.meters_per_min)}</td>
-                  <td className="px-5 py-3" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{num(g.max_velocity)}</td>
-                </tr>
-              ))}
+              <GpsRows entries={gps} edit={edit} />
             </Table>
           )}
         </Section>
@@ -303,47 +306,17 @@ export default function AthleteProfile({
         <Section title="VALD" href={links.vald} hint="Five most recent tests.">
           {vald.length === 0 ? <Empty>No VALD tests recorded.</Empty> : (
             <Table head={["Date", "Test", "Asymmetry"]}>
-              {vald.map((v, i) => {
-                const high = typeof v.asymmetry_pct === "number" && Math.abs(v.asymmetry_pct) > 15;
-                return (
-                  <tr key={v.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
-                    <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>{v.date}</td>
-                    <td className="px-5 py-3" style={{ color: "var(--text)" }}>{v.test_type ?? "—"}</td>
-                    <td className="px-5 py-3" style={{ color: high ? "var(--danger)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-                      {num(v.asymmetry_pct, 1, "%")}
-                    </td>
-                  </tr>
-                );
-              })}
+              <ValdRows entries={vald} edit={edit} />
             </Table>
           )}
         </Section>
       </div>
 
+      {/* Reports open a VIEW-ONLY modal — they are generated, not edited. */}
       <Section title="Reports" href={links.reports} hint="Eight most recent reports naming this athlete.">
         {reports.length === 0 ? <Empty>No reports generated for this athlete.</Empty> : (
           <Table head={["Generated", "Type", "Official", "PDF"]}>
-            {reports.map((r, i) => (
-              <tr key={r.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
-                <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
-                  {String(r.created_at).slice(0, 10)}
-                </td>
-                <td className="px-5 py-3" style={{ color: "var(--text)" }}>
-                  {(r.report_types ?? []).map((t) => REPORT_TYPE_LABELS[t] ?? t).join(", ")}
-                </td>
-                <td className="px-5 py-3" style={{ color: "var(--text-muted)" }}>{r.is_official ? "Yes" : "—"}</td>
-                <td className="px-5 py-3">
-                  {r.file_url ? (
-                    <a href={r.file_url} target="_blank" rel="noopener noreferrer"
-                      className="text-xs underline-offset-2 hover:underline" style={{ color: "var(--brand-blue)" }}>
-                      Download
-                    </a>
-                  ) : (
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            <ReportRows entries={reports} />
           </Table>
         )}
       </Section>

@@ -4,6 +4,8 @@ import { useActionState, useState } from "react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DataCsvImportPanel from "@/components/DataCsvImportPanel";
+import { EDIT_WINDOW_CLOSED_LABEL } from "@/lib/constants";
+import { useOnSaved } from "@/lib/useOnSaved";
 import { logGps, updateGps, previewGpsCsv, confirmGpsCsv, type ActionState, type GpsValues } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -159,8 +161,24 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
   );
 }
 
-function EditForm({ teamId, entry, onDone }: { teamId: string; entry: GpsEntry; onDone: () => void }) {
+// Exported as EditGpsForm so the athlete profile renders THIS form in its
+// modal — see the note on EditInjuryForm in
+// app/staff/[teamId]/injuries/InjuriesClient.tsx. The local alias keeps the
+// call site below reading as it always did.
+export function EditGpsForm({
+  teamId,
+  entry,
+  onDone,
+  onSaved,
+}: {
+  teamId: string;
+  entry: GpsEntry;
+  onDone: () => void;
+  /** Optional: fires after a successful save. */
+  onSaved?: () => void;
+}) {
   const [state, formAction] = useActionState(updateGps, initialState);
+  useOnSaved(state.savedAt, onSaved);
   return (
     <form
       action={formAction}
@@ -229,11 +247,11 @@ function Row({ teamId, entry }: { teamId: string; entry: GpsEntry }) {
           )
         ) : (
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Edit window closed
+            {EDIT_WINDOW_CLOSED_LABEL}
           </span>
         )}
       </div>
-      {editing && <EditForm teamId={teamId} entry={entry} onDone={() => setEditing(false)} />}
+      {editing && <EditGpsForm teamId={teamId} entry={entry} onDone={() => setEditing(false)} />}
     </div>
   );
 }

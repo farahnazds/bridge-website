@@ -44,6 +44,14 @@ export default async function ClubAthleteProfilePage({
     <AthleteProfile
       data={data}
       canEdit={canEdit}
+      // Read-only row modals on this route. Every data-entry action requires
+      // a team_id and the club dashboard has no team in scope; it also has no
+      // data-entry pages of its own yet (Injuries/GPS/VALD/Assessments are
+      // still ComingSoon here), so an editable modal would be a NEW entry
+      // point rather than a second door onto an existing one. A Club Manager
+      // edits through /staff/[teamId], which getStaffTeamContext admits them
+      // to. See components/AthleteEntryRows.tsx.
+      edit={null}
       links={{
         assessments: `/club/${clubId}/assessments`,
         injuries: `/club/${clubId}/injuries`,

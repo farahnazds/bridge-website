@@ -6,6 +6,10 @@ import { getCurrentProfile } from "@/lib/auth";
 
 export interface ActionState {
   error: string | null;
+  /** Set only on a successful save — see the note in
+   *  app/staff/[teamId]/injuries/actions.ts. `{ error: null }` doubles as the
+   *  initial state, so a timestamp is what lets a caller detect a save. */
+  savedAt?: number;
 }
 
 function parseNumeric(value: FormDataEntryValue | null): number | null {
@@ -59,7 +63,7 @@ export async function logAssessment(_prevState: ActionState, formData: FormData)
   }
 
   revalidatePath(`/staff/${teamId}/assessments`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 // The 7-day edit window (docs/05-business-rules.md) is enforced by the
@@ -103,5 +107,5 @@ export async function updateAssessment(_prevState: ActionState, formData: FormDa
   }
 
   revalidatePath(`/staff/${teamId}/assessments`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }

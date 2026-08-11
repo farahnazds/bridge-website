@@ -290,3 +290,26 @@ export const RTP_PHASES = [
   { value: "return_to_training", label: "Return to Training" },
   { value: "returned", label: "Returned" },
 ];
+
+// The club-staff edit window from docs/05-business-rules.md: "Club
+// Practitioner / Club Manager | Any club staff member | 7 days, then Admin
+// only". The real enforcement is the `within_edit_window(created_at, 7)` RLS
+// policy (database/rls-policies.md) — this constant only decides whether the
+// UI offers an Edit affordance at all, and a stale UI is caught server-side
+// by the zero-rows-returned check in each update action.
+//
+// It lives here because the same figure was declared independently in four
+// data pages (Assessments, Injuries, GPS, VALD) and is now also needed by the
+// athlete-profile loader; five hand-copied `7 * 24 * 60 * 60 * 1000`s is
+// exactly the drift this file exists to prevent.
+export const EDIT_WINDOW_DAYS = 7;
+export const EDIT_WINDOW_MS = EDIT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+/** True while a row is still inside the 7-day club-staff edit window. */
+export function isWithinEditWindow(createdAt: string, now: number = Date.now()): boolean {
+  return now <= new Date(createdAt).getTime() + EDIT_WINDOW_MS;
+}
+
+/** The wording every surface uses when the window has closed. One string so
+ *  the profile modal and the dedicated pages cannot describe it differently. */
+export const EDIT_WINDOW_CLOSED_LABEL = "Edit window closed";

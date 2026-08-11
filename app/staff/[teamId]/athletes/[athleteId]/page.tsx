@@ -60,6 +60,11 @@ export default async function TeamAthleteProfilePage({
     <AthleteProfile
       data={data}
       canEdit={canEdit}
+      // The team workspace the row modals submit their edits under. This is
+      // the route that HAS a team in scope, so it is the route where the
+      // dedicated pages' real edit forms can run — see the header of
+      // components/AthleteEntryRows.tsx.
+      edit={{ teamId }}
       viewerNote={
         context.isOversight ? "You are viewing this athlete as oversight, not as assigned staff." : undefined
       }

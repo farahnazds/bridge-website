@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DataCsvImportPanel from "@/components/DataCsvImportPanel";
-import { VALD_TEST_TYPES, OTHER_VALD_TEST_TYPE } from "@/lib/constants";
+import { VALD_TEST_TYPES, OTHER_VALD_TEST_TYPE, EDIT_WINDOW_CLOSED_LABEL } from "@/lib/constants";
+import { useOnSaved } from "@/lib/useOnSaved";
 import { logVald, updateVald, previewValdCsv, confirmValdCsv, type ActionState, type ValdValues } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -201,8 +202,23 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
   );
 }
 
-function EditForm({ teamId, entry, onDone }: { teamId: string; entry: ValdEntry; onDone: () => void }) {
+// Exported as EditValdForm so the athlete profile renders THIS form in its
+// modal — see the note on EditInjuryForm in
+// app/staff/[teamId]/injuries/InjuriesClient.tsx.
+export function EditValdForm({
+  teamId,
+  entry,
+  onDone,
+  onSaved,
+}: {
+  teamId: string;
+  entry: ValdEntry;
+  onDone: () => void;
+  /** Optional: fires after a successful save. */
+  onSaved?: () => void;
+}) {
   const [state, formAction] = useActionState(updateVald, initialState);
+  useOnSaved(state.savedAt, onSaved);
   return (
     <form action={formAction} className={`mt-3 flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
       <input type="hidden" name="team_id" value={teamId} />
@@ -256,10 +272,10 @@ function Row({ teamId, entry }: { teamId: string; entry: ValdEntry }) {
             </button>
           )
         ) : (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>Edit window closed</span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{EDIT_WINDOW_CLOSED_LABEL}</span>
         )}
       </div>
-      {editing && <EditForm teamId={teamId} entry={entry} onDone={() => setEditing(false)} />}
+      {editing && <EditValdForm teamId={teamId} entry={entry} onDone={() => setEditing(false)} />}
     </div>
   );
 }

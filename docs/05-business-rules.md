@@ -26,6 +26,20 @@ labeled; an edit is a visible "edited by X on [date]" event in history,
 not a silent overwrite. The UI should always show the remaining edit
 window to the person entering data.
 
+The 7-day figure lives once in code, as `EDIT_WINDOW_DAYS` /
+`EDIT_WINDOW_MS` in `lib/constants.ts`, alongside the one wording used
+when it has expired (`EDIT_WINDOW_CLOSED_LABEL`, "Edit window closed").
+Every surface that offers an edit — the four dedicated data pages and
+the athlete profile's row modals — reads those, so none of them can
+disagree about when the window shuts or what to call it.
+
+That check only decides whether an Edit affordance is *offered*. The
+boundary itself is the `within_edit_window(created_at, 7)` RLS policy:
+once it has passed, the UPDATE matches zero rows rather than erroring,
+which each action detects by chaining `.select()`. A stale open form
+therefore fails server-side with "the 7-day edit window has closed"
+instead of silently succeeding — verified live.
+
 ## Product/discount/prescription model (unchanged from v3, extended)
 
 Every club-brand (or segment-brand) relationship has three independent

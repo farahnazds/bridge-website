@@ -64,6 +64,15 @@ Admin only).
 - Roster per team, today's check-in status
 - Athlete profile — log data (including compliance proxy-entry for
   club athletes), assessments, GPS/performance, injuries/RTP
+  - Every data row (Injuries, GPS, VALD, Assessment history) opens a
+    modal with the full entry. Inside it, "Edit" mounts the *same*
+    component the dedicated page uses, so validation, the 7-day window
+    and the server action are shared rather than duplicated. Report rows
+    open a view-only modal — reports are generated, not edited.
+  - Editing from the modal is offered on `/staff/[team-id]` only. The
+    Club Manager's `/club/[club-id]` copy of the same profile shows the
+    modals read-only: the update actions need a `team_id`, and the club
+    dashboard has no data-entry pages of its own.
 - Training Load Plan (intensity/RPE calendar, team-wide or individual)
 - Reports — generate (individual or team-combined), share
 - Messenger, Official/Private Comments

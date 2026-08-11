@@ -8,6 +8,10 @@ import { matchRowsByAthleteCode, parseNum, type MatchedRow } from "@/lib/csvImpo
 
 export interface ActionState {
   error: string | null;
+  /** Set only on a successful save — see the note in
+   *  app/staff/[teamId]/injuries/actions.ts. `{ error: null }` doubles as the
+   *  initial state, so a timestamp is what lets a caller detect a save. */
+  savedAt?: number;
 }
 
 export interface ValdValues {
@@ -74,7 +78,7 @@ export async function logVald(_prevState: ActionState, formData: FormData): Prom
   if (error) return { error: `Couldn't save the VALD test: ${error.message}` };
 
   revalidatePath(`/staff/${teamId}/vald`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 // 7-day edit window — only exists because migration 015 added the update
@@ -109,7 +113,7 @@ export async function updateVald(_prevState: ActionState, formData: FormData): P
   }
 
   revalidatePath(`/staff/${teamId}/vald`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 // ---------------- CSV import ----------------

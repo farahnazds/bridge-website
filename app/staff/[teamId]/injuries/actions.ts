@@ -6,6 +6,12 @@ import { getCurrentProfile } from "@/lib/auth";
 
 export interface ActionState {
   error: string | null;
+  /** Set only on a successful save. `{ error: null }` is also the INITIAL
+   *  state, so it cannot tell "nothing has happened yet" from "saved" — a
+   *  caller that needs to react to a save (the athlete-profile modal closes
+   *  and refreshes the page behind it) watches this timestamp instead.
+   *  Optional, so the dedicated page's `initialState` is unchanged. */
+  savedAt?: number;
 }
 
 function injuryFields(formData: FormData) {
@@ -51,7 +57,7 @@ export async function logInjury(_prevState: ActionState, formData: FormData): Pr
   }
 
   revalidatePath(`/staff/${teamId}/injuries`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 // The 7-day edit window (docs/05-business-rules.md) is enforced by the
@@ -92,5 +98,5 @@ export async function updateInjury(_prevState: ActionState, formData: FormData):
   }
 
   revalidatePath(`/staff/${teamId}/injuries`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }

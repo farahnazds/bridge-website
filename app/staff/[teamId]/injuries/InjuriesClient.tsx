@@ -3,7 +3,8 @@
 import { useActionState, useState } from "react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
-import { INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
+import { INJURY_STATUSES, RTP_PHASES, EDIT_WINDOW_CLOSED_LABEL } from "@/lib/constants";
+import { useOnSaved } from "@/lib/useOnSaved";
 import { logInjury, updateInjury, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -230,16 +231,26 @@ function LogInjuryForm({
   );
 }
 
-function EditInjuryForm({
+// Exported so the athlete profile can render THIS form inside a modal rather
+// than growing a second injury form of its own. Everything that matters —
+// field set, the `updateInjury` action, its permission check and the RLS
+// 7-day window behind it — is therefore shared by both surfaces by
+// construction, not by two implementations agreeing.
+export function EditInjuryForm({
   teamId,
   record,
   onDone,
+  onSaved,
 }: {
   teamId: string;
   record: InjuryRecord;
   onDone: () => void;
+  /** Optional: fires after a successful save. The injuries page passes
+   *  nothing and keeps its original behaviour (form stays open). */
+  onSaved?: () => void;
 }) {
   const [state, formAction] = useActionState(updateInjury, initialState);
+  useOnSaved(state.savedAt, onSaved);
 
   return (
     <form action={formAction} className={`mt-3 flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
@@ -334,7 +345,7 @@ function InjuryRow({ teamId, record }: { teamId: string; record: InjuryRecord })
           )
         ) : (
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Edit window closed
+            {EDIT_WINDOW_CLOSED_LABEL}
           </span>
         )}
       </div>

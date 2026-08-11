@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import ValdClient, { type ValdEntry, type Athlete } from "./ValdClient";
 import { CARD, NOTICE } from "@/lib/ui";
+import { EDIT_WINDOW_MS } from "@/lib/constants";
 
 // Formats an embedded profile row into a display name. The provider name
 // used to require a second round trip (fetch ids, then fetch profiles);
@@ -12,8 +13,6 @@ function personName(p: { first_name: string | null; last_name: string | null } |
 }
 
 export const metadata: Metadata = { title: "VALD — Bridgetx" };
-
-const EDIT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 type AthleteEmbed = { id: string; first_name: string; last_name: string; code: string };
 

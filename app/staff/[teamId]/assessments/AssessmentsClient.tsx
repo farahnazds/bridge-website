@@ -3,6 +3,8 @@
 import { useActionState, useState } from "react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
+import { EDIT_WINDOW_CLOSED_LABEL } from "@/lib/constants";
+import { useOnSaved } from "@/lib/useOnSaved";
 import { logAssessment, updateAssessment, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -267,16 +269,22 @@ function LogAssessmentForm({
   );
 }
 
-function EditAssessmentForm({
+// Exported so the athlete profile renders THIS form in its modal — see the
+// note on EditInjuryForm in app/staff/[teamId]/injuries/InjuriesClient.tsx.
+export function EditAssessmentForm({
   teamId,
   record,
   onDone,
+  onSaved,
 }: {
   teamId: string;
   record: AssessmentRecord;
   onDone: () => void;
+  /** Optional: fires after a successful save. */
+  onSaved?: () => void;
 }) {
   const [state, formAction] = useActionState(updateAssessment, initialState);
+  useOnSaved(state.savedAt, onSaved);
 
   return (
     <form action={formAction} className={`mt-3 flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
@@ -352,7 +360,7 @@ function AssessmentRow({ teamId, record }: { teamId: string; record: AssessmentR
               )
             ) : (
               <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Edit window closed
+                {EDIT_WINDOW_CLOSED_LABEL}
               </span>
             )}
           </span>
