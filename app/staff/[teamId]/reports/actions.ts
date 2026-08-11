@@ -10,6 +10,15 @@ import { assertReportSafe } from "@/lib/reportSafetyCheck";
 import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
 import { resolveReportLanguage } from "@/lib/reportLanguage";
 import { resolveReportAudience } from "@/lib/reportAudience";
+import {
+  getReportBundle,
+  isReportType,
+  REPORT_TYPES,
+  MIN_COMBINED_TYPES,
+  MAX_COMBINED_TYPES,
+  type ReportType,
+} from "@/lib/reportBundle";
+import { combinedSystemPrompt, buildCombinedUserPrompt } from "./combinedPromptBuilder";
 import { getClinicalLibraryEntries } from "@/lib/clinicalLibrary";
 import {
   buildCompliancePrompt,
@@ -1402,4 +1411,183 @@ export async function generateInjuryReport(
 
   revalidatePath(`/staff/${teamId}/reports`);
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id };
+}
+
+// ---------------------------------------------------------------------------
+// COMBINED report — two or more types merged into ONE document
+// ---------------------------------------------------------------------------
+// Deliberately a separate action rather than a branch inside the five above:
+// each of those owns its own data gather and its own prompt, and threading a
+// "combined" flag through all five would have made every one of them harder to
+// read for a feature none of them performs.
+//
+// What it does NOT duplicate is the data itself. lib/reportBundle.ts issues the
+// same queries the individual generators issue, so a combined Compliance
+// section reads the same rows the standalone Compliance report would.
+//
+// SINGLE ATHLETE ONLY for now. The team-wide practitioner-audience shape is a
+// separate architectural question — see docs/07-ai-engine.md.
+export async function generateCombinedReport(
+  _prevState: GenerateReportState,
+  formData: FormData
+): Promise<GenerateReportState> {
+  const base: GenerateReportState = { error: null, reportText: null, dataCheckNote: null, reportId: null };
+
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "club_practitioner") {
+    return { ...base, error: "You don't have permission to do this." };
+  }
+
+  const teamId = String(formData.get("team_id") ?? "").trim();
+  const athleteId = String(formData.get("athlete_id") ?? "").trim();
+  const periodStart = String(formData.get("period_start") ?? "").trim();
+  const periodEnd = String(formData.get("period_end") ?? "").trim();
+  const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
+  const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
+  const audience = resolveReportAudience(formData.get("audience") as string | null);
+
+  // Checkbox group. Filtered against the known set server-side rather than
+  // trusted, and de-duplicated, so a hand-rolled request cannot inject an
+  // unknown "type" that would reach the prompt as a section heading.
+  const types = [...new Set(formData.getAll("report_types").map(String))]
+    .filter(isReportType)
+    .sort((a, b) => REPORT_TYPES.indexOf(a) - REPORT_TYPES.indexOf(b));
+
+  if (!teamId || !athleteId || !periodStart || !periodEnd) {
+    return { ...base, error: "Athlete and report period are required." };
+  }
+  if (types.length < MIN_COMBINED_TYPES) {
+    return { ...base, error: "Choose at least two report types to combine. For a single type, use its own tab." };
+  }
+  // Enforced here as well as in the form: a combined report is generated
+  // synchronously, and the cap is what keeps that wait reasonable. See
+  // MAX_COMBINED_TYPES in lib/reportBundle.ts.
+  if (types.length > MAX_COMBINED_TYPES) {
+    return {
+      ...base,
+      error: `A combined report covers up to ${MAX_COMBINED_TYPES} types at once. Generate the remaining types as a second report.`,
+    };
+  }
+
+  const { bundle, error: bundleError } = await getReportBundle(athleteId, periodStart, periodEnd, types);
+  if (bundleError || !bundle) return { ...base, error: bundleError ?? "Couldn't load the report data." };
+
+  const dataCheckNote = bundle.dataCheckNotes.join(" ");
+  const userPrompt = buildCombinedUserPrompt({ bundle, additionalInstructions, language });
+
+  const anthropic = createAnthropicClient();
+  let response;
+  try {
+    response = await anthropic.messages
+      .stream({
+        model: REPORT_MODEL,
+        // Higher than the 8000 an individual report uses: this document
+        // carries N domain sections plus a synthesis, and truncating it
+        // mid-section would silently drop the recommendations at the end.
+        max_tokens: 16000,
+        thinking: { type: "adaptive" },
+        output_config: { effort: REPORT_EFFORT },
+        system: combinedSystemPrompt(audience, types),
+        messages: [{ role: "user", content: userPrompt }],
+      })
+      .finalMessage();
+  } catch (err) {
+    return {
+      ...base,
+      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      dataCheckNote,
+    };
+  }
+
+  if (response.stop_reason === "refusal") {
+    return {
+      ...base,
+      error: "The AI declined to generate this report. Try adjusting the additional instructions, or contact support if this persists.",
+      dataCheckNote,
+    };
+  }
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
+  if (!reportText) return { ...base, error: "The AI returned an empty response. Try again.", dataCheckNote };
+
+  // Same unconditional pre-save gate as every individual report — combining
+  // types does not change what counts as unsafe.
+  const safety = await assertReportSafe(athleteId, reportText);
+  if (!safety.ok) return { ...base, error: safety.message, reportText, dataCheckNote };
+
+  const { data: insertedReport, error: insertError } = await supabaseInsertCombined({
+    generatedBy: profile.id,
+    types,
+    audience,
+    teamId,
+    athleteId,
+    periodStart,
+    periodEnd,
+    language,
+    additionalInstructions,
+    reportText,
+  });
+  if (insertError || !insertedReport) {
+    return {
+      ...base,
+      error: `Report generated, but saving it failed: ${insertError ?? "unknown error"}`,
+      reportText,
+      dataCheckNote,
+    };
+  }
+
+  // Same branded pipeline as individual reports; only the title differs.
+  const pdf = await generateAndStoreReportPdf({
+    reportId: insertedReport.id,
+    athleteId,
+    markdown: reportText,
+    reportTypeLabel: types.map((t) => REPORT_TYPE_LABELS[t] ?? t).join(" + "),
+    athleteName: `${bundle.athlete.first_name} ${bundle.athlete.last_name}`,
+    periodStart,
+    periodEnd,
+    generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+  });
+
+  revalidatePath(`/staff/${teamId}/reports`);
+  return {
+    error: null,
+    reportText,
+    dataCheckNote: pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote,
+    reportId: insertedReport.id,
+  };
+}
+
+/** Split out only to keep the action readable; same insert shape as the five
+ *  individual generators, with report_types carrying every selected domain. */
+async function supabaseInsertCombined(input: {
+  generatedBy: string;
+  types: ReportType[];
+  audience: string;
+  teamId: string;
+  athleteId: string;
+  periodStart: string;
+  periodEnd: string;
+  language: string;
+  additionalInstructions: string | null;
+  reportText: string;
+}): Promise<{ data: { id: string } | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("reports")
+    .insert({
+      generated_by: input.generatedBy,
+      report_types: input.types,
+      audience: input.audience,
+      team_id: input.teamId,
+      athlete_ids: [input.athleteId],
+      report_period_start: input.periodStart,
+      report_period_end: input.periodEnd,
+      language: input.language,
+      additional_instructions: input.additionalInstructions,
+      ai_summary: input.reportText,
+    })
+    .select("id")
+    .single();
+  return { data: data ?? null, error: error?.message ?? null };
 }

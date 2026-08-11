@@ -109,12 +109,69 @@ Three consequences worth stating explicitly:
 audience — the prompt-level rules above are the first layer, not the only
 one.
 
-### Not implemented — merge behaviour
+### Partly implemented — merge behaviour
 
-The per-athlete vs per-team merge rule above is still unbuilt: generation
-is one athlete at a time (`athlete_ids` always has one entry). Until that
-exists, the column means register only. The `reports` table comment in
-`schema.sql` says the same, so neither overstates it.
+**Single athlete, 2–3 types: built.** The Reports page has a **Combined** tab.
+Pick between `MIN_COMBINED_TYPES` and `MAX_COMBINED_TYPES` domains
+(`lib/reportBundle.ts`), one athlete, one period, and the existing Audience and
+Language controls. The result is one `reports` row whose `report_types` holds
+every selected domain.
+
+**Team-wide (per-team merged document): still unbuilt.** `athlete_ids` still
+always has exactly one entry. The proposed shape is a squad summary + squad
+patterns + athletes-needing-attention + thinner per-athlete sections; it is not
+built, and it raises a real question about `assertReportSafe()`, which takes one
+athlete id and would need per-section scoping to avoid flagging athlete A's
+allergen inside athlete B's section.
+
+## Combined reports
+
+### One document, not N reports concatenated
+
+The entire value is that a single generation holds every domain at once, so it
+can relate them. Five separate generations physically cannot — each sees a
+fifth of the picture. `combinedPromptBuilder.ts` therefore mandates:
+
+```
+1.        Executive summary        — ONE, covering everything
+2..n+1.   One findings section per selected domain
+n+2.      Cross-domain synthesis   — the section that justifies combining
+n+3.      Goals — one consolidated set
+n+4.      Recommendations — one priority-ordered list across domains
+```
+
+The prompt says outright that N mini-reports stapled together is a failure, and
+adds three rules that only matter for combined output: no finding repeated
+across sections, every cross-domain link anchored to dated observations, and
+correlation discipline ("coincides with", never "caused"). A stated
+non-relationship between two domains is an acceptable — and sometimes
+correct — finding.
+
+### The 3-type cap, and why
+
+Combined reports generate **synchronously**: submit the form, wait, the
+document appears — the same pattern as individual reports. Three domains is
+what keeps that wait tolerable.
+
+All five at once is a reasonable thing to want, but it needs infrastructure
+this build does not have: background generation, a notification when ready,
+and somewhere for an in-progress report to live. That is its own piece of
+work and was deliberately **not** bolted onto the synchronous path. The cap is
+enforced in the form (a fourth checkbox will not tick) and again in the action,
+because a server action is independently addressable.
+
+### Data and safety
+
+`lib/reportBundle.ts` gathers each selected domain with **the same queries the
+individual generators use** — a combined Compliance section reads the rows the
+standalone Compliance report would. The shared block (athlete, conditions,
+allergies, intolerances) is fetched once rather than per type.
+
+Safety is unchanged and unconditional: `audienceDirective()` is embedded whole,
+so the identical safety half applies regardless of which domains are combined
+or which audience is chosen, and `assertReportSafe()` still runs before the row
+is inserted. Combining changes the shape of a report, never what counts as
+unsafe.
 
 Annual reporting is not a separate feature — just the Report Period
 calendar set to a full year.

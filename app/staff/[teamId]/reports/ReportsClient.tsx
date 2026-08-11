@@ -6,9 +6,10 @@ import BodyCompositionReportForm from "./BodyCompositionReportForm";
 import NutritionReportForm from "./NutritionReportForm";
 import PerformanceReportForm from "./PerformanceReportForm";
 import InjuryReportForm from "./InjuryReportForm";
+import CombinedReportForm from "./CombinedReportForm";
 import type { RecipientCandidate } from "./ShareReportPanel";
 
-type ReportType = "compliance" | "body_composition" | "nutrition" | "performance" | "injury";
+type ReportType = "compliance" | "body_composition" | "nutrition" | "performance" | "injury" | "combined";
 
 const TABS: { value: ReportType; label: string }[] = [
   { value: "compliance", label: "Compliance" },
@@ -16,6 +17,9 @@ const TABS: { value: ReportType; label: string }[] = [
   { value: "nutrition", label: "Nutrition" },
   { value: "performance", label: "Performance" },
   { value: "injury", label: "Injury" },
+  // Last, and visually separated by its label: it is a different SHAPE of
+  // report rather than a sixth domain.
+  { value: "combined", label: "Combined" },
 ];
 
 export default function ReportsClient({
@@ -65,6 +69,9 @@ export default function ReportsClient({
       )}
       {activeTab === "injury" && (
         <InjuryReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
+      )}
+      {activeTab === "combined" && (
+        <CombinedReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
       )}
     </div>
   );
