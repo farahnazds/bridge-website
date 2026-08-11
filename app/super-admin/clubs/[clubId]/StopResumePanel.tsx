@@ -17,7 +17,7 @@ function SubmitButton({ label, danger }: { label: string; danger: boolean }) {
       style={
         danger
           ? { border: "1px solid var(--danger)", color: "var(--danger)", backgroundColor: "transparent" }
-          : { backgroundImage: "var(--brand-gradient)", color: "#fff" }
+          : { backgroundImage: "var(--brand-gradient-action)", color: "#fff" }
       }
     >
       {pending ? "Working…" : label}

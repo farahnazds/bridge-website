@@ -69,7 +69,7 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? pendingLabel : label}
     </button>
@@ -377,7 +377,7 @@ export default function InjuriesClient({
             type="button"
             onClick={() => setShowForm(true)}
             className={BTN_PRIMARY}
-            style={{ backgroundImage: "var(--brand-gradient)" }}
+            style={{ backgroundImage: "var(--brand-gradient-action)" }}
           >
             + Log Injury
           </button>

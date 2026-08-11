@@ -59,7 +59,7 @@ function SubmitButton() {
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? "Saving…" : "Add to plan"}
     </button>
@@ -353,7 +353,7 @@ export default function TrainingLoadClient({
             type="button"
             onClick={() => setShowForm(true)}
             className={BTN_PRIMARY}
-            style={{ backgroundImage: "var(--brand-gradient)" }}
+            style={{ backgroundImage: "var(--brand-gradient-action)" }}
           >
             + Add to plan
           </button>

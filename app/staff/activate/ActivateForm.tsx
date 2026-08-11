@@ -162,7 +162,7 @@ export default function ActivateForm() {
         type="submit"
         disabled={status === "submitting" || status === "done"}
         className={BTN_PRIMARY_FULL}
-        style={{ backgroundImage: "var(--brand-gradient)" }}
+        style={{ backgroundImage: "var(--brand-gradient-action)" }}
       >
         {status === "submitting" || status === "done"
           ? "Activating…"

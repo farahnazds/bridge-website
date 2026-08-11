@@ -41,21 +41,39 @@ export default function DashboardHeader({
   return (
     <header
       style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20,
-        padding: "0 24px", height: 56, flex: "none",
-        borderBottom: "1px solid rgba(255,255,255,.08)", backgroundColor: "var(--brand-navy)",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24,
+        // 14px 32px and a hairline bottom rule, matching the design file's top
+        // bar. The old 56px fixed height with 24px sides read cramped against a
+        // larger mark; height is now driven by the content and its padding.
+        padding: "14px 32px", flex: "none",
+        borderBottom: "1px solid var(--border)", backgroundColor: "var(--surface)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
         <Link href={homeHref} style={{ display: "flex", alignItems: "center", flex: "none" }} aria-label="Bridgetx home">
-          <Image src="/brand/logo-horizontal-dark.png" alt="Bridgetx" width={26} height={26}
-            className="h-[26px] w-auto object-contain" priority />
+          {/* The design file leads with the MARK at a comfortable size and lets
+              the role line carry the wordmark's job, rather than shrinking a
+              horizontal lockup until neither reads. 36px against the old 26px,
+              with the gap opened from 14 to 16. */}
+          <Image src="/brand/logo-mark-alpha.png" alt="Bridgetx" width={36} height={36}
+            className="h-9 w-auto object-contain" priority />
         </Link>
-        <span aria-hidden="true" style={{ width: 1, height: 20, background: "rgba(255,255,255,.14)", flex: "none" }} />
-        <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,.72)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          <span style={{ fontWeight: 600, color: "#fff" }}>{role}</span>
-          {context ? <span style={{ color: "rgba(255,255,255,.5)" }}> — {context}</span> : null}
-        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+          <span style={{
+            fontFamily: "var(--font-heading)", fontSize: 14.5, fontWeight: 600,
+            letterSpacing: "-.01em", color: "var(--text)",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {role}
+          </span>
+          <span style={{
+            fontFamily: "var(--font-mono)", fontSize: 9.5, letterSpacing: ".14em",
+            color: "var(--text-muted)", textTransform: "uppercase",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {context ?? "Bridgetx"}
+          </span>
+        </div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14, flex: "none" }}>

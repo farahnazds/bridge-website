@@ -21,37 +21,76 @@ logo itself).
 |---|---|---|
 | `--brand-teal` | `#00B3A6` | Gradient start, success/positive states, sparingly |
 | `--brand-sky` | `#0091D6` | Gradient midpoint, secondary accents |
-| `--brand-blue` | `#0057FF` | Primary actions, links, active states, focus rings |
+| `--brand-blue` | `#59C4F5` | Links, active states, focus rings (see note) |
 | `--brand-blue-deep` | `#0A2D8F` | Gradient toward dark end, hover states on primary blue |
 | `--brand-navy` | `#0D1B4C` | Headings, primary text, nav bars, dark UI surfaces |
-| `--bg` | `#F7F9FC` | Page background (light-first) |
-| `--surface` | `#FFFFFF` | Cards, panels (on the off-white background) |
-| `--border` | `#E4E9F2` | Dividers, card borders, input borders |
-| `--text` | `#0D1B4C` | Primary text (reuse brand-navy) |
-| `--text-muted` | `#5B6B8C` | Secondary/meta text |
+| `--bg` | `#05091A` | Page background |
+| `--surface` | `#080D20` | Cards, panels, header, sidebar |
+| `--surface-raised` | `#0A1026` | A panel nested inside a card; sidebar inset blocks |
+| `--border` | `#1C1F2F` | Dividers, card borders, input borders |
+| `--text` | `#F2F5FA` | Primary text |
+| `--text-muted` | `#9B9DA3` | Secondary/meta text |
 | `--danger` | `#E5484D` | Errors, missed compliance, overdue flags |
 | `--warning` | `#F5A524` | Caution states, mid-range compliance |
 | `--success` | `#00B3A6` | Reuse brand teal for positive/on-track states |
 
-`--bg` previously read `#FFFFFF / #F7F9FC`, which made the page background
-look like a choice between two values. It is not: the page is the off-white
-`#F7F9FC` and pure white belongs to `--surface`, the cards sitting on it. That
-contrast is what lets a card read as a raised surface held by a 1px border
-rather than a heavy shadow. `app/globals.css` has only ever defined
-`--bg: #f7f9fc`, and all five dashboards' `<main>` elements use it — the
-ambiguity was in this table alone, which is how it would have got copied into
-a page eventually.
+### The product is dark
 
-**The gradient itself** (`linear-gradient(135deg, #00B3A6, #0091D6,
-#0057FF, #0A2D8F, #0D1B4C)`) is used for: the logo, primary CTA buttons
-(as a subtle gradient fill, not loud), progress rings/compliance
-indicators, and key hero moments on the public site. Not used as a full
-page background — too heavy at that scale.
+Everything behind sign-in — all five dashboards, `/account`, the club and
+team choosers, and the activation and password-reset pages — renders dark.
+The values above are taken from the `Bridgetx Roster` design file in the
+brand-guidelines project, not invented: `#05091A` page, `#080D20` cards and
+chrome, `#0A1026` raised panels, hairline borders at ~9% white.
 
-**Dark navy (`#0D1B4C` or deeper)** is used deliberately for: the main
-navigation bar, sidebars in dashboards, the public site's hero section,
-and footer — these are the "premium" anchor moments, echoing how the logo
-itself appears on dark backgrounds in the brand assets.
+This replaced a light content area against a dark sidebar. Three tokens could
+not simply carry over, and the reasons matter if you ever touch them:
+
+- **`--text` was `#0D1B4C`, the same hex as `--brand-navy`** — this table used
+  to say "reuse brand-navy". On `#05091A` that is **1.21:1**, i.e. invisible.
+  The two are now separate concerns: `--brand-navy` is the brand colour,
+  `--text` is near-white.
+- **`--text-muted` was `#5B6B8C`** — 3.70:1, below AA.
+- **`--brand-blue` was `#0057FF`** — 3.59:1, below AA, and it is every link,
+  active state and focus ring in the product. It is now the design file's own
+  `#59C4F5` (10.03:1). The brand's `#0057FF` still exists inside both
+  gradients, where it sits *under* white text rather than being read as text.
+
+Measured contrast on `#05091A` page / `#080D20` card: `--text` 18.12:1 /
+17.65:1, `--text-muted` 7.30:1 / 7.11:1, `--brand-blue` 10.03:1 / 9.77:1,
+`--success` 7.54:1, `--danger` 5.06:1, `--warning` 9.70:1. All pass WCAG AA
+for body text. **Re-check contrast before changing any of these** — three of
+the six needed changing precisely because the light values looked fine in
+isolation.
+
+The dashboards are almost entirely tokenized (1,011 `var(--…)` colour usages
+across 117 files, against 12 hardcoded colours, all in the chrome), which is
+why this was a token change rather than a rewrite. Keep it that way.
+
+### Two gradients, and which is which
+
+**`--brand-gradient`** — the identity gradient (`#00B3A6, #0091D6, #0057FF,
+#0A2D8F, #0A1026`). The logo, hero moments on the public site, progress
+rings. It ends dark on purpose. Not a full page background — too heavy at
+that scale.
+
+**`--brand-gradient-action`** — the button gradient, from the design file:
+`linear-gradient(135deg, #00B3A6, #0091D6 45%, #0057FF)`. Three stops,
+stopping at blue instead of fading to navy.
+
+**Use the action gradient on anything filled that sits on the page** —
+primary buttons, avatars, the switcher's initials badge, meters. On `#05091A`
+the identity gradient's dark end dissolves into the background, so a primary
+button using it looks broken at one corner. That is the whole reason there
+are two.
+
+The "glow" on primary actions is that brighter gradient plus a
+`brightness(1.1)` hover — **not** a box-shadow. The design file contains no
+`box-shadow` anywhere; depth comes from surface steps and hairline borders.
+
+**Dark navy (`#0D1B4C`)** remains the brand colour and lives in the gradients
+and the logo. It is no longer a surface: `--surface` (`#080D20`) is what the
+chrome and cards use, because navy against a `#05091A` page is too close to
+read as a separate plane.
 
 ## Typography
 

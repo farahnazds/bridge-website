@@ -30,7 +30,7 @@ function SubmitButton() {
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY_FULL}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? "Generating… usually 15–60 seconds" : "Generate body composition report"}
     </button>

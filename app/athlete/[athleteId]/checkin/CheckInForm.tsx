@@ -34,7 +34,7 @@ function SubmitButton() {
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY_FULL}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? "Saving…" : "Save check-in"}
     </button>

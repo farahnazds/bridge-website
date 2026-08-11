@@ -1,30 +1,74 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   Theme tokens — DARK.
+
+   The product used to be light-content-on-dark-sidebar. It is now dark
+   throughout, matching the "Bridgetx Roster" design file in the brand
+   guidelines project. Values below are that file's, not invented:
+   #05091A page, #080D20 cards/chrome, #0A1026 raised panels,
+   rgba(255,255,255,.09) hairlines.
+
+   Only the SEMANTIC tokens flipped. The five --brand-* values are brand
+   identity and are unchanged — except --brand-blue, see below.
+
+   CONTRAST, measured against #05091A page / #080D20 card:
+     --text        #f2f5fa   18.12:1 / 17.65:1
+     --text-muted  #9b9da3    7.30:1 /  7.11:1
+     --brand-blue  #59c4f5   10.03:1 /  9.77:1
+     --success     #00b3a6    7.54:1 /  7.35:1
+     --danger      #e5484d    5.06:1 /  4.93:1
+     --warning     #f5a524    9.70:1 /  9.45:1
+   All pass WCAG AA for body text.
+
+   THREE tokens could not simply carry over:
+
+   1. --text was #0d1b4c, the SAME hex as --brand-navy ("reuse brand-navy",
+      docs/06). On this page that is 1.21:1 — invisible. The two are now
+      decoupled: --brand-navy stays the brand colour, --text is near-white.
+   2. --text-muted #5b6b8c was 3.70:1 — below AA.
+   3. --brand-blue #0057ff was 3.59:1 — below AA, and it is every link,
+      active state and focus ring in the app. Raised to the design file's
+      own #59c4f5. The brand's #0057ff survives inside the gradients below,
+      where it sits under white text rather than being read as text.
+   ========================================================================== */
 :root {
   --brand-teal: #00b3a6;
   --brand-sky: #0091d6;
-  --brand-blue: #0057ff;
+  --brand-blue: #59c4f5;
   --brand-blue-deep: #0a2d8f;
   --brand-navy: #0d1b4c;
 
-  --bg: #f7f9fc;
-  --surface: #ffffff;
-  --border: #e4e9f2;
-  --text: #0d1b4c;
-  --text-muted: #5b6b8c;
+  --bg: #05091a;
+  --surface: #080d20;
+  /* One step up from --surface, for panels nested inside a card and for the
+     sidebar's own inset blocks. CARD vs PANEL already encode that nesting in
+     radius; this gives it a surface too. */
+  --surface-raised: #0a1026;
+  --border: #1c1f2f;
+  --text: #f2f5fa;
+  --text-muted: #9b9da3;
 
   --danger: #e5484d;
   --warning: #f5a524;
   --success: #00b3a6;
 
+  /* The identity gradient — logo, hero moments, progress meters. Ends dark on
+     purpose, which is why it is NOT the button fill on a dark page. */
   --brand-gradient: linear-gradient(
     135deg,
     #00b3a6,
     #0091d6,
     #0057ff,
     #0a2d8f,
-    #0d1b4c
+    #0a1026
   );
+
+  /* The ACTION gradient, straight from the design file's primary button.
+     Three stops, ending at #0057ff rather than fading to navy — on #05091A a
+     button using the identity gradient above would dissolve into the page at
+     its dark end. Buttons use this; brand surfaces use the one above. */
+  --brand-gradient-action: linear-gradient(135deg, #00b3a6, #0091d6 45%, #0057ff);
 
   --font-heading: "General Sans", var(--font-body), sans-serif;
 }
@@ -38,6 +82,7 @@
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-border: var(--border);
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);

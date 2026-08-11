@@ -45,7 +45,7 @@ export default async function ClubsPage() {
         <Link
           href="/super-admin/clubs/new"
           className={BTN_PRIMARY}
-          style={{ backgroundImage: "var(--brand-gradient)" }}
+          style={{ backgroundImage: "var(--brand-gradient-action)" }}
         >
           + New Club
         </Link>

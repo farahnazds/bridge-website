@@ -69,7 +69,7 @@ function PreviewButton() {
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? "Parsing…" : "Preview import"}
     </button>
@@ -83,7 +83,7 @@ function ConfirmButton({ count }: { count: number }) {
       type="submit"
       disabled={pending || count === 0}
       className={BTN_PRIMARY}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? "Importing…" : `Confirm import (${count})`}
     </button>

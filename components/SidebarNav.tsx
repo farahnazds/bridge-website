@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
+import SidebarNavItem from "@/components/SidebarNavItem";
 
 // Grouped sidebar navigation, shared by every dashboard.
 //
@@ -26,6 +26,9 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+// Stays a SERVER component on purpose: `groups` carries lucide icon
+// components, which cannot cross into a Client Component. The active-state
+// logic lives in SidebarNavItem, which receives the already-rendered icon.
 export default function SidebarNav({ groups }: { groups: NavGroup[] }) {
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Dashboard sections">
@@ -45,17 +48,18 @@ export default function SidebarNav({ groups }: { groups: NavGroup[] }) {
           {group.items.map((item) => {
             const Icon = item.icon;
             return (
-              <Link
+              <SidebarNavItem
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
-              >
-                {/* 16px, 1.75 stroke, inheriting colour: the icon supports the
-                    label rather than competing with it. Decorative because the
-                    label is already the accessible name. */}
-                <Icon size={16} strokeWidth={1.75} aria-hidden="true" className="flex-none opacity-80" />
-                <span className="truncate">{item.label}</span>
-              </Link>
+                label={item.label}
+                // Rendered here, on the server. No `color` prop: the icon
+                // inherits currentColor from SidebarNavItem's wrapper, which is
+                // what lets the active state tint it without this component
+                // knowing which item is active. 16px / 1.75 stroke so the icon
+                // supports the label rather than competing with it; decorative,
+                // because the label is the accessible name.
+                icon={<Icon size={16} strokeWidth={1.75} aria-hidden="true" />}
+              />
             );
           })}
         </div>

@@ -14,7 +14,7 @@ function Submit() {
       type="submit"
       disabled={pending}
       className={`w-fit ${BTN_PRIMARY}`}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? "Saving…" : "Save changes"}
     </button>

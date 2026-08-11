@@ -52,7 +52,7 @@ function Submit({ label, pending: pendingLabel }: { label: string; pending: stri
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? pendingLabel : label}
     </button>

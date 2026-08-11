@@ -29,6 +29,15 @@ export interface SwitcherOption {
   sublabel?: string | null;
 }
 
+// Two-letter badge from the context name — "First Team" -> FT, "test1" -> TE.
+// Mirrors initialsFrom() in DashboardHeader.tsx rather than importing it: that
+// one falls back to an email local-part, which a team or club never has.
+function initialsOf(label: string): string {
+  const parts = label.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return label.trim().slice(0, 2).toUpperCase() || "--";
+}
+
 export default function ContextSwitcher({
   currentId,
   options,
@@ -154,29 +163,48 @@ export default function ContextSwitcher({
           setOpen((v) => !v);
         }}
         onKeyDown={onTriggerKey}
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-150 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+        // The design file's bordered card, not plain stacked text: a raised
+        // surface held by a hairline that brightens on hover, a gradient
+        // initials badge, and the up/down chevron that says "switchable"
+        // rather than the single down-caret of a dropdown.
+        className="flex w-full items-center justify-between gap-2.5 rounded-[11px] border px-3 py-2.5 text-left transition-colors duration-200 hover:border-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+        style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }}
       >
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-white">
-            {current?.label ?? emptyLabel}
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg text-[10px] font-medium text-white"
+            style={{ fontFamily: "var(--font-mono)", backgroundImage: "var(--brand-gradient-action)" }}
+          >
+            {initialsOf(current?.label ?? emptyLabel)}
           </span>
-          {current?.sublabel && (
-            <span className="block truncate text-xs text-white/50">{current.sublabel}</span>
-          )}
+          <span className="min-w-0">
+            <span className="block truncate text-[13.5px] font-semibold text-white">
+              {current?.label ?? emptyLabel}
+            </span>
+            {current?.sublabel && (
+              <span
+                className="block truncate uppercase"
+                style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, letterSpacing: ".12em", color: "var(--text-muted)" }}
+              >
+                {current.sublabel}
+              </span>
+            )}
+          </span>
         </span>
         <svg
-          width="14"
-          height="14"
-          viewBox="0 0 16 16"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.75"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="flex-shrink-0 text-white/50"
+          className="flex-shrink-0 text-white/45"
           aria-hidden="true"
         >
-          <path d="M4 6.5 8 10.5 12 6.5" />
+          <path d="M8 10l4-4 4 4M8 14l4 4 4-4" />
         </svg>
       </button>
 

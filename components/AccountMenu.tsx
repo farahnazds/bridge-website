@@ -59,7 +59,7 @@ export default function AccountMenu({
             width: 26, height: 26, borderRadius: "50%", flex: "none",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 11, fontWeight: 600, letterSpacing: ".02em", color: "#fff",
-            backgroundImage: "var(--brand-gradient)",
+            backgroundImage: "var(--brand-gradient-action)",
           }}
         >
           {initials}

@@ -28,7 +28,7 @@ const FOCUS =
  * (`--brand-blue`, `--brand-navy`, or the gradient) — the text is always white.
  */
 export const BTN_PRIMARY =
-  "rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 " +
+  "rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-[filter,transform] duration-200 ease-out hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 " +
   FOCUS;
 
 /**
@@ -36,7 +36,7 @@ export const BTN_PRIMARY =
  * page. Taller only; everything else matches BTN_PRIMARY.
  */
 export const BTN_PRIMARY_LG =
-  "rounded-lg px-5 py-3 text-sm font-semibold text-white transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 " +
+  "rounded-lg px-5 py-3 text-sm font-semibold text-white transition-[filter,transform] duration-200 ease-out hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 " +
   FOCUS;
 
 /** BTN_PRIMARY_LG stretched — the submit at the foot of a single-column form. */
@@ -47,7 +47,7 @@ export const BTN_PRIMARY_FULL = `w-full ${BTN_PRIMARY_LG.replace("px-5", "px-4")
  * color inline so it can read as neutral or as danger.
  */
 export const BTN_SECONDARY =
-  "rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out hover:bg-[color:var(--bg)] disabled:cursor-not-allowed disabled:opacity-60 " +
+  "rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out hover:border-white/25 hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-60 " +
   FOCUS;
 
 /**
@@ -60,7 +60,7 @@ export const BTN_SECONDARY =
  * element gets one (docs/06-design-system.md), so it is folded in here.
  */
 export const BTN_TERTIARY =
-  "rounded-lg px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out hover:bg-[color:var(--bg)] disabled:cursor-not-allowed disabled:opacity-60 " +
+  "rounded-lg px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60 " +
   FOCUS;
 
 /**

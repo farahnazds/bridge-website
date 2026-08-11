@@ -170,7 +170,7 @@ export default function PasswordForm({ email }: { email: string }) {
         type="submit"
         disabled={status === "submitting"}
         className={`w-fit ${BTN_PRIMARY}`}
-        style={{ backgroundImage: "var(--brand-gradient)" }}
+        style={{ backgroundImage: "var(--brand-gradient-action)" }}
       >
         {status === "submitting" ? "Changing…" : "Change password"}
       </button>

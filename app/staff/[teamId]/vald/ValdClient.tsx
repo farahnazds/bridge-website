@@ -57,7 +57,7 @@ function Submit({ label, pending: p }: { label: string; pending: string }) {
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? p : label}
     </button>
@@ -338,7 +338,7 @@ export default function ValdClient({
                 type="button"
                 onClick={() => setShowForm(true)}
                 className={BTN_PRIMARY}
-                style={{ backgroundImage: "var(--brand-gradient)" }}
+                style={{ backgroundImage: "var(--brand-gradient-action)" }}
               >
                 + Log test
               </button>

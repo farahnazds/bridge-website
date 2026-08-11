@@ -52,7 +52,7 @@ export default async function ClubAthletesPage({
           <Link
             href={`/club/${clubId}/athletes/new`}
             className={BTN_PRIMARY}
-            style={{ backgroundImage: "var(--brand-gradient)" }}
+            style={{ backgroundImage: "var(--brand-gradient-action)" }}
           >
             + Register Athlete
           </Link>

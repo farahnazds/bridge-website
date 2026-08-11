@@ -23,7 +23,7 @@ function SubmitButton() {
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY_LG}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? "Registering…" : "Register athlete & send invite"}
     </button>

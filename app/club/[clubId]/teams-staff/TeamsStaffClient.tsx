@@ -56,7 +56,7 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? pendingLabel : label}
     </button>
@@ -324,7 +324,7 @@ function AssignTeamWidget({
       <button
         type="submit"
         className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
-        style={{ backgroundImage: "var(--brand-gradient)" }}
+        style={{ backgroundImage: "var(--brand-gradient-action)" }}
       >
         Assign
       </button>
@@ -361,7 +361,7 @@ export default function TeamsStaffClient({
               type="button"
               onClick={() => setShowTeamForm(true)}
               className={BTN_PRIMARY}
-              style={{ backgroundImage: "var(--brand-gradient)" }}
+              style={{ backgroundImage: "var(--brand-gradient-action)" }}
             >
               + New Team
             </button>
@@ -424,7 +424,7 @@ export default function TeamsStaffClient({
               type="button"
               onClick={() => setShowInviteForm(true)}
               className={BTN_PRIMARY}
-              style={{ backgroundImage: "var(--brand-gradient)" }}
+              style={{ backgroundImage: "var(--brand-gradient-action)" }}
             >
               + Invite Practitioner
             </button>

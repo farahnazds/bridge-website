@@ -143,7 +143,7 @@ export default async function AthleteProfilePage({
             ) : (
               <div
                 className="flex items-center justify-center rounded-full text-xl font-semibold text-white"
-                style={{ height: 72, width: 72, backgroundImage: "var(--brand-gradient)" }}
+                style={{ height: 72, width: 72, backgroundImage: "var(--brand-gradient-action)" }}
               >
                 {athlete.first_name.charAt(0)}
                 {athlete.last_name.charAt(0)}

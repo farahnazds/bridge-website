@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 // Layout and information architecture follow the "Bridgetx Roster" mockup in
 // the Bridgetx brand-guidelines design project: a summary strip of stat cards
 // above a filterable, sortable athlete table with a per-athlete compliance
-// sparkline. The mockup is a DARK surface; this is not. docs/06-design-system
+// sparkline. docs/06-design-system
 // .md governs colour and type, so every value here is a brand token — see the
 // note at the top of RosterClient.tsx.
 //
@@ -90,7 +90,7 @@ function StatCard({
         <div className="h-[3px] overflow-hidden rounded-sm" style={{ backgroundColor: "var(--border)" }}>
           <div
             className="h-full rounded-sm"
-            style={{ width: `${Math.round(progress * 100)}%`, backgroundImage: "var(--brand-gradient)" }}
+            style={{ width: `${Math.round(progress * 100)}%`, backgroundImage: "var(--brand-gradient-action)" }}
           />
         </div>
       )}

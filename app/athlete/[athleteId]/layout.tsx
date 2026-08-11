@@ -63,7 +63,7 @@ export default async function AthleteLayout({
       <div className="flex flex-1">
       <aside
         className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--brand-navy)" }}
+        style={{ backgroundColor: "var(--surface)" }}
       >
 
         <SidebarNav groups={navGroups} />

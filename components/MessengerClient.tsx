@@ -58,7 +58,7 @@ function SendButton({ label }: { label: string }) {
       type="submit"
       disabled={pending}
       className={BTN_PRIMARY}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       {pending ? "Sending…" : label}
     </button>
@@ -304,7 +304,7 @@ export default function MessengerClient({
               type="button"
               onClick={() => setComposing(true)}
               className={BTN_PRIMARY}
-              style={{ backgroundImage: "var(--brand-gradient)" }}
+              style={{ backgroundImage: "var(--brand-gradient-action)" }}
             >
               + New message
             </button>

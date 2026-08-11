@@ -185,7 +185,7 @@ function EditAffordance({
       type="button"
       onClick={onEdit}
       className={`${BTN_PRIMARY} self-start`}
-      style={{ backgroundImage: "var(--brand-gradient)" }}
+      style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >
       Edit {noun}
     </button>
