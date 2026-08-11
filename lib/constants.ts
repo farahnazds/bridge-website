@@ -291,6 +291,22 @@ export const RTP_PHASES = [
   { value: "returned", label: "Returned" },
 ];
 
+// Display names for the `role` values on `profiles`. Previously declared as a
+// local ROLE_LABEL inside app/staff/[teamId]/layout.tsx covering only the four
+// roles that reach a team; the shared account page needs all of them, and two
+// maps that disagree about what to call a role is how "Club Practitioner"
+// becomes "Practitioner" on one screen and "Staff" on the next.
+export const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Admin",
+  admin: "Admin",
+  club_manager: "Club Manager",
+  club_practitioner: "Club Practitioner",
+  independent_practitioner: "Independent Practitioner",
+  athlete: "Athlete",
+  brand_partner: "Brand Partner",
+  partnerships_consultant: "Partnerships Consultant",
+};
+
 // The club-staff edit window from docs/05-business-rules.md: "Club
 // Practitioner / Club Manager | Any club staff member | 7 days, then Admin
 // only". The real enforcement is the `within_edit_window(created_at, 7)` RLS

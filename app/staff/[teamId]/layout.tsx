@@ -9,15 +9,12 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import ContextSwitcher from "@/components/ContextSwitcher";
+import { ROLE_LABELS } from "@/lib/constants";
 
 // The header states which role you are viewing as — a Club Manager and an
-// oversight Admin both reach team pages, and it should be obvious which you are.
-const ROLE_LABEL: Record<string, string> = {
-  club_practitioner: "Club Practitioner",
-  club_manager: "Club Manager",
-  admin: "Admin",
-  super_admin: "Super Admin",
-};
+// oversight Admin both reach team pages, and it should be obvious which you
+// are. The labels themselves are shared with the account page via
+// ROLE_LABELS, so a role cannot be named two different things.
 
 // Grouped per the Phase 2 brief: frequent items first, admin/config last.
 // Built inside the component because hrefs depend on the route param.
@@ -103,7 +100,7 @@ export default async function TeamLayout({
       <DashboardHeader
         name={profile.first_name ?? profile.email}
         email={profile.email}
-        role={ROLE_LABEL[profile.role] ?? "Staff"}
+        role={ROLE_LABELS[profile.role] ?? "Staff"}
         homeHref={isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : `/staff/${teamId}`}
       >
         <ContextSwitcher

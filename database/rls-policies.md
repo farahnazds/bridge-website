@@ -838,3 +838,83 @@ into one they no longer hold. Authorisation still comes from
 only ever chooses *between options the caller already has*.
 
 See `database/migrations/030_last_used_context.sql`.
+
+---
+
+## SECURITY FIX: `profiles` self-update had no column boundary (2026-08-11)
+
+Migration `031_profiles_identity_columns_immutable.sql`.
+
+The self-service policy shipped in `schema.sql` as:
+
+```sql
+create policy "update own profile basics" on profiles for update
+  using (user_id = auth.uid());
+```
+
+No `with check`. Postgres reuses `using` as the check when one is omitted, so
+the row boundary held — you could only update your own row — but **there was no
+column boundary at all**. `profiles` has no column-level `GRANT`s and had no
+trigger, so any authenticated caller with nothing but the anon key could run:
+
+```sql
+update profiles set role = 'super_admin' where user_id = auth.uid();
+```
+
+`current_user_role()` backs most other policies in this schema, so that single
+statement is a full escalation to Super Admin. The same hole allowed rewriting
+one's own `email` (the unique sign-in identity) or re-pointing `user_id` at a
+different auth user.
+
+Nothing in the app ever issued such a write — the account page's `updateMyName`
+sends `first_name` and `last_name` and no other column — but the application
+choosing not to ask is not a boundary. This was found while building
+`/account`, the first surface in the product that writes to one's own profile.
+
+### The fix
+
+A `with check` cannot express it. The rule is "these columns must equal what
+they already were", and a `with check` expression cannot see the old row.
+Writing it in the policy would mean querying `profiles` from inside a
+`profiles` policy — the recursion this schema has already hit twice (it is why
+`current_user_role()` is `security definer`, and why migration 018 exists). A
+`before update` trigger receives OLD and NEW directly: no lookup, no recursion,
+and it applies regardless of which UPDATE policy admitted the row.
+
+```sql
+create trigger trg_profiles_guard_identity_columns
+  before update on profiles
+  for each row
+  execute function guard_profile_identity_columns();
+```
+
+`guard_profile_identity_columns()` raises `42501` (→ HTTP 403 through
+PostgREST) when `role`, `email` or `user_id` changes on a row whose `user_id`
+is the caller's own. The policy is also rewritten with an explicit
+`with check (user_id = auth.uid())` — behaviourally a no-op, but it stops the
+next reader needing to know the implicit-check rule.
+
+### Deliberately still permitted
+
+- **Club staff / Super Admin updating someone else's profile.** That is
+  onboarding, already scoped by the `"club staff updates linked ..."` policies.
+  The four invite flows (`athletes/new`, `athletes/import`, `teams-staff`,
+  `clubs/new`) set `user_id` on a just-created profile whose `user_id` is still
+  null — `old.user_id is distinct from auth.uid()` is true for a null, so those
+  take the "someone else's row" branch and are unaffected.
+- **A Super Admin changing these columns on their own row.** They hold
+  `"super admin full access"` over every other row already.
+- **Callers with no `auth.uid()`** — service-role key, SQL editor, migrations,
+  `scripts/bootstrap-super-admin.mjs`. They bypass RLS by design, so the
+  trigger is not their boundary either. This escape is what keeps the bootstrap
+  script working: it inserts a profile with a null `user_id`, then sets it,
+  with no JWT in play.
+
+### Not covered
+
+`specialty` and `department` are not pinned. `docs/02-roles-and-permissions.md`
+says department "determines the default data-access tier", but **no policy in
+this schema reads it today** — every club staff member currently sees the same
+clinical detail. If department ever becomes access-bearing it belongs in the
+same guard, and the column list in `guard_profile_identity_columns()` is the
+one place to add it.

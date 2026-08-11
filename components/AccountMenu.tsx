@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { signOut } from "@/app/actions/session";
 
 // Avatar + dropdown in the dashboard header. Client-side only because it owns
@@ -86,22 +87,21 @@ export default function AccountMenu({
             <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</p>
           </div>
 
-          {/* Placeholder per the brief — there is no account-settings page yet,
-              so this is deliberately inert rather than a link to a 404. */}
-          <a
+          {/* /account is one shared route for every role — see the header of
+              app/account/page.tsx for why it is not per-dashboard, and why it
+              is not the same thing as the practitioner's /staff/profile. */}
+          <Link
             ref={firstItemRef}
+            href="/account"
             role="menuitem"
-            tabIndex={0}
-            aria-disabled="true"
-            title="Coming soon"
+            onClick={() => setOpen(false)}
             style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-              padding: "10px 14px", fontSize: 13, color: "var(--text-muted)", cursor: "default",
+              display: "block", padding: "10px 14px", fontSize: 13,
+              color: "var(--text)", textDecoration: "none",
             }}
           >
-            Account Settings
-            <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", letterSpacing: ".08em", opacity: .7 }}>SOON</span>
-          </a>
+            My Account
+          </Link>
 
           <form action={signOut} style={{ borderTop: "1px solid var(--border)" }}>
             <button

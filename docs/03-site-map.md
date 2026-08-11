@@ -9,6 +9,28 @@
 - `/join/practitioner` — Independent Practitioner signup
 - `/articles`, `/articles/[slug]`, `/contact`
 
+## Every signed-in role — `/account`
+
+"My Account", reached from the avatar dropdown in the dashboard header on
+every dashboard (Super Admin, Admin, Club Manager, Club Practitioner, Club
+Athlete). One shared route, with role-specific sections shown conditionally —
+the same one-component-many-routes shape as the Athlete Profile.
+
+- First and last name — editable, **except** for a Club Athlete, whose name
+  is held on `athletes` by their club because it appears on official reports
+  (`02-roles-and-permissions.md`: "Zero self-editable fields"). They see it
+  read-only with a pointer to message their practitioner.
+- Email — read-only. It is the sign-in username and is permanent.
+- Password — change with current-password re-verification, via
+  `supabase.auth.updateUser()` in the browser. Never touches `profiles`.
+- Club Practitioner / Club Manager only: specialty and department, read-only,
+  because department decides the default clinical-data tier and is part of the
+  staff record rather than a self-service preference.
+
+Distinct from `/staff/profile`, which is the practitioner's auto-generated
+work-history timeline (still a placeholder) — a different page about their
+career, not their login. The two are cross-linked, not merged.
+
 ## Super Admin — `/super-admin`
 
 - Overview — clubs, athletes, check-ins today, alerts

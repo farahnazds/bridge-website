@@ -1014,6 +1014,61 @@ language sql stable as $$
   select now() <= p_created_at + (p_days || ' days')::interval
 $$;
 
+-- Column boundary for the self-service half of `profiles`. RLS decides WHICH
+-- ROW a caller may update; it cannot express "and these three columns must not
+-- change", because a `with check` cannot see the old row and a subquery back
+-- onto `profiles` from a `profiles` policy recurses. A BEFORE UPDATE trigger
+-- gets OLD and NEW handed to it, so it needs neither.
+--
+-- Added by migration 031 after the "update own profile basics" policy was
+-- found to permit `update profiles set role = 'super_admin'` on one's own row.
+-- Full rationale in database/rls-policies.md.
+create or replace function guard_profile_identity_columns()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  -- The ordinary name-change path: nothing sensitive touched.
+  if new.role is not distinct from old.role
+     and new.email is not distinct from old.email
+     and new.user_id is not distinct from old.user_id then
+    return new;
+  end if;
+
+  -- No JWT (service role, SQL editor, migrations) — RLS is not in force for
+  -- these callers either, so this is not their boundary.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  -- Someone else's row: onboarding/admin work, scoped by the other UPDATE
+  -- policies. `is distinct from` so a not-yet-linked null user_id lands here.
+  if old.user_id is distinct from auth.uid() then
+    return new;
+  end if;
+
+  if is_super_admin() then
+    return new;
+  end if;
+
+  raise exception
+    'profiles.% cannot be changed on your own account'
+    , case
+        when new.role is distinct from old.role then 'role'
+        when new.email is distinct from old.email then 'email'
+        else 'user_id'
+      end
+    using errcode = '42501';
+end
+$$;
+
+drop trigger if exists trg_profiles_guard_identity_columns on profiles;
+create trigger trg_profiles_guard_identity_columns
+  before update on profiles
+  for each row
+  execute function guard_profile_identity_columns();
+
 -- ============================================================================
 -- SECTION 19 — ROW LEVEL SECURITY
 -- ============================================================================
@@ -1072,8 +1127,14 @@ create policy "super admin full access" on profiles for all
   using (is_super_admin());
 create policy "read own profile" on profiles for select
   using (user_id = auth.uid());
+-- "basics" is enforced, not just intended: the row boundary is here, and the
+-- COLUMN boundary is the trg_profiles_guard_identity_columns trigger below,
+-- which blocks role/email/user_id from changing on your own row. Without it
+-- this policy permitted `update profiles set role='super_admin'` on yourself —
+-- see migration 031 and database/rls-policies.md.
 create policy "update own profile basics" on profiles for update
-  using (user_id = auth.uid());
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
 -- No club_id lives on `profiles` itself, so this can only be scoped by
 -- role, not by "which club" — the insert alone is harmless (an unlinked
 -- profile grants no access to anything); real scoping happens on the
