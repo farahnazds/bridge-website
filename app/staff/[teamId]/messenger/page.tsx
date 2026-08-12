@@ -16,10 +16,16 @@ type AthleteEmbed = {
 
 export default async function TeamMessengerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ teamId: string }>;
+  /** ?thread=<id> — where the Athlete Profile's composer lands after sending,
+   *  so the practitioner arrives on the conversation they just started rather
+   *  than at the top of a list. */
+  searchParams: Promise<{ thread?: string }>;
 }) {
   const { teamId } = await params;
+  const { thread: openThreadId } = await searchParams;
   // Reuses the layout's cached context query — no extra round trip.
   const context = await getStaffTeamContext(teamId);
   if (!context) return null;
@@ -88,6 +94,7 @@ export default async function TeamMessengerPage({
         threads={clientThreads}
         contacts={contacts}
         revalidatePath={`/staff/${teamId}/messenger`}
+        openThreadId={openThreadId ?? null}
       />
     </div>
   );

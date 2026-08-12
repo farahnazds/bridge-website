@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { BADGE, BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
+import { useOnSaved } from "@/lib/useOnSaved";
 import { sendMessage, markThreadRead, type ActionState } from "@/app/athlete/[athleteId]/messenger/actions";
 
 // Shared by the athlete and practitioner messenger pages — the surface is
@@ -65,17 +66,27 @@ function SendButton({ label }: { label: string }) {
   );
 }
 
-function NewThreadForm({
+// Exported so the Athlete Profile's Messenger quick-add opens THIS composer
+// rather than a second one — same reasoning as the entry forms in
+// components/QuickAddModals.tsx. `lockedRecipient` fixes the addressee to the
+// athlete whose profile is open; the action, its RLS `can_message_profile`
+// check and the notification insert are all untouched.
+export function NewThreadForm({
   contacts,
   revalidatePath,
+  lockedRecipient,
   onDone,
+  onSaved,
 }: {
   contacts: ClientContact[];
   revalidatePath: string;
+  lockedRecipient?: { id: string; name: string } | null;
   onDone: () => void;
+  onSaved?: () => void;
 }) {
   const [state, formAction] = useActionState(sendMessage, initialState);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  useOnSaved(state.savedAt, onSaved);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -100,7 +111,14 @@ function NewThreadForm({
         <legend className="text-sm font-medium" style={{ color: "var(--text)" }}>
           Send to
         </legend>
-        {contacts.length === 0 ? (
+        {lockedRecipient ? (
+          // Read-only display plus a hidden input: a disabled control submits
+          // nothing, and the action requires at least one recipient_ids value.
+          <>
+            <p className="text-sm" style={{ color: "var(--text)" }}>{lockedRecipient.name}</p>
+            <input type="hidden" name="recipient_ids" value={lockedRecipient.id} />
+          </>
+        ) : contacts.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             No one available to message yet.
           </p>
@@ -192,10 +210,11 @@ function MarkReadButton({ threadId, revalidatePath }: { threadId: string; revali
   );
 }
 
-function ThreadCard({ thread, revalidatePath }: { thread: ClientThread; revalidatePath: string }) {
+function ThreadCard({ thread, revalidatePath, forceOpen = false }: { thread: ClientThread; revalidatePath: string; forceOpen?: boolean }) {
   // Threads with something unread open by default — that's the reason you
-  // came to this page.
-  const [open, setOpen] = useState(thread.unreadCount > 0);
+  // came to this page. A thread named in ?thread= opens too: you were just
+  // sent here to read it.
+  const [open, setOpen] = useState(forceOpen || thread.unreadCount > 0);
   const replyTo = thread.replyRecipientIds;
 
   return (
@@ -281,11 +300,14 @@ export default function MessengerClient({
   contacts,
   revalidatePath,
   canStartThread = true,
+  openThreadId = null,
 }: {
   threads: ClientThread[];
   contacts: ClientContact[];
   revalidatePath: string;
   canStartThread?: boolean;
+  /** Thread to expand on arrival — see the staff messenger page. */
+  openThreadId?: string | null;
 }) {
   const [composing, setComposing] = useState(false);
 
@@ -330,7 +352,7 @@ export default function MessengerClient({
       ) : (
         <div className="flex flex-col gap-3">
           {threads.map((t) => (
-            <ThreadCard key={t.threadId} thread={t} revalidatePath={revalidatePath} />
+            <ThreadCard key={t.threadId} thread={t} revalidatePath={revalidatePath} forceOpen={t.threadId === openThreadId} />
           ))}
         </div>
       )}

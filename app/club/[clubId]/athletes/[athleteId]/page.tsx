@@ -53,20 +53,7 @@ export default async function ClubAthleteProfilePage({
       // to. See components/AthleteEntryRows.tsx.
       edit={null}
       links={{
-        assessments: `/club/${clubId}/assessments`,
-        injuries: `/club/${clubId}/injuries`,
-        gps: `/club/${clubId}/gps-performance`,
-        vald: `/club/${clubId}/vald`,
         reports: `/club/${clubId}/reports`,
-        protocol: null,
-        // The club dashboard has no Comments page at all, and Periodization
-        // and Messenger are both still ComingSoon here — so these three
-        // sections show their rows without a deep link rather than pointing
-        // at a placeholder. A Club Manager reaches the real pages through
-        // /staff/[teamId], same as for editing.
-        comments: null,
-        trainingLoad: null,
-        messenger: null,
         back: { href: `/club/${clubId}/athletes`, label: "Athletes" },
       }}
     />

@@ -6,6 +6,15 @@ import { getCurrentProfile } from "@/lib/auth";
 
 export interface ActionState {
   error: string | null;
+  /** Set only on a successful send. `{ error: null }` doubles as the initial
+   *  state, so a timestamp is what lets a caller detect one — same shape the
+   *  data-entry actions use, added so the Athlete Profile's message composer
+   *  can close and refresh. */
+  savedAt?: number;
+  /** The thread the message landed in — a new uuid for a new conversation, or
+   *  the existing one for a reply. Returned so the Athlete Profile's composer
+   *  can navigate straight to that conversation after sending. */
+  threadId?: string;
 }
 
 // Shared by both messenger sides. `threadId` null starts a new thread;
@@ -63,7 +72,10 @@ export async function sendMessage(_prevState: ActionState, formData: FormData): 
   // (database/migrations/013_messenger_policies.sql). Best-effort: a failure
   // here must not undo a message that was already delivered.
   const senderName = `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email;
-  const { error: notifError } = await supabase.from("notifications").insert(
+  // Result deliberately unread: the send already succeeded, and this insert is
+  // best-effort. It used to be branched on only to return the same
+  // `{ error: null }` either way, so the branch said nothing.
+  await supabase.from("notifications").insert(
     recipientIds.map((recipientId) => ({
       profile_id: recipientId,
       type: "message_received",
@@ -74,10 +86,11 @@ export async function sendMessage(_prevState: ActionState, formData: FormData): 
   );
 
   if (revalidate) revalidatePath(revalidate);
-  if (notifError) {
-    return { error: null };
-  }
-  return { error: null };
+  // Both paths are a successful SEND — the notification is best-effort and its
+  // failure must not read as a failed message, so savedAt is set either way.
+  // Without it the profile's composer would stay open after a delivered
+  // message just because the in-app notification insert happened to fail.
+  return { error: null, savedAt: Date.now(), threadId: newThreadId };
 }
 
 // Marks every message in a thread that is addressed to the caller as read.

@@ -11,6 +11,7 @@ import { LogForm as LogValdForm } from "@/app/staff/[teamId]/vald/ValdClient";
 import { LogInjuryForm } from "@/app/staff/[teamId]/injuries/InjuriesClient";
 import { NewCommentForm } from "@/app/staff/[teamId]/comments/CommentsClient";
 import { PlanForm } from "@/app/staff/[teamId]/training-load/TrainingLoadClient";
+import AthleteMessageComposer from "@/components/AthleteMessageComposer";
 
 // The Athlete Profile's quick-add: a "+" on each section that opens the REAL
 // entry form for that data type, with the athlete fixed to this profile.
@@ -45,6 +46,10 @@ import { PlanForm } from "@/app/staff/[teamId]/training-load/TrainingLoadClient"
 export interface QuickAddContext {
   teamId: string;
   athlete: FieldAthlete;
+  /** The athlete's login profile id, or null if they haven't activated. A
+   *  message needs a recipient PROFILE, not an athlete row, so the Messenger
+   *  quick-add is not offered when this is null — there is nobody to address. */
+  athleteProfileId?: string | null;
   /** Team name, for the Comments form's target list. */
   teamName: string;
   /** Practitioners on this team — recipient candidates for report sharing.
@@ -109,7 +114,8 @@ export type QuickAddKind =
   | "vald"
   | "injury"
   | "comment"
-  | "training_load";
+  | "training_load"
+  | "message";
 
 const TITLES: Record<QuickAddKind, string> = {
   assessment: "Log assessment",
@@ -118,6 +124,7 @@ const TITLES: Record<QuickAddKind, string> = {
   injury: "Log injury",
   comment: "New comment",
   training_load: "Add to training plan",
+  message: "Message athlete",
 };
 
 export function QuickAdd({ kind, ctx, onClose }: { kind: QuickAddKind; ctx: QuickAddContext; onClose: () => void }) {
@@ -150,6 +157,18 @@ export function QuickAdd({ kind, ctx, onClose }: { kind: QuickAddKind; ctx: Quic
                 onSaved={onSaved}
               />
             );
+          case "message":
+            // Compose-and-redirect rather than compose-and-close: sending
+            // creates the thread through the Messenger action and then lands on
+            // that conversation. Only rendered when athleteProfileId exists.
+            return ctx.athleteProfileId ? (
+              <AthleteMessageComposer
+                teamId={ctx.teamId}
+                recipientProfileId={ctx.athleteProfileId}
+                athleteName={ctx.athlete.label}
+                onDone={onDone}
+              />
+            ) : null;
           case "training_load":
             return (
               <PlanForm

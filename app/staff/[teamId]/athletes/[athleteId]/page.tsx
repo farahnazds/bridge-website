@@ -88,6 +88,10 @@ export default async function TeamAthleteProfilePage({
       quickAdd={{
         teamId,
         athlete: { id: data.athlete.id, label: `${data.athlete.first_name} ${data.athlete.last_name}` },
+        // Null until the athlete activates. The Messenger quick-add is hidden
+        // in that case — a message needs a recipient profile, and there isn't
+        // one to address yet.
+        athleteProfileId: data.athlete.profile_id,
         teamName: context.team.name,
         practitioners,
         defaultLanguage,
@@ -96,15 +100,7 @@ export default async function TeamAthleteProfilePage({
         context.isOversight ? "You are viewing this athlete as oversight, not as assigned staff." : undefined
       }
       links={{
-        assessments: `/staff/${teamId}/assessments`,
-        injuries: `/staff/${teamId}/injuries`,
-        gps: `/staff/${teamId}/gps-performance`,
-        vald: `/staff/${teamId}/vald`,
         reports: `/staff/${teamId}/reports`,
-        protocol: null,
-        comments: `/staff/${teamId}/comments`,
-        trainingLoad: `/staff/${teamId}/training-load`,
-        messenger: `/staff/${teamId}/messenger`,
         back: { href: `/staff/${teamId}`, label: "Roster" },
       }}
     />

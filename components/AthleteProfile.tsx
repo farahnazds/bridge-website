@@ -29,19 +29,10 @@ import { BADGE, CARD, NOTICE_EMPTY } from "@/lib/ui";
 // shells and section headings still live here.
 
 export interface ProfileLinks {
-  assessments: string | null;
-  injuries: string | null;
-  gps: string | null;
-  vald: string | null;
+  // Reports is the only section that still deep-links out. The rest lost their
+  // "Open …" buttons — the dedicated pages stay reachable from the sidebar, and
+  // each section now offers a quick-add instead.
   reports: string | null;
-  protocol: string | null;
-  // Null on the club route: /club/[clubId] has no Comments page at all, and
-  // its Periodization and Messenger routes are still ComingSoon. A Section
-  // with href={null} renders its rows without an "Open …" link rather than
-  // deep-linking somewhere that cannot answer.
-  comments: string | null;
-  trainingLoad: string | null;
-  messenger: string | null;
   back: { href: string; label: string };
 }
 
@@ -226,7 +217,7 @@ export default function AthleteProfile({
         </p>
       </div>
 
-      <Section title="Supplement protocol" href={links.protocol}
+      <Section title="Supplement protocol"
         hint="One active prescription at a time; a new one supersedes the last rather than deleting it.">
         {data.activeProtocol ? (
           <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
@@ -255,7 +246,7 @@ export default function AthleteProfile({
         )}
       </Section>
 
-      <Section title="Body composition" href={links.assessments} hint="Latest assessment, and the change since the one before it.">
+      <Section title="Body composition" hint="Latest assessment, and the change since the one before it.">
         {latest ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Card label="Weight" value={num(latest.weightKg, 1, " kg")}
@@ -293,7 +284,7 @@ export default function AthleteProfile({
       {/* The assessment history the cards above summarise. It exists as its
           own table because the cards can only ever show the latest two, and
           because a row is what opens the real assessment edit form. */}
-      <Section title="Assessment history" href={links.assessments} hint="Ten most recent assessments."
+      <Section title="Assessment history" hint="Ten most recent assessments."
         action={quickAdd && <SectionQuickAdd kind="assessment" ctx={quickAdd} label="Log an assessment for this athlete" />}>
         {assessments.length === 0 ? (
           <Empty>No assessments recorded.</Empty>
@@ -321,7 +312,7 @@ export default function AthleteProfile({
           rather than at the end. Individual entries only — a team-wide entry
           applies to this athlete but is not about them, and the club route has
           no team in scope to resolve one against. */}
-      <Section title="Training load" href={links.trainingLoad}
+      <Section title="Training load"
         hint="Plan entries written for this athlete specifically. Team-wide entries apply too and live on the Training Load Plan."
         action={quickAdd && <SectionQuickAdd kind="training_load" ctx={quickAdd} label="Plan a session for this athlete" />}>
         {trainingLoad.length === 0 ? (
@@ -333,7 +324,7 @@ export default function AthleteProfile({
         )}
       </Section>
 
-      <Section title="Injuries" href={links.injuries}
+      <Section title="Injuries"
         action={quickAdd && <SectionQuickAdd kind="injury" ctx={quickAdd} label="Log an injury for this athlete" />}>
         {injuries.length === 0 ? (
           <Empty>No injuries recorded.</Empty>
@@ -345,7 +336,7 @@ export default function AthleteProfile({
       </Section>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <Section title="GPS" href={links.gps} hint="Five most recent sessions."
+        <Section title="GPS" hint="Five most recent sessions."
           action={quickAdd && <SectionQuickAdd kind="gps" ctx={quickAdd} label="Add a GPS session for this athlete" />}>
           {gps.length === 0 ? <Empty>No GPS sessions recorded.</Empty> : (
             <Table head={["Date", "Distance", "m/min", "Max vel."]}>
@@ -354,7 +345,7 @@ export default function AthleteProfile({
           )}
         </Section>
 
-        <Section title="VALD" href={links.vald} hint="Five most recent tests."
+        <Section title="VALD" hint="Five most recent tests."
           action={quickAdd && <SectionQuickAdd kind="vald" ctx={quickAdd} label="Log a VALD test for this athlete" />}>
           {vald.length === 0 ? <Empty>No VALD tests recorded.</Empty> : (
             <Table head={["Date", "Test", "Asymmetry"]}>
@@ -380,7 +371,7 @@ export default function AthleteProfile({
           states the rule the database enforces rather than describing a filter
           this file performs, because this file performs none. See the note on
           CommentEntry in lib/athleteProfile.ts. */}
-      <Section title="Comments" href={links.comments}
+      <Section title="Comments"
         hint="Official Comments from anyone with access to this athlete, plus your own Private Notes. Another author's Private Notes are never shown."
         action={quickAdd && <SectionQuickAdd kind="comment" ctx={quickAdd} label="Post a comment about this athlete" />}>
         {comments.length === 0 ? (
@@ -394,8 +385,11 @@ export default function AthleteProfile({
 
       {/* Scoped to the viewer's own correspondence for the same reason: the
           messages policies only return threads the caller sent or received. */}
-      <Section title="Messenger" href={links.messenger}
-        hint="Your conversations with this athlete. Other staff members' conversations are not shown.">
+      <Section title="Messenger"
+        hint="Your conversations with this athlete. Other staff members' conversations are not shown."
+        action={quickAdd && athlete.profile_id
+          ? <SectionQuickAdd kind="message" ctx={quickAdd} label="Message this athlete" />
+          : undefined}>
         {threads.length === 0 ? (
           <Empty>
             {athlete.profile_id
