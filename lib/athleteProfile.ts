@@ -1,4 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth";
+import { getThreadsForCurrentProfile } from "@/lib/messaging";
+import { readComments, commentAuthorName } from "@/lib/comments";
 import { EDIT_WINDOW_MS } from "@/lib/constants";
 // Type-only imports, erased at compile time — no client module is pulled into
 // this server loader. They exist so the rows this file produces ARE the props
@@ -32,6 +35,10 @@ import type { ValdEntry } from "@/app/staff/[teamId]/vald/ValdClient";
 
 export interface AthleteIdentity {
   id: string;
+  /** Null until the athlete activates their login. Only used to find the
+   *  messenger threads this athlete is a participant in — an athlete with no
+   *  profile cannot be addressed, so there is nothing to look up. */
+  profile_id: string | null;
   club_id: string | null;
   first_name: string;
   last_name: string;
@@ -79,6 +86,9 @@ export interface AthleteProfileData {
   gps: GpsEntry[];
   injuries: InjuryRecord[];
   reports: ReportDetail[];
+  comments: CommentEntry[];
+  trainingLoad: TrainingLoadEntry[];
+  threads: ThreadSummary[];
 }
 
 // Re-exported so a consumer of this loader never has to reach into an
@@ -110,6 +120,79 @@ export interface ReportDetail {
   hasPdf: boolean;
 }
 
+// A comment about THIS athlete. Deliberately a view shape with no edit form
+// behind it: /staff/[teamId]/comments offers post, delete-own and
+// turn-off-AI-reflection, and no update-the-body path exists anywhere in the
+// app, so there is nothing here for a modal to reuse.
+//
+// VISIBILITY IS NOT DECIDED HERE, AND CANNOT BE.
+//
+// This loader does not write a comments query at all. It calls readComments()
+// in lib/comments.ts — the SAME function app/staff/[teamId]/comments/page.tsx
+// calls — passing only a scope. There is no comment_type or author parameter
+// to pass, so the Flow 8 privacy rule is not a thing this file could get wrong
+// even by accident; RLS answers it, identically for both surfaces.
+//
+// Proven, not asserted: with a mix of private and official comments from three
+// different authors across both the athlete and team scopes, the profile's
+// read and the Comments page's read (restricted to the same athlete) returned
+// byte-identical rows for every real account tested — practitioner, second
+// practitioner, club manager, and a manager at another club. See
+// database/rls-policies.md.
+export interface CommentEntry {
+  id: string;
+  commentType: "private_note" | "official_comment";
+  body: string;
+  reflectInAi: boolean;
+  /** True when a Club Manager turned reflection off, as opposed to it never
+   *  having been marked — the two read very differently to the author. */
+  aiReflectionDisabled: boolean;
+  authorName: string;
+  createdAt: string;
+  isOwn: boolean;
+}
+
+// A Training Load Plan entry naming THIS athlete specifically (athlete_id set).
+// Team-wide entries (athlete_id null) also apply to them but are not about
+// them, and the athlete profile has no team in scope on the club route — so
+// they stay on the dedicated page, which is what the section's hint says.
+//
+// Read-only for the same reason as comments: the Training Load Plan page
+// offers add and remove, never edit, so there is no form to reuse.
+export interface TrainingLoadEntry {
+  id: string;
+  date: string;
+  intensity: string;
+  rpe: number | null;
+  seasonPhase: string | null;
+  sessionType: string | null;
+  sessionDurationBand: string | null;
+  estimatedSweatRateMl: number | null;
+  createdByName: string;
+}
+
+// One messenger thread that this athlete is a participant in.
+//
+// `id` rather than `threadId` so the shared useOpenEntry() row helper works
+// unchanged — a thread is the "row" here, and a message is not independently
+// addressable.
+//
+// SCOPE: this is the VIEWER's correspondence with the athlete, not the
+// athlete's inbox. lib/messaging.ts reads `messages` under the caller's own
+// client, and its only SELECT policies are "sender reads own messages" and
+// "recipient reads message via join" — so another practitioner's thread with
+// the same athlete is invisible here, exactly as it is on the Messenger page.
+// The section heading says so rather than implying completeness.
+export interface ThreadSummary {
+  id: string;
+  lastAt: string;
+  withNames: string[];
+  messageCount: number;
+  unreadCount: number;
+  lastBody: string;
+  messages: { id: string; senderName: string; body: string; createdAt: string; isMine: boolean }[];
+}
+
 const COMPLIANCE_WINDOW_DAYS = 30;
 
 function avg(values: (number | null)[]): number | null {
@@ -134,7 +217,7 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
   const { data: athlete } = await supabase
     .from("athletes")
     .select(
-      "id, club_id, first_name, last_name, code, sport, position, tier, diet_preference, country, dob, gender, ethnicity, status, profile_photo_url, menstrual_status, iron_status, goal_body_fat_pct, goal_lean_mass_kg, is_subscribed, created_at, updated_at"
+      "id, profile_id, club_id, first_name, last_name, code, sport, position, tier, diet_preference, country, dob, gender, ethnicity, status, profile_photo_url, menstrual_status, iron_status, goal_body_fat_pct, goal_lean_mass_kg, is_subscribed, created_at, updated_at"
     )
     .eq("id", athleteId)
     .maybeSingle();
@@ -146,9 +229,16 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
 
   const since = new Date(Date.now() - COMPLIANCE_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
 
+  // Needed for two things only: `isOwn` on a comment (whose Delete affordance
+  // the Comments page gates on authorship) and the viewer id the messenger
+  // thread assembly is written around. Cached per request by lib/auth.ts, and
+  // both routes already called it, so this costs nothing.
+  const viewer = await getCurrentProfile();
+
   const [
     conditionsRes, allergiesRes, intolerancesRes, teamsRes,
     protocolsRes, assessmentsRes, checkinsRes, valdRes, gpsRes, injuriesRes, reportsRes,
+    commentsRes, trainingLoadRes, allThreads,
   ] = await Promise.all([
     supabase.from("athlete_conditions").select("other_note, medical_conditions(label)").eq("athlete_id", athleteId),
     supabase.from("athlete_allergies").select("other_note, allergies(label)").eq("athlete_id", athleteId),
@@ -209,6 +299,29 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
       .contains("athlete_ids", [athleteId])
       .order("created_at", { ascending: false })
       .limit(8),
+    // THE SAME READ THE COMMENTS PAGE PERFORMS — literally the same function,
+    // not a matching copy. Only the scope differs (this one athlete, rather
+    // than the team plus its roster), which is a product question. Visibility
+    // is not a parameter and is not expressible here: see lib/comments.ts.
+    readComments({ athleteIds: [athleteId], limit: 10 }),
+    // athlete_id set = an entry written for this athlete specifically. The
+    // dedicated page shows today-onward only because it is a planning surface;
+    // here the ordering matches every other table on the profile (newest date
+    // first) so past and planned entries both stay reachable.
+    supabase
+      .from("training_load_plans")
+      .select(
+        "id, date, intensity, rpe, season_phase, session_type, session_duration_band, estimated_sweat_rate_ml, created_by, creator:profiles!created_by(first_name, last_name)"
+      )
+      .eq("athlete_id", athleteId)
+      .order("date", { ascending: false })
+      .limit(8),
+    // Reuses the Messenger page's own thread assembly rather than a second
+    // read of messages/message_recipients. An athlete with no profile_id has
+    // never activated and cannot be a recipient, so there is nothing to fetch.
+    athlete.profile_id && viewer
+      ? getThreadsForCurrentProfile(viewer.id)
+      : Promise.resolve([]),
   ]);
 
   // Each *_code join is many-to-one, so PostgREST returns a single object —
@@ -312,6 +425,97 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     isEditable: editable(v.created_at as string),
   }));
 
+  // No filtering step between the read and the render — every row readComments
+  // returned is shown. `isOwn` labels the author column and picks the modal's
+  // footer wording; it never hides a row, because RLS already did.
+  const comments: CommentEntry[] = commentsRes.rows.map((c) => ({
+    id: c.id,
+    commentType: c.comment_type,
+    body: c.body,
+    reflectInAi: c.reflect_in_ai,
+    aiReflectionDisabled: c.ai_reflection_disabled_by !== null,
+    authorName: commentAuthorName(c),
+    createdAt: c.created_at,
+    isOwn: viewer !== null && c.author_id === viewer.id,
+  }));
+
+  type TrainingLoadRaw = Record<string, unknown> & {
+    creator: { first_name: string | null; last_name: string | null } | null;
+  };
+  const trainingLoad: TrainingLoadEntry[] = ((trainingLoadRes.data ?? []) as unknown as TrainingLoadRaw[]).map((t) => ({
+    id: t.id as string,
+    date: t.date as string,
+    intensity: t.intensity as string,
+    rpe: t.rpe as number | null,
+    seasonPhase: t.season_phase as string | null,
+    sessionType: t.session_type as string | null,
+    sessionDurationBand: t.session_duration_band as string | null,
+    estimatedSweatRateMl: t.estimated_sweat_rate_ml as number | null,
+    createdByName: personName(t.creator),
+  }));
+
+  // A thread belongs on this profile when the athlete is one of its
+  // participants — sender of some message, or addressed on one. Everything
+  // `allThreads` contains is already a thread the viewer is party to.
+  const athleteProfileId = athlete.profile_id;
+
+  // WHY THE ATHLETE IS NAMED FROM `athletes` RATHER THAN FROM THE THREAD.
+  //
+  // lib/messaging.ts resolves every participant by reading `profiles`, and no
+  // club staff member can read an ATHLETE's profiles row: "club staff reads
+  // athlete profiles" is an `exists` over `athletes` evaluated under the
+  // caller's own RLS, and it does not admit them. Verified live — a Club
+  // Practitioner AND a Club Manager both get zero rows for their own team's
+  // athlete. So participantNames/senderName arrive as "—".
+  //
+  // That is a pre-existing defect on /staff/[teamId]/messenger, which shows
+  // the same em dash today, and it is the exact pattern migration 032 flagged
+  // and deliberately left alone — fixing it is a policy decision about how far
+  // athlete-name resolution should reach, not something to bundle into an
+  // additive profile section.
+  //
+  // This page does not need the policy changed: it already holds the athlete's
+  // name from the `athletes` row it just read, and the athlete is a
+  // participant in every thread here by construction. So the substitution
+  // below is local knowledge, not a widened grant. Anyone else on the thread
+  // is still named the way lib/messaging.ts named them.
+  const threads: ThreadSummary[] = (athleteProfileId
+    ? allThreads.filter((t) =>
+        t.messages.some((m) => m.senderId === athleteProfileId || m.recipientIds.includes(athleteProfileId))
+      )
+    : []
+  ).map((t) => {
+    const last = t.messages[t.messages.length - 1];
+
+    const participantIds = new Set<string>();
+    for (const m of t.messages) {
+      participantIds.add(m.senderId);
+      for (const r of m.recipientIds) participantIds.add(r);
+    }
+    if (viewer) participantIds.delete(viewer.id);
+
+    // A participant who only ever received is not named by any message, hence
+    // the "—" fallback — the same value lib/messaging.ts would have produced.
+    const nameFor = (id: string) =>
+      id === athleteProfileId ? athleteName : t.messages.find((m) => m.senderId === id)?.senderName ?? "—";
+
+    return {
+      id: t.threadId,
+      lastAt: t.lastAt,
+      withNames: [...participantIds].map(nameFor),
+      messageCount: t.messages.length,
+      unreadCount: t.unreadCount,
+      lastBody: last?.body ?? "",
+      messages: t.messages.map((m) => ({
+        id: m.id,
+        senderName: m.senderId === athleteProfileId ? athleteName : m.senderName,
+        body: m.body,
+        createdAt: m.createdAt,
+        isMine: m.isMine,
+      })),
+    };
+  });
+
   type ReportRaw = Record<string, unknown> & {
     generator: { first_name: string | null; last_name: string | null } | null;
   };
@@ -351,6 +555,9 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     gps,
     injuries,
     reports,
+    comments,
+    trainingLoad,
+    threads,
   };
 }
 

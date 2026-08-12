@@ -10,11 +10,17 @@ import {
   GpsDetailModal,
   ValdDetailModal,
   AssessmentDetailModal,
+  CommentDetailModal,
+  TrainingLoadDetailModal,
+  ThreadDetailModal,
   type EntryEditContext,
 } from "@/components/EntryDetailModals";
-import { INJURY_STATUSES, RTP_PHASES, VALD_TEST_TYPES, REPORT_TYPE_LABELS } from "@/lib/constants";
+import { INJURY_STATUSES, RTP_PHASES, VALD_TEST_TYPES, INTENSITIES, REPORT_TYPE_LABELS } from "@/lib/constants";
 import { BADGE, NOTICE_EMPTY, PANEL } from "@/lib/ui";
-import type { InjuryRecord, AssessmentRecord, GpsEntry, ValdEntry, ReportDetail } from "@/lib/athleteProfile";
+import type {
+  InjuryRecord, AssessmentRecord, GpsEntry, ValdEntry, ReportDetail,
+  CommentEntry, TrainingLoadEntry, ThreadSummary,
+} from "@/lib/athleteProfile";
 
 // The clickable half of the Athlete Profile: every data row opens a modal
 // showing that entry in full, and — where the rules already allow it — the
@@ -60,6 +66,32 @@ const STATUS_COLOR: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = Object.fromEntries(INJURY_STATUSES.map((s) => [s.value, s.label]));
 const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
 const VALD_LABEL: Record<string, string> = Object.fromEntries(VALD_TEST_TYPES.map((t) => [t.value, t.label]));
+const INTENSITY_LABEL: Record<string, string> = Object.fromEntries(INTENSITIES.map((i) => [i.value, i.label]));
+// Same four colours the Training Load Plan page uses for its intensity dot.
+const INTENSITY_COLOR: Record<string, string> = {
+  high: "var(--danger)",
+  medium: "var(--warning)",
+  low: "var(--brand-blue)",
+  rest: "var(--success)",
+};
+
+/** One-line preview for a body of free text in a table cell. */
+function preview(text: string, max = 70): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+}
+
+// The date half of a timestamptz, NOT a locale-formatted date.
+//
+// Two reasons, and the first is a bug that was caught here in the browser:
+// toLocaleDateString() in a client component renders under the SERVER's locale
+// during SSR and the BROWSER's on hydration ("Aug 12, 2026" vs "12 Aug 2026"),
+// which React reports as a hydration mismatch and repaints. Second, every
+// other table on this profile shows a plain ISO date in tabular figures, and
+// comments/threads are the only rows carrying a timestamp rather than a date
+// column — formatting them differently would have been the odd one out.
+// Same slice ReportRows already used for exactly this reason.
+const shortDate = (iso: string) => String(iso).slice(0, 10);
 
 const num = (v: number | null | undefined, digits = 1, suffix = "") =>
   v === null || v === undefined ? "—" : `${Number(v).toFixed(digits)}${suffix}`;
@@ -272,6 +304,146 @@ export function AssessmentRows({ entries, edit }: { entries: AssessmentRecord[];
       {open && (
         <AssessmentDetailModal record={open} edit={edit} onClose={() => setOpenId(null)} />
       )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- comments
+
+/**
+ * Comments about this athlete.
+ *
+ * There is no `edit` prop and no visibility prop, on purpose. Which rows exist
+ * in `entries` was decided by RLS in lib/athleteProfile.ts — a private note
+ * belonging to someone else never reaches this component on any route, so
+ * there is no client-side branch here that could get it wrong. The badge
+ * distinguishes the two types for the reader; it does not gate anything.
+ */
+export function CommentRows({ entries }: { entries: CommentEntry[] }) {
+  const { open, setOpenId } = useOpenEntry(entries);
+
+  return (
+    <>
+      {entries.map((c, i) => {
+        const isOfficial = c.commentType === "official_comment";
+        return (
+          <ClickableRow
+            key={c.id}
+            first={i === 0}
+            onOpen={() => setOpenId(c.id)}
+            label={`Open ${isOfficial ? "official comment" : "private note"} from ${shortDate(c.createdAt)}`}
+          >
+            <td className={CELL} style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+              {shortDate(c.createdAt)}
+            </td>
+            <td className={CELL}>
+              <span
+                className={BADGE}
+                style={{
+                  backgroundColor: isOfficial
+                    ? "color-mix(in srgb, var(--brand-blue) 12%, transparent)"
+                    : "color-mix(in srgb, var(--text-muted) 15%, transparent)",
+                  color: isOfficial ? "var(--brand-blue)" : "var(--text-muted)",
+                }}
+              >
+                {isOfficial ? "Official" : "Private"}
+              </span>
+            </td>
+            <td className={CELL} style={{ color: "var(--text)" }}>
+              {preview(c.body)}
+            </td>
+            <td className={CELL} style={{ color: "var(--text-muted)" }}>
+              {c.isOwn ? "You" : c.authorName}
+            </td>
+          </ClickableRow>
+        );
+      })}
+
+      {open && <CommentDetailModal comment={open} onClose={() => setOpenId(null)} />}
+    </>
+  );
+}
+
+// ---------------------------------------------------- training load plan
+
+export function TrainingLoadRows({ entries }: { entries: TrainingLoadEntry[] }) {
+  const { open, setOpenId } = useOpenEntry(entries);
+
+  return (
+    <>
+      {entries.map((e, i) => {
+        const color = INTENSITY_COLOR[e.intensity] ?? "var(--text-muted)";
+        return (
+          <ClickableRow
+            key={e.id}
+            first={i === 0}
+            onOpen={() => setOpenId(e.id)}
+            label={`Open planned session on ${e.date}`}
+          >
+            <td className={CELL} style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+              {e.date}
+            </td>
+            <td className={CELL}>
+              <span className={BADGE} style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
+                {INTENSITY_LABEL[e.intensity] ?? e.intensity ?? "—"}
+              </span>
+            </td>
+            <td className={CELL} style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+              {e.rpe ?? "—"}
+            </td>
+            <td className={CELL} style={{ color: "var(--text-muted)" }}>
+              {e.createdByName}
+            </td>
+          </ClickableRow>
+        );
+      })}
+
+      {open && <TrainingLoadDetailModal entry={open} onClose={() => setOpenId(null)} />}
+    </>
+  );
+}
+
+// -------------------------------------------------------------- messenger
+
+export function ThreadRows({ entries }: { entries: ThreadSummary[] }) {
+  const { open, setOpenId } = useOpenEntry(entries);
+
+  return (
+    <>
+      {entries.map((t, i) => (
+        <ClickableRow
+          key={t.id}
+          first={i === 0}
+          onOpen={() => setOpenId(t.id)}
+          label={`Open conversation last active ${shortDate(t.lastAt)}`}
+        >
+          <td className={CELL} style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+            {shortDate(t.lastAt)}
+          </td>
+          <td className={CELL} style={{ color: "var(--text)" }}>
+            {preview(t.lastBody)}
+          </td>
+          <td className={CELL} style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+            {t.messageCount}
+          </td>
+          <td className={CELL}>
+            {t.unreadCount > 0 ? (
+              <span
+                className={BADGE}
+                style={{ backgroundColor: "color-mix(in srgb, var(--brand-blue) 12%, transparent)", color: "var(--brand-blue)" }}
+              >
+                {t.unreadCount} unread
+              </span>
+            ) : (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                —
+              </span>
+            )}
+          </td>
+        </ClickableRow>
+      ))}
+
+      {open && <ThreadDetailModal thread={open} onClose={() => setOpenId(null)} />}
     </>
   );
 }

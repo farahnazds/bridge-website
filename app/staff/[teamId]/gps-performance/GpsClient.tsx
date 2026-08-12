@@ -4,8 +4,8 @@ import { useActionState, useState } from "react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DataCsvImportPanel from "@/components/DataCsvImportPanel";
-import { EDIT_WINDOW_CLOSED_LABEL } from "@/lib/constants";
 import { useOnSaved } from "@/lib/useOnSaved";
+import { GpsDetailModal } from "@/components/EntryDetailModals";
 import { logGps, updateGps, previewGpsCsv, confirmGpsCsv, type ActionState, type GpsValues } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -219,40 +219,44 @@ export function EditGpsForm({
   );
 }
 
+// Editing is reached through the detail modal now, not from the row. The title
+// line is a real <button> because it is the row's ONLY focusable control — the
+// removed "Edit" link used to be, and dropping it without this would leave the
+// row openable by mouse alone. The wrapper keeps its onClick as a pointer
+// convenience.
 function Row({ teamId, entry }: { teamId: string; entry: GpsEntry }) {
-  const [editing, setEditing] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const v = entry.values;
   return (
-    <div className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--border)" }}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+    <>
+      <div
+        onClick={() => setDetailOpen(true)}
+        className="cursor-pointer border-b py-3 transition-colors duration-150 last:border-b-0 hover:bg-white/[0.03]"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <p className="text-sm font-medium">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDetailOpen(true);
+            }}
+            className="text-left underline-offset-2 hover:underline"
+            style={{ color: "var(--text)" }}
+          >
             {entry.athleteName} · {entry.date}
-          </p>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {v.total_distance_m ?? "—"} m · {v.meters_per_min ?? "—"} m/min · max{" "}
-            {v.max_velocity ?? "—"} m/s · load {v.player_load ?? "—"} · {entry.providerName}
-          </p>
-        </div>
-        {entry.isEditable ? (
-          !editing && (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="text-xs font-medium underline-offset-2 hover:underline"
-              style={{ color: "var(--brand-blue)" }}
-            >
-              Edit
-            </button>
-          )
-        ) : (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {EDIT_WINDOW_CLOSED_LABEL}
-          </span>
-        )}
+          </button>
+        </p>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {v.total_distance_m ?? "—"} m · {v.meters_per_min ?? "—"} m/min · max{" "}
+          {v.max_velocity ?? "—"} m/s · load {v.player_load ?? "—"} · {entry.providerName}
+        </p>
       </div>
-      {editing && <EditGpsForm teamId={teamId} entry={entry} onDone={() => setEditing(false)} />}
-    </div>
+
+      {detailOpen && (
+        <GpsDetailModal entry={entry} edit={{ teamId }} onClose={() => setDetailOpen(false)} />
+      )}
+    </>
   );
 }
 

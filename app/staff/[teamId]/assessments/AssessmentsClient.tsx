@@ -3,8 +3,8 @@
 import { useActionState, useState } from "react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
-import { EDIT_WINDOW_CLOSED_LABEL } from "@/lib/constants";
 import { useOnSaved } from "@/lib/useOnSaved";
+import { AssessmentDetailModal } from "@/components/EntryDetailModals";
 import { logAssessment, updateAssessment, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -328,50 +328,75 @@ function fmt(value: number | null, unit = ""): string {
   return value === null ? "—" : `${value}${unit}`;
 }
 
+const CELL = "px-4 py-3 whitespace-nowrap";
+
 function AssessmentRow({ teamId, record }: { teamId: string; record: AssessmentRecord }) {
-  const [editing, setEditing] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
+  // Real <td> cells, one per <th>.
+  //
+  // This row used to be a single <td colSpan={9}> wrapping a `grid-cols-9`.
+  // The header cells size to their content while the grid divides the width
+  // into nine equal fractions, so the two could never line up — the body drifted
+  // left of the headings by a growing amount across the row. Using actual cells
+  // hands column sizing back to the table, which is the only thing that keeps
+  // header and body in the same columns.
+  //
+  // Editing is reached through the detail modal now, not from the row. The
+  // athlete name is a real <button> rather than plain text because it is the
+  // row's ONLY focusable control: the removed "Edit" link used to be, and
+  // dropping it without this would leave the row openable by mouse alone. The
+  // <tr> keeps its own onClick purely as a pointer convenience and deliberately
+  // carries no role="button" — that would flatten the table's row semantics for
+  // a screen reader, which the button in the cell gives us without cost.
   return (
-    <tr style={{ borderTop: "1px solid var(--border)" }}>
-      <td colSpan={9} className="px-5 py-3">
-        <div className="grid grid-cols-9 items-center gap-2 text-sm">
-          <span className="font-medium" style={{ color: "var(--text)" }}>
+    <>
+      <tr
+        onClick={() => setDetailOpen(true)}
+        className="cursor-pointer transition-colors duration-150 hover:bg-white/[0.03]"
+        style={{ borderTop: "1px solid var(--border)" }}
+      >
+        <td className={`${CELL} font-medium`}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDetailOpen(true);
+            }}
+            className="text-left underline-offset-2 hover:underline"
+            style={{ color: "var(--text)" }}
+          >
             {record.athleteName}
-          </span>
-          <span style={{ color: "var(--text)" }}>{record.date}</span>
-          <span style={{ color: "var(--text)" }}>{fmt(record.weightKg, " kg")}</span>
-          <span style={{ color: "var(--text)" }}>{fmt(record.bodyFatPct, "%")}</span>
-          <span style={{ color: "var(--text)" }}>{fmt(record.leanMassKg, " kg")}</span>
-          <span style={{ color: "var(--text)" }}>{fmt(record.muscleMassKg, " kg")}</span>
-          <span style={{ color: "var(--text-muted)" }} className="text-xs">
-            {record.providerName}
-          </span>
-          <span>
-            {record.isEditable ? (
-              !editing && (
-                <button
-                  type="button"
-                  onClick={() => setEditing(true)}
-                  className="text-xs font-medium underline-offset-2 hover:underline"
-                  style={{ color: "var(--brand-blue)" }}
-                >
-                  Edit
-                </button>
-              )
-            ) : (
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                {EDIT_WINDOW_CLOSED_LABEL}
-              </span>
-            )}
-          </span>
-          <span />
-        </div>
+          </button>
+        </td>
+        <td className={CELL} style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+          {record.date}
+        </td>
+        <td className={CELL} style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+          {fmt(record.weightKg, " kg")}
+        </td>
+        <td className={CELL} style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+          {fmt(record.bodyFatPct, "%")}
+        </td>
+        <td className={CELL} style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+          {fmt(record.leanMassKg, " kg")}
+        </td>
+        <td className={CELL} style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+          {fmt(record.muscleMassKg, " kg")}
+        </td>
+        <td className={`${CELL} text-xs`} style={{ color: "var(--text-muted)" }}>
+          {record.providerName}
+        </td>
+      </tr>
 
-        {editing && (
-          <EditAssessmentForm teamId={teamId} record={record} onDone={() => setEditing(false)} />
-        )}
-      </td>
-    </tr>
+      {detailOpen && (
+        <AssessmentDetailModal
+          record={record}
+          edit={{ teamId }}
+          onClose={() => setDetailOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -417,8 +442,15 @@ export default function AssessmentsClient({
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                {["Athlete", "Date", "Weight", "Body Fat %", "Lean Mass", "Muscle Mass", "Provider", "", ""].map((h, i) => (
-                  <th key={i} className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>
+                {/* Seven headings for seven <td> cells. This count has to track
+                    the row exactly — it was nine against a grid at one point,
+                    then eight with a trailing Actions column for the Edit link.
+                    That column went when editing moved into the detail modal;
+                    leaving the empty <th> behind would have re-opened the same
+                    header/body drift, and leaving the empty <td> would have put
+                    a strip of unclickable dead space at the end of every row. */}
+                {["Athlete", "Date", "Weight", "Body Fat %", "Lean Mass", "Muscle Mass", "Provider"].map((h, i) => (
+                  <th key={i} className="whitespace-nowrap px-4 py-3 font-medium" style={{ color: "var(--text-muted)" }}>
                     {h}
                   </th>
                 ))}

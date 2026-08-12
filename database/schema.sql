@@ -879,6 +879,21 @@ language sql stable security definer set search_path = public, pg_temp as $$
   )
 $$;
 
+-- security definer for a different reason than the two above: not recursion,
+-- but that reading club_staff AS THE CALLER is itself the bug. A practitioner's
+-- only SELECT policy on club_staff is their own row, so any peer lookup done
+-- under their RLS returns nothing. See migration 032.
+create or replace function shares_club_with_staff(p_profile_id uuid) returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select exists (
+    select 1
+    from club_staff target
+    join club_staff caller on caller.club_id = target.club_id
+    where target.profile_id = p_profile_id
+      and caller.profile_id = current_profile_id()
+  )
+$$;
+
 -- Includes the same Club Manager fallback as is_assigned_to_athlete_via_team()
 -- below — see database/migrations/007_comments_policies.sql for why this
 -- was missing and what it fixes (team-level official comments, plus
@@ -1188,13 +1203,14 @@ create policy "club staff updates linked practitioner profiles" on profiles for 
 -- Needed for the Teams & Staff list — any club_staff can read another club
 -- staff member's profile (name/specialty/department) at a club they're
 -- both staff of. Same "linked access" shape used for athlete-linked tables.
+-- Goes through shares_club_with_staff() rather than an inline `exists` over
+-- club_staff, and must stay that way. The inline version was unsatisfiable for
+-- a Club Practitioner: the subquery runs as the caller, and a practitioner can
+-- only see their OWN club_staff row, so it could never match a peer. That is
+-- what made Assessments / GPS / VALD / Injury Log render "Provider —". See
+-- database/migrations/032_practitioner_reads_peer_staff_profiles.sql.
 create policy "club staff reads linked staff profiles" on profiles for select
-  using (
-    exists (
-      select 1 from club_staff cs
-      where cs.profile_id = profiles.id and is_club_staff_for_club(cs.club_id)
-    )
-  );
+  using (shares_club_with_staff(profiles.id));
 -- Admin equivalent — without this an Admin sees no names at all, not even
 -- for their own assigned clubs' staff/athletes. See
 -- database/migrations/008_admin_scoped_data_access.sql.

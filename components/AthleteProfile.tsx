@@ -6,6 +6,9 @@ import {
   ValdRows,
   AssessmentRows,
   ReportRows,
+  CommentRows,
+  TrainingLoadRows,
+  ThreadRows,
   type EntryEditContext,
 } from "@/components/AthleteEntryRows";
 import { COMPLIANCE_WINDOW, type AthleteProfileData } from "@/lib/athleteProfile";
@@ -30,6 +33,13 @@ export interface ProfileLinks {
   vald: string | null;
   reports: string | null;
   protocol: string | null;
+  // Null on the club route: /club/[clubId] has no Comments page at all, and
+  // its Periodization and Messenger routes are still ComingSoon. A Section
+  // with href={null} renders its rows without an "Open …" link rather than
+  // deep-linking somewhere that cannot answer.
+  comments: string | null;
+  trainingLoad: string | null;
+  messenger: string | null;
   back: { href: string; label: string };
 }
 
@@ -117,7 +127,7 @@ export default function AthleteProfile({
   edit: EntryEditContext;
   viewerNote?: string;
 }) {
-  const { athlete, compliance, assessments, injuries, vald, gps, reports } = data;
+  const { athlete, compliance, assessments, injuries, vald, gps, reports, comments, trainingLoad, threads } = data;
   const latest = assessments[0] ?? null;
   const previous = assessments[1] ?? null;
   const delta = (a: number | null | undefined, b: number | null | undefined) =>
@@ -284,6 +294,21 @@ export default function AthleteProfile({
         )}
       </Section>
 
+      {/* The planned counterpart to the actuals above, so it sits beside them
+          rather than at the end. Individual entries only — a team-wide entry
+          applies to this athlete but is not about them, and the club route has
+          no team in scope to resolve one against. */}
+      <Section title="Training load" href={links.trainingLoad}
+        hint="Plan entries written for this athlete specifically. Team-wide entries apply too and live on the Training Load Plan.">
+        {trainingLoad.length === 0 ? (
+          <Empty>No individual plan entries for this athlete.</Empty>
+        ) : (
+          <Table head={["Date", "Intensity", "RPE", "Added by"]}>
+            <TrainingLoadRows entries={trainingLoad} />
+          </Table>
+        )}
+      </Section>
+
       <Section title="Injuries" href={links.injuries}>
         {injuries.length === 0 ? (
           <Empty>No injuries recorded.</Empty>
@@ -317,6 +342,41 @@ export default function AthleteProfile({
         {reports.length === 0 ? <Empty>No reports generated for this athlete.</Empty> : (
           <Table head={["Generated", "Type", "Official", "PDF"]}>
             <ReportRows entries={reports} />
+          </Table>
+        )}
+      </Section>
+
+      {/* WHAT IS IN THIS LIST IS DECIDED BY RLS, NOT BY THIS COMPONENT.
+          `comments` has no SELECT policy that returns another author's
+          private_note — not for a Club Manager, not for an Admin — so a
+          Private Note appearing here is always the reader's own. The hint
+          states the rule the database enforces rather than describing a filter
+          this file performs, because this file performs none. See the note on
+          CommentEntry in lib/athleteProfile.ts. */}
+      <Section title="Comments" href={links.comments}
+        hint="Official Comments from anyone with access to this athlete, plus your own Private Notes. Another author's Private Notes are never shown.">
+        {comments.length === 0 ? (
+          <Empty>No comments about this athlete.</Empty>
+        ) : (
+          <Table head={["Date", "Type", "Comment", "Author"]}>
+            <CommentRows entries={comments} />
+          </Table>
+        )}
+      </Section>
+
+      {/* Scoped to the viewer's own correspondence for the same reason: the
+          messages policies only return threads the caller sent or received. */}
+      <Section title="Messenger" href={links.messenger}
+        hint="Your conversations with this athlete. Other staff members' conversations are not shown.">
+        {threads.length === 0 ? (
+          <Empty>
+            {athlete.profile_id
+              ? "No messages with this athlete."
+              : "This athlete hasn't activated their account, so they can't be messaged yet."}
+          </Empty>
+        ) : (
+          <Table head={["Latest", "Last message", "Messages", "Unread"]}>
+            <ThreadRows entries={threads} />
           </Table>
         )}
       </Section>

@@ -918,3 +918,184 @@ this schema reads it today** — every club staff member currently sees the same
 clinical detail. If department ever becomes access-bearing it belongs in the
 same guard, and the column list in `guard_profile_identity_columns()` is the
 one place to add it.
+
+## Fixed: practitioners could not resolve peer staff names (2026-08-12)
+
+Migration 032. `"club staff reads linked staff profiles"` was unsatisfiable for
+a Club Practitioner, which is why Assessments, GPS, VALD and Injury Log all
+rendered **"Provider —"**. Every row has a `provider_id`; the name simply
+could not be read. A data-completeness bug, not a leak.
+
+The policy called `is_club_staff_for_club()` — `SECURITY DEFINER`, correct —
+but wrapped it in `select 1 from club_staff cs where cs.profile_id = profiles.id`,
+which runs **as the caller** and so is subject to `club_staff`'s own RLS. A
+practitioner's only SELECT policy there is
+`"staff reads own club_staff rows" using (profile_id = current_profile_id())`,
+so the subquery searches for a peer's row inside a set containing only the
+caller's own. It can never match.
+
+Club Managers hold `"club manager manages own club staff" for all` and so their
+subquery does see peer rows — the same policy works for them, which is why
+Teams & Staff showed names and this went unnoticed. Admins ride the
+`or is_admin_for_club(club_id)` arm of that policy and were likewise
+unaffected; verified against live RLS, not assumed.
+
+Confirmed at PostgREST with a real practitioner session token (not the service
+key): `GET /profiles?id=eq.<peer at same club>` returned `[]` as practitioner
+and the row as manager.
+
+### The fix
+
+`shares_club_with_staff(p_profile_id uuid)` — `SECURITY DEFINER`, self-join on
+`club_staff` — answers "does the caller share a club with this profile?" in one
+place, outside RLS, with a pinned `search_path`. The policy becomes
+`using (shares_club_with_staff(profiles.id))`. This is the same treatment
+migration 021 gave the athlete-facing direction of this relationship, for the
+same reason.
+
+No recursion risk: the helper reads `club_staff` and never `profiles`, so it
+cannot re-enter the policy that calls it (cf. migration 018, and the 42P17 in
+014, both caused by a policy querying its own table).
+
+**Visible set is unchanged** for Super Admin, Club Manager and Admin. It is
+restored for Club Practitioner to what the policy already claimed to do: any
+`club_staff` may read another staff member's profile at a club they are both
+staff of. No new columns, no other clubs, no athletes.
+
+### Rejected alternative
+
+Widening `club_staff` SELECT so practitioners see colleagues' rows. That grants
+more than the question asks — `club_staff` carries `staff_role` and full club
+membership — and would change what several other policies that read
+`club_staff` under RLS can see, each requiring its own audit.
+
+### Same shape, deliberately not changed
+
+The two athlete-linked `profiles` policies (`"club staff reads athlete profiles"`
+and its update twin) also wrap an `exists` over `athletes` evaluated under the
+caller's RLS. There the coupling is arguably load-bearing: migration 026 scoped
+practitioners to their assigned teams, and that scoping should plausibly
+propagate into which athlete names they can resolve. Changing it would be a
+policy decision, not a bug fix.
+
+## Verified: Athlete Profile's Comments / Training Load / Messenger sections (2026-08-12)
+
+**No migration, no policy change.** The Athlete Profile gained three read
+sections — Comments, Training load and Messenger — and each one delegates its
+entire visibility rule to policies that already existed. This entry records
+what was verified live, because the Comments section is the first surface in
+the app where a *private* record and a *shared* record sit in the same table on
+the same page.
+
+### Comments — private notes must not leak
+
+**There is one comments read in this app, not two.** `lib/comments.ts`
+`readComments({ teamId?, athleteIds?, limit? })` is called by both
+`app/staff/[teamId]/comments/page.tsx` and `lib/athleteProfile.ts`. The two
+were duplicated selects while the profile had no comments section; once it had
+one, that would have been two places a `comment_type` or author filter could
+appear with only one of them reviewed.
+
+The signature is the guarantee: **scope is a parameter, visibility is not.**
+Which athlete or team the comments are about is a product question and differs
+per call site. Who may read them is a security question, is identical
+everywhere, and there is no argument through which a caller could express it.
+
+The three SELECT policies on `comments` are:
+
+| policy | returns |
+|---|---|
+| `"author reads own comment"` | `author_id = current_profile_id()` — any type |
+| `"linked read official comments"` | `official_comment` **and** linked to the athlete |
+| `"super admin full access"` | everything |
+
+There is **no Club Manager arm and no Admin arm** for `private_note`. A private
+note is therefore readable only by its author, and the profile view cannot show
+what the Comments page would not have shown.
+
+An app-side filter was deliberately *not* added at either call site. It would
+be a second, weaker copy of the boundary that can drift from the policy — the
+same reasoning that keeps the four data-entry tables' edit windows in RLS
+rather than in the forms.
+
+#### Equivalence proof
+
+Verified live with real user JWTs (magiclink → `verifyOtp`, never the service
+key), against a mix deliberately built to break a naive filter: **both comment
+types, three different authors, and both scopes.**
+
+| tag | author | type | scope |
+|---|---|---|---|
+| `OFFICIAL-A` / `PRIVATE-A` | Practitioner A | official / private | athlete |
+| `OFFICIAL-B` / `PRIVATE-B` | Practitioner B | official / private | athlete |
+| `OFFICIAL-M` / `PRIVATE-M` | Club Manager | official / private | athlete |
+| `TEAMOFFICIAL-A` / `TEAMPRIVATE-A` | Practitioner A | official / private | team |
+
+Each account then ran (1) the Comments page's read restricted to that athlete,
+(2) the profile's read, and (3) the shared reader for both scopes. All three
+returned **byte-identical rows** for every account, compared field by field
+including the author embed:
+
+| caller | athlete-scoped rows | team-scoped rows (page only) |
+|---|---|---|
+| Practitioner A | `OFFICIAL-M`, `OFFICIAL-B`, `OFFICIAL-A`, `PRIVATE-A` | `TEAMOFFICIAL-A`, `TEAMPRIVATE-A` |
+| Practitioner B | `OFFICIAL-M`, `OFFICIAL-B`, `OFFICIAL-A`, `PRIVATE-B` | `TEAMOFFICIAL-A` |
+| Club Manager | `OFFICIAL-M`, `OFFICIAL-B`, `OFFICIAL-A`, `PRIVATE-M` | `TEAMOFFICIAL-A` |
+| Club B Manager | none | none |
+| the athlete themself | none | none |
+
+Three things worth reading off that table. **A Club Manager does not see their
+practitioners' private notes** — the case most likely to be assumed otherwise.
+**Private isolation holds on the team scope too**: only Practitioner A sees
+`TEAMPRIVATE-A`. And athletes have no SELECT policy on `comments` at all, so an
+athlete sees neither kind — including official comments about themself.
+
+The refactor to a shared reader changed the profile's scope filter from
+`.eq("athlete_id", id)` to `athlete_id.in.(id)`; the proof above was re-run
+after the change and both shapes return the same set.
+
+`limit` truncates for display only — it caps how many *permitted* rows are
+shown (the profile shows ten), exactly like "ten most recent assessments". It
+never changes which rows are permitted.
+
+Cross-club INSERT was also probed: Club B's manager attempting to attach a
+comment to a Club A athlete is rejected by `"linked staff creates comments"`.
+Same probe against `training_load_plans` — also rejected.
+
+The same five callers were then rendered through the real HTTP route
+(`/staff/[teamId]/athletes/[athleteId]` and `/club/[clubId]/athletes/[athleteId]`)
+and the returned HTML grepped for each marker. No leak in the markup; Club B's
+manager gets 404 on both routes.
+
+### Training load — athlete-scoped rows only
+
+`training_load_plans` rows carrying `athlete_id`, governed by the existing
+`"club staff access"` policy whose USING arm is
+`athlete_id is not null and is_assigned_to_athlete_via_team(athlete_id)`. That
+helper carries the Club Manager fallback, so the club route resolves the same
+rows without a team in scope. Team-wide rows (`athlete_id is null`) are
+deliberately not shown — see the section hint on the page.
+
+### Messenger — the viewer's own correspondence, not the athlete's inbox
+
+Reuses `getThreadsForCurrentProfile()` unchanged, so the only SELECT policies in
+play are `"sender reads own messages"` and `"recipient reads message via join"`.
+Verified live: of Practitioner A, Practitioner B and the Club Manager, **only
+Practitioner A** — the actual participant — sees the thread. The section
+heading says so rather than implying completeness.
+
+### Known, pre-existing, deliberately not fixed here
+
+Staff cannot read an athlete's `profiles` row, so `lib/messaging.ts` renders
+every athlete participant as **"—"**. Confirmed live for both a Club
+Practitioner and a Club Manager, and visible today on
+`/staff/[teamId]/messenger` itself — this is not new. It is precisely the
+"same shape, deliberately not changed" case flagged at the end of the migration
+032 entry above, and fixing it is a policy decision about how far athlete-name
+resolution should reach.
+
+The profile's Messenger section sidesteps it **without touching policy**: it
+already holds the athlete's name from the `athletes` row it just read, and the
+athlete is a participant in every thread it lists by construction, so it
+substitutes that name locally. Anyone else on the thread is still named exactly
+the way `lib/messaging.ts` names them.

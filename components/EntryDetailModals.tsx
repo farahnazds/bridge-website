@@ -7,10 +7,15 @@ import {
   INJURY_STATUSES,
   RTP_PHASES,
   VALD_TEST_TYPES,
+  INTENSITIES,
+  SEASON_PHASES,
+  SESSION_TYPES,
+  SESSION_DURATION_BANDS,
   EDIT_WINDOW_DAYS,
   EDIT_WINDOW_CLOSED_LABEL,
 } from "@/lib/constants";
-import { BTN_PRIMARY, NOTICE, NOTICE_EMPTY, PANEL } from "@/lib/ui";
+import { BADGE, BTN_PRIMARY, NOTICE, NOTICE_EMPTY, PANEL } from "@/lib/ui";
+import type { CommentEntry, TrainingLoadEntry, ThreadSummary } from "@/lib/athleteProfile";
 import type { InjuryRecord } from "@/app/staff/[teamId]/injuries/InjuriesClient";
 import type { AssessmentRecord } from "@/app/staff/[teamId]/assessments/AssessmentsClient";
 import type { GpsEntry } from "@/app/staff/[teamId]/gps-performance/GpsClient";
@@ -40,6 +45,10 @@ export type EntryEditContext = { teamId: string } | null;
 const STATUS_LABEL: Record<string, string> = Object.fromEntries(INJURY_STATUSES.map((s) => [s.value, s.label]));
 const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
 const VALD_LABEL: Record<string, string> = Object.fromEntries(VALD_TEST_TYPES.map((t) => [t.value, t.label]));
+const INTENSITY_LABEL: Record<string, string> = Object.fromEntries(INTENSITIES.map((i) => [i.value, i.label]));
+const PHASE_LABEL: Record<string, string> = Object.fromEntries(SEASON_PHASES.map((p) => [p.value, p.label]));
+const SESSION_TYPE_LABEL: Record<string, string> = Object.fromEntries(SESSION_TYPES.map((t) => [t.value, t.label]));
+const DURATION_LABEL: Record<string, string> = Object.fromEntries(SESSION_DURATION_BANDS.map((d) => [d.value, d.label]));
 
 const num = (v: number | null | undefined, digits = 1, suffix = "") =>
   v === null || v === undefined ? "—" : `${Number(v).toFixed(digits)}${suffix}`;
@@ -172,6 +181,50 @@ function EntryModal({
     </DataModal>
   );
 }
+
+/**
+ * The read-only sibling of EntryModal, for the three data types that have no
+ * edit form anywhere in the app to reuse.
+ *
+ * It exists rather than being folded into EntryModal because the distinction
+ * is not "editing happens to be unavailable right now" — which EditAffordance
+ * already covers with a reason — but "this record type is never edited". A
+ * disabled Edit button would imply an edit path that does not exist.
+ *
+ * `managedNote` is mandatory for the same reason EditAffordance never returns
+ * null: the reader is told where the record IS acted on instead of being left
+ * to guess why the modal only reads.
+ */
+function DetailOnlyModal({
+  title,
+  subtitle,
+  managedNote,
+  onClose,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  managedNote: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <DataModal title={title} subtitle={subtitle} onClose={onClose}>
+      <div className="flex flex-col gap-5">
+        {children}
+        <p className={NOTICE_EMPTY} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+          {managedNote}
+        </p>
+      </div>
+    </DataModal>
+  );
+}
+
+// Plain ISO date, matching the rows that open these modals and the four
+// existing modals' subtitles ("2026-08-20 · logged by …"). See the note on the
+// same helper in components/AthleteEntryRows.tsx for why this is not
+// toLocaleDateString.
+const shortDate = (iso: string) => String(iso).slice(0, 10);
 
 // ---------------------------------------------------------------- per type
 
@@ -376,5 +429,161 @@ export function AssessmentDetailModal({
         edit && <EditAssessmentForm teamId={edit.teamId} record={record} onDone={onDone} onSaved={onSaved} />
       }
     />
+  );
+}
+
+/**
+ * A comment about this athlete.
+ *
+ * Nothing about visibility is decided in this component or in the row that
+ * opens it. If a private note reaches here at all, the caller is its author —
+ * `comments` has no SELECT policy that returns someone else's private_note
+ * (database/schema.sql, Section 9). The "Private Note" badge is therefore a
+ * label on something the reader wrote, never a preview of someone else's.
+ *
+ * Read-only: the Comments page offers post, delete-own and turn-off-AI
+ * -reflection, and no update-the-body path exists in the app. Deletion is
+ * deliberately NOT mirrored here — it is irreversible, and none of the four
+ * existing entry modals carries a destructive action either.
+ */
+export function CommentDetailModal({ comment, onClose }: { comment: CommentEntry; onClose: () => void }) {
+  const isOfficial = comment.commentType === "official_comment";
+  return (
+    <DetailOnlyModal
+      title={isOfficial ? "Official Comment" : "Private Note"}
+      subtitle={`${comment.authorName} · ${shortDate(comment.createdAt)}`}
+      managedNote={
+        comment.isOwn
+          ? "You wrote this. Comments are posted and deleted from the Comments page — they are never edited in place."
+          : "Comments are posted and deleted by their author from the Comments page."
+      }
+      onClose={onClose}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={BADGE}
+            style={{
+              backgroundColor: isOfficial
+                ? "color-mix(in srgb, var(--brand-blue) 12%, transparent)"
+                : "color-mix(in srgb, var(--text-muted) 15%, transparent)",
+              color: isOfficial ? "var(--brand-blue)" : "var(--text-muted)",
+            }}
+          >
+            {isOfficial ? "Official Comment" : "Private Note"}
+          </span>
+          {/* Same three-way wording the Comments page uses, so a comment does
+              not describe its own AI status differently on the two surfaces. */}
+          {isOfficial && (
+            <span className="text-xs" style={{ color: comment.reflectInAi ? "var(--success)" : "var(--text-muted)" }}>
+              {comment.reflectInAi
+                ? "Reflects in AI reports"
+                : comment.aiReflectionDisabled
+                  ? "AI reflection turned off by Club Manager"
+                  : "Not marked for AI reflection"}
+            </span>
+          )}
+        </div>
+
+        {/* whitespace-pre-wrap, not a markdown renderer: a comment is plain
+            text typed into a <textarea> and is stored and shown as such. */}
+        <p className="whitespace-pre-wrap text-sm" style={{ color: "var(--text)" }}>
+          {comment.body}
+        </p>
+
+        {!isOfficial && (
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            A Private Note is visible only to you and never reaches an AI report.
+          </p>
+        )}
+      </div>
+    </DetailOnlyModal>
+  );
+}
+
+/**
+ * One planned session for this athlete.
+ *
+ * Read-only: the Training Load Plan page adds and removes entries, and has no
+ * edit form. Remove is not mirrored here for the same reason Delete is absent
+ * from the comment modal.
+ */
+export function TrainingLoadDetailModal({ entry, onClose }: { entry: TrainingLoadEntry; onClose: () => void }) {
+  return (
+    <DetailOnlyModal
+      title={`Planned session · ${entry.date}`}
+      subtitle={`added by ${entry.createdByName}`}
+      managedNote="Planned load is added and removed from the Training Load Plan page. Entries are not edited in place."
+      onClose={onClose}
+    >
+      <Fields
+        rows={[
+          ["Date", entry.date],
+          ["Intensity", INTENSITY_LABEL[entry.intensity] ?? entry.intensity ?? "—"],
+          ["RPE", entry.rpe ?? "—"],
+          // season_phase is free text with an "Other…" escape hatch, so an
+          // unrecognised value is shown as typed rather than blanked.
+          ["Season phase", entry.seasonPhase ? PHASE_LABEL[entry.seasonPhase] ?? entry.seasonPhase : "—"],
+          // The three migration-027 fields. "Not recorded" rather than a
+          // default, matching how the nutrition prompt treats them.
+          ["Session type", entry.sessionType ? SESSION_TYPE_LABEL[entry.sessionType] ?? entry.sessionType : "Not recorded"],
+          [
+            "Session duration",
+            entry.sessionDurationBand ? DURATION_LABEL[entry.sessionDurationBand] ?? entry.sessionDurationBand : "Not recorded",
+          ],
+          [
+            "Est. sweat rate",
+            entry.estimatedSweatRateMl === null ? "Not recorded" : `${entry.estimatedSweatRateMl} ml/hr`,
+          ],
+        ]}
+      />
+    </DetailOnlyModal>
+  );
+}
+
+/**
+ * A messenger thread this athlete is part of.
+ *
+ * Only threads the VIEWER is party to ever reach this component — see the note
+ * on ThreadSummary in lib/athleteProfile.ts. Read-only by design: replying
+ * needs the recipient picker and the send action that the Messenger page owns,
+ * and a reply box here would be a second, divergent send path.
+ */
+export function ThreadDetailModal({ thread, onClose }: { thread: ThreadSummary; onClose: () => void }) {
+  return (
+    <DetailOnlyModal
+      title={thread.withNames.length > 0 ? `Conversation with ${thread.withNames.join(", ")}` : "Conversation"}
+      subtitle={`${thread.messageCount} message${thread.messageCount === 1 ? "" : "s"} · last ${shortDate(thread.lastAt)}`}
+      managedNote="Read-only here. Reply from the Messenger page, which addresses the thread and notifies the recipient."
+      onClose={onClose}
+    >
+      <div className="flex flex-col gap-3">
+        {thread.messages.map((m) => (
+          <div
+            key={m.id}
+            className={`${PANEL} p-3`}
+            style={{
+              borderColor: "var(--border)",
+              // The viewer's own messages sit on the surface tone, the
+              // athlete's on the page tone — the same read the Messenger
+              // page gives, without re-implementing its bubble layout.
+              backgroundColor: m.isMine ? "var(--surface)" : "var(--bg)",
+            }}
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-xs font-medium" style={{ color: "var(--text)" }}>
+                {m.isMine ? "You" : m.senderName}
+              </span>
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {shortDate(m.createdAt)}
+              </span>
+            </div>
+            <p className="mt-1 whitespace-pre-wrap text-sm" style={{ color: "var(--text)" }}>
+              {m.body}
+            </p>
+          </div>
+        ))}
+      </div>
+    </DetailOnlyModal>
   );
 }

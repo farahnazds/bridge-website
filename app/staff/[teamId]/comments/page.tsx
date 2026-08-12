@@ -1,31 +1,23 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
+import { readComments, commentAuthorName } from "@/lib/comments";
 import CommentsClient, { type CommentRecord } from "./CommentsClient";
 import { NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Comments — Bridgetx" };
 
 type AthleteEmbed = { id: string; first_name: string; last_name: string; code: string };
-type CommentRow = {
-  id: string;
-  athlete_id: string | null;
-  team_id: string | null;
-  author_id: string;
-  // Arrives via the FK embed on the query below — replaces a second
-  // round trip that fetched author ids then looked up profiles.
-  author: { first_name: string | null; last_name: string | null } | null;
-  comment_type: "private_note" | "official_comment";
-  body: string;
-  reflect_in_ai: boolean;
-  ai_reflection_disabled_by: string | null;
-  created_at: string;
-};
 
-function personName(p: { first_name: string | null; last_name: string | null } | null): string {
-  if (!p) return "—";
-  return `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "—";
-}
+// The select, the column list and the author embed now live in lib/comments.ts,
+// which the Athlete Profile's Comments section also calls. They were duplicated
+// while the profile had no comments section; keeping two copies once it did
+// would have meant two places a comment_type or author filter could appear,
+// with only one of them reviewed. See the header of that file for why the
+// privacy rule is not — and must not be — expressed in either call site.
+//
+// This page still owns everything that is genuinely ITS OWN: the team + roster
+// scope it asks for, the target label, and the moderation affordances below.
 
 export default async function TeamCommentsPage({
   params,
@@ -54,24 +46,16 @@ export default async function TeamCommentsPage({
   const athleteById = new Map(athletes.map((a) => [a.id, a]));
   const athleteIds = athletes.map((a) => a.id);
 
-  const orFilters = [`team_id.eq.${teamId}`];
-  if (athleteIds.length > 0) orFilters.push(`athlete_id.in.(${athleteIds.join(",")})`);
+  // Same two scope branches as before: this team's own entries, plus
+  // individual entries for anyone on its roster.
+  const { rows, error: fetchError } = await readComments({ teamId, athleteIds });
 
-  const { data: commentRows, error: fetchError } = await supabase
-    .from("comments")
-    .select(
-      "id, athlete_id, team_id, author_id, comment_type, body, reflect_in_ai, ai_reflection_disabled_by, created_at, author:profiles!author_id(first_name, last_name)"
-    )
-    .or(orFilters.join(","))
-    .order("created_at", { ascending: false });
-
-  const rows = (commentRows ?? []) as unknown as CommentRow[];
   const comments: CommentRecord[] = rows.map((r) => {
     const athlete = r.athlete_id ? athleteById.get(r.athlete_id) : null;
     return {
       id: r.id,
       authorId: r.author_id,
-      authorName: personName(r.author),
+      authorName: commentAuthorName(r),
       commentType: r.comment_type,
       body: r.body,
       reflectInAi: r.reflect_in_ai,
@@ -106,7 +90,7 @@ export default async function TeamCommentsPage({
           className={NOTICE}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
         >
-          Couldn&apos;t load comments: {fetchError.message}
+          Couldn&apos;t load comments: {fetchError}
         </p>
       )}
 

@@ -4,8 +4,9 @@ import { useActionState, useState } from "react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import DataCsvImportPanel from "@/components/DataCsvImportPanel";
-import { VALD_TEST_TYPES, OTHER_VALD_TEST_TYPE, EDIT_WINDOW_CLOSED_LABEL } from "@/lib/constants";
+import { VALD_TEST_TYPES, OTHER_VALD_TEST_TYPE } from "@/lib/constants";
 import { useOnSaved } from "@/lib/useOnSaved";
+import { ValdDetailModal } from "@/components/EntryDetailModals";
 import { logVald, updateVald, previewValdCsv, confirmValdCsv, type ActionState, type ValdValues } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -249,34 +250,43 @@ export function EditValdForm({
   );
 }
 
+// Editing is reached through the detail modal now, not from the row. The title
+// line is a real <button> because it is the row's ONLY focusable control — see
+// the note on the matching Row in GpsClient.tsx.
 function Row({ teamId, entry }: { teamId: string; entry: ValdEntry }) {
-  const [editing, setEditing] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const metrics = Object.entries(entry.values.metric_json ?? {});
   return (
-    <div className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--border)" }}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+    <>
+      <div
+        onClick={() => setDetailOpen(true)}
+        className="cursor-pointer border-b py-3 transition-colors duration-150 last:border-b-0 hover:bg-white/[0.03]"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <p className="text-sm font-medium">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDetailOpen(true);
+            }}
+            className="text-left underline-offset-2 hover:underline"
+            style={{ color: "var(--text)" }}
+          >
             {entry.athleteName} · {TEST_LABEL[entry.values.test_type] ?? entry.values.test_type} · {entry.date}
-          </p>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {entry.values.asymmetry_pct !== null ? `Asymmetry ${entry.values.asymmetry_pct}% · ` : ""}
-            {metrics.length > 0 ? metrics.map(([k, v]) => `${k}: ${v}`).join(" · ") : "no metrics recorded"} ·{" "}
-            {entry.providerName}
-          </p>
-        </div>
-        {entry.isEditable ? (
-          !editing && (
-            <button type="button" onClick={() => setEditing(true)} className="text-xs font-medium underline-offset-2 hover:underline" style={{ color: "var(--brand-blue)" }}>
-              Edit
-            </button>
-          )
-        ) : (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>{EDIT_WINDOW_CLOSED_LABEL}</span>
-        )}
+          </button>
+        </p>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {entry.values.asymmetry_pct !== null ? `Asymmetry ${entry.values.asymmetry_pct}% · ` : ""}
+          {metrics.length > 0 ? metrics.map(([k, v]) => `${k}: ${v}`).join(" · ") : "no metrics recorded"} ·{" "}
+          {entry.providerName}
+        </p>
       </div>
-      {editing && <EditValdForm teamId={teamId} entry={entry} onDone={() => setEditing(false)} />}
-    </div>
+
+      {detailOpen && (
+        <ValdDetailModal entry={entry} edit={{ teamId }} onClose={() => setDetailOpen(false)} />
+      )}
+    </>
   );
 }
 

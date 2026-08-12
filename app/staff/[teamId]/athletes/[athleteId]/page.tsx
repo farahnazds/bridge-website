@@ -75,6 +75,9 @@ export default async function TeamAthleteProfilePage({
         vald: `/staff/${teamId}/vald`,
         reports: `/staff/${teamId}/reports`,
         protocol: null,
+        comments: `/staff/${teamId}/comments`,
+        trainingLoad: `/staff/${teamId}/training-load`,
+        messenger: `/staff/${teamId}/messenger`,
         back: { href: `/staff/${teamId}`, label: "Roster" },
       }}
     />
