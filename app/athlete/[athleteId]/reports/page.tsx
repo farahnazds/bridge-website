@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import MyReportsList, { type MyReportEntry } from "./MyReportsList";
 import { CARD, NOTICE } from "@/lib/ui";
 
@@ -21,21 +20,33 @@ export default async function MyReportsPage() {
   // where the caller's profile is in shared_with — the explicit .contains
   // filter matches the convention used elsewhere in this app of being
   // explicit rather than relying on RLS alone.
+  // `ai_summary` is no longer selected here either — same reasoning as the
+  // practitioner history (mean ~10KB per report, fetched on expand instead via
+  // /api/reports/[reportId]/summary). An athlete accumulates reports for as
+  // long as they are with a club, so this list grows without a natural ceiling.
   const { data: reportRows, error } = await supabase
     .from("reports")
     .select(
-      "id, report_types, report_period_start, report_period_end, generated_by, ai_summary, created_at, file_url, generator:profiles!generated_by(first_name, last_name)"
+      "id, report_types, athlete_ids, audience, report_period_start, report_period_end, is_official, shared_with, generated_by, created_at, file_url, generator:profiles!generated_by(first_name, last_name)"
     )
     .contains("shared_with", [profile.id])
     .order("created_at", { ascending: false });
 
   const reports: MyReportEntry[] = (reportRows ?? []).map((r) => ({
     id: r.id,
-    typeLabel: (r.report_types as string[]).map((t) => REPORT_TYPE_LABELS[t] ?? t).join(" + "),
+    reportTypes: r.report_types as string[],
+    athleteId: r.athlete_ids?.[0] ?? null,
+    // Every report here is about the reader, so the name is theirs. It exists
+    // only to satisfy the shared shape; My Reports never renders it.
+    athleteName: "",
+    audience: r.audience as string,
     periodStart: r.report_period_start,
     periodEnd: r.report_period_end,
-    sharedByName: personName((r as unknown as { generator?: { first_name: string | null; last_name: string | null } | null }).generator ?? null),
-    summary: r.ai_summary as string | null,
+    isOfficial: Boolean(r.is_official),
+    sharedWith: (r.shared_with as string[]) ?? [],
+    // On this surface the generator is "who shared it with me".
+    generatedByName: personName((r as unknown as { generator?: { first_name: string | null; last_name: string | null } | null }).generator ?? null),
+    isOwnReport: false,
     createdAt: r.created_at,
     // Only whether a PDF exists — the storage path stays server-side.
     hasPdf: Boolean(r.file_url),
