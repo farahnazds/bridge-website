@@ -114,6 +114,12 @@ Admin only).
 - Home — compliance snapshot, streak, latest shared report
 - Daily Check-In (yesterday-then-today logic, see `04-user-flows.md`)
 - My Compliance, My Body Composition, My Protocol
+- My Training Plan — Training Load Plan entries that apply to them: their own
+  targeted sessions plus whole-team sessions for their own team. Window is
+  asymmetric — **all upcoming entries, plus the last 14 days** for context
+  (two microcycles, so a hard week followed by a lighter one reads as a
+  pattern). Read-only. Unlike injuries, nothing is simplified — planned load is
+  what they are being asked to do, not clinical detail.
 - My Reports (only reports explicitly shared with them)
 - My Assessments (view-only)
 - Messenger (message one or more of their practitioners)

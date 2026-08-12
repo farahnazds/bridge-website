@@ -1024,6 +1024,21 @@ language sql stable security definer set search_path = public, pg_temp as $$
   )
 $$;
 
+-- security definer: an athlete has NO select policy on athlete_teams ("team-
+-- linked access" is about staff and has no athlete arm), so this join run as
+-- the caller would see nothing and the policy calling it would be unsatisfiable
+-- for exactly the people it serves. See migration 033.
+create or replace function is_own_team(p_team_id uuid) returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select exists (
+    select 1
+    from athlete_teams at
+    join athletes a on a.id = at.athlete_id
+    where at.team_id = p_team_id
+      and a.profile_id = current_profile_id()
+  )
+$$;
+
 create or replace function within_edit_window(p_created_at timestamptz, p_days int) returns boolean
 language sql stable as $$
   select now() <= p_created_at + (p_days || ' days')::interval
@@ -1501,6 +1516,16 @@ create policy "club staff access" on training_load_plans for all
     (team_id is not null or athlete_id is not null)
     and (team_id is null or is_assigned_to_team(team_id))
     and (athlete_id is null or is_assigned_to_athlete_via_team(athlete_id))
+  );
+-- Athlete-facing read for /athlete/[athleteId]/training-plan. See migration
+-- 033. The `athlete_id is null` guard on the team branch is load-bearing, not
+-- tidiness: a targeted entry is inserted with team_id set AS WELL as
+-- athlete_id (app/staff/[teamId]/training-load/actions.ts), so without it an
+-- athlete would read every teammate's individual plan through the team branch.
+create policy "athlete reads own training load" on training_load_plans for select
+  using (
+    (athlete_id is not null and is_own_athlete_profile(athlete_id))
+    or (athlete_id is null and team_id is not null and is_own_team(team_id))
   );
 
 -- ---- checkins ----

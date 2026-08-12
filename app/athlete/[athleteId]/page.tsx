@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { CARD } from "@/lib/ui";
+import { INTENSITIES, SESSION_TYPES } from "@/lib/constants";
+import { BADGE, CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Home — Bridgetx",
@@ -23,6 +25,15 @@ const RTP_PHASE_LABEL: Record<string, string> = {
   sub_acute: "Sub-acute",
   return_to_training: "Return to Training",
   returned: "Returned",
+};
+
+const INTENSITY_LABEL: Record<string, string> = Object.fromEntries(INTENSITIES.map((i) => [i.value, i.label]));
+const SESSION_TYPE_LABEL: Record<string, string> = Object.fromEntries(SESSION_TYPES.map((t) => [t.value, t.label]));
+const INTENSITY_COLOR: Record<string, string> = {
+  high: "var(--danger)",
+  medium: "var(--warning)",
+  low: "var(--brand-blue)",
+  rest: "var(--success)",
 };
 
 function toDateStr(d: Date): string {
@@ -121,6 +132,20 @@ export default async function AthleteHomePage({
     .eq("athlete_id", athleteId)
     .maybeSingle();
 
+  // Next planned session. No athlete_id or team_id predicate: the "athlete
+  // reads own training load" policy (migration 033) decides which rows are
+  // this athlete's, and restating that rule here would be a second copy of a
+  // subtle predicate — a targeted entry carries team_id as well as athlete_id,
+  // so "team-wide" is `athlete_id IS NULL`, not "has a team_id". The full page
+  // at /training-plan takes the same approach.
+  const { data: nextSession } = await supabase
+    .from("training_load_plans")
+    .select("id, athlete_id, date, intensity, rpe, session_type")
+    .gte("date", todayStr)
+    .order("date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -215,6 +240,65 @@ export default async function AthleteHomePage({
           )}
         </div>
       )}
+
+      {/* Next planned session. A link rather than a stat card, because the
+          useful action is "see the rest of the plan" — same relationship the
+          injury card has to nothing and the report card has to My Reports. */}
+      <Link
+        href={`/athlete/${athleteId}/training-plan`}
+        className={`${CARD} block p-5 transition-colors duration-150 hover:border-[color:var(--brand-blue)]`}
+        style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Next planned session
+          </p>
+          <span className="text-xs font-medium" style={{ color: "var(--brand-blue)" }}>
+            My Training Plan →
+          </span>
+        </div>
+        {nextSession ? (
+          <>
+            <p
+              className="mt-1 inline-flex items-center gap-1.5 text-lg font-semibold"
+              style={{
+                fontFamily: "var(--font-heading)",
+                color: INTENSITY_COLOR[nextSession.intensity] ?? "var(--text)",
+              }}
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: INTENSITY_COLOR[nextSession.intensity] ?? "var(--text-muted)" }}
+              />
+              {INTENSITY_LABEL[nextSession.intensity] ?? nextSession.intensity}
+              {nextSession.session_type
+                ? ` · ${SESSION_TYPE_LABEL[nextSession.session_type] ?? nextSession.session_type}`
+                : ""}
+            </p>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--text-muted)" }}>
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                {nextSession.date === todayStr ? "Today" : nextSession.date}
+              </span>
+              {nextSession.rpe !== null && <span>· RPE {nextSession.rpe} / 10</span>}
+              <span
+                className={BADGE}
+                style={{
+                  backgroundColor: nextSession.athlete_id
+                    ? "color-mix(in srgb, var(--brand-blue) 12%, transparent)"
+                    : "color-mix(in srgb, var(--text-muted) 15%, transparent)",
+                  color: nextSession.athlete_id ? "var(--brand-blue)" : "var(--text-muted)",
+                }}
+              >
+                {nextSession.athlete_id ? "You specifically" : "Whole team"}
+              </span>
+            </p>
+          </>
+        ) : (
+          <p className="mt-1" style={{ color: "var(--text-muted)" }}>
+            Nothing planned ahead yet.
+          </p>
+        )}
+      </Link>
 
       <div
         className={`${CARD} p-5`}

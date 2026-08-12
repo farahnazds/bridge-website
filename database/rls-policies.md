@@ -1099,3 +1099,80 @@ already holds the athlete's name from the `athletes` row it just read, and the
 athlete is a participant in every thread it lists by construction, so it
 substitutes that name locally. Anyone else on the thread is still named exactly
 the way `lib/messaging.ts` names them.
+
+## Added: athlete reads their own Training Load Plan (2026-08-12)
+
+Migration 033, backing `/athlete/[athleteId]/training-plan`. Before it, an
+athlete could read nothing from `training_load_plans` — the table's only
+non-super-admin policy is `"club staff access"`, which is entirely about staff
+assignment. Confirmed live with a real athlete session first: zero rows, no
+error, as expected for a table with no applicable policy.
+
+### The trap, and the one predicate that avoids it
+
+The obvious policy leaks every teammate's individual plan:
+
+```sql
+   (team_id   is not null and <caller is on that team>)
+or (athlete_id is not null and <row targets the caller>)
+```
+
+`app/staff/[teamId]/training-load/actions.ts` inserts a targeted entry with
+**both** columns set — `team_id` is kept "so the entry stays attributable to
+the team it was planned from". So the two real shapes are:
+
+| meaning | `team_id` | `athlete_id` |
+|---|---|---|
+| team-wide | `T` | `NULL` |
+| targeted at A | `T` | `A` |
+
+Under the naive policy, athlete B on team T satisfies the **team** branch for a
+row targeted at athlete A, because that row's `team_id` is also T. B reads A's
+individual plan.
+
+The shipped policy guards the team branch with `athlete_id is null`:
+
+```sql
+   (athlete_id is not null and is_own_athlete_profile(athlete_id))
+or (athlete_id is null and team_id is not null and is_own_team(team_id))
+```
+
+"Team-wide" is **`athlete_id IS NULL`**, not "has a `team_id`".
+
+This is the mirror image of migration 011. There, two OR'd scope branches in a
+`WITH CHECK` let a *writer* satisfy one branch and attach the other to a club
+they did not own. Here two OR'd scope branches in a `USING` let a *reader*
+satisfy the team branch and read a row scoped to someone else. Same root cause —
+nullable scope columns OR'd without asking what the other column says — different
+verb. `training_load_plans` and `comments` both carry two nullable scope
+columns; any future policy on either should state explicitly what "both set"
+means.
+
+### `is_own_team()`
+
+`SECURITY DEFINER`, pinned `search_path`, joins `athlete_teams` to `athletes`.
+Definer for the same reason as migrations 021 and 032: an athlete has **no
+SELECT policy on `athlete_teams`** (`"team-linked access"` is about staff and
+has no athlete arm), so the join run as the caller would see nothing and the
+policy would be unsatisfiable for exactly the people it serves. No recursion
+risk — it reads `athlete_teams`/`athletes` and never `training_load_plans`.
+
+### Scope of the grant
+
+SELECT only — no insert, update or delete, matching the Club Athlete
+"no self-editable fields" rule. No date restriction: which dates to show is a
+display question and lives in the page (all upcoming entries plus the last 14
+days), and a window in RLS would silently break any future surface needing full
+history — as well as making the page's window unchangeable without a migration.
+
+Nothing was granted on `athlete_teams` or `teams`. The page labels entries
+"Whole team" / "You specifically" rather than naming the team, so neither table
+needed widening — same minimal-grant reasoning migration 032 used when it
+rejected widening `club_staff`.
+
+### Not simplified, unlike injuries
+
+`injuries_athlete_view` exists because clinical detail is staff-only. Planned
+load is not clinical — it is what the athlete is being asked to do — so session
+type, intensity, RPE, duration and sweat rate are read straight off the table
+with no view and no column restriction.

@@ -1,5 +1,5 @@
 import { redirect, notFound } from "next/navigation";
-import { CircleCheckBig, CircleUser, FileText, LayoutDashboard, MessageSquare, Pill, Scale } from "lucide-react";
+import { CircleCheckBig, CircleUser, FileText, Gauge, LayoutDashboard, MessageSquare, Pill, Scale } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import { getCurrentProfile } from "@/lib/auth";
@@ -46,6 +46,9 @@ export default async function AthleteLayout({
     { label: "My Compliance", href: `/athlete/${athleteId}/compliance`, icon: CircleCheckBig },
     { label: "My Body Composition", href: `/athlete/${athleteId}/body-composition`, icon: Scale },
     { label: "My Protocol", href: `/athlete/${athleteId}/protocol`, icon: Pill },
+    // Same Gauge icon the staff sidebar gives Training Load Plan, so the two
+    // sides of the same data read as the same thing.
+    { label: "My Training Plan", href: `/athlete/${athleteId}/training-plan`, icon: Gauge },
   ] },
   { label: "ACCOUNT", items: [
     { label: "Profile", href: `/athlete/${athleteId}/profile`, icon: CircleUser },
