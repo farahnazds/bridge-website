@@ -15,6 +15,7 @@ import { COMPLIANCE_WINDOW, type AthleteProfileData } from "@/lib/athleteProfile
 import { goalBodyWeightKg, gap } from "@/lib/bodyComposition";
 import { SectionQuickAdd, type QuickAddContext } from "@/components/QuickAddModals";
 import GenerateReportAction from "@/components/GenerateReportAction";
+import ComplianceDetailModal from "@/components/ComplianceDetailModal";
 import { BADGE, CARD, NOTICE_EMPTY } from "@/lib/ui";
 
 // The staff-facing athlete profile, rendered identically for the Club Manager
@@ -296,16 +297,18 @@ export default function AthleteProfile({
       </Section>
 
       <Section title="Compliance" href={null} hint={`Daily check-ins over the last ${COMPLIANCE_WINDOW} days.`}>
-        {compliance.total > 0 ? (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Card label="Check-in rate" value={`${compliance.rate}%`} hint={`${compliance.completed} of ${compliance.total}`} />
-            <Card label="Skipped" value={compliance.skipped} hint={compliance.lastDate ? `last ${compliance.lastDate}` : ""} />
-            <Card label="Avg nutrition" value={num(compliance.avgNutrition)} />
-            <Card label="Avg sleep" value={num(compliance.avgSleep)} />
-          </div>
-        ) : (
-          <Empty>No check-ins in the last {COMPLIANCE_WINDOW} days.</Empty>
-        )}
+        <ComplianceDetailModal athleteId={athlete.id} athleteName={`${athlete.first_name} ${athlete.last_name}`}>
+          {compliance.total > 0 ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <Card label="Check-in rate" value={`${compliance.rate}%`} hint={`${compliance.completed} of ${compliance.total}`} />
+              <Card label="Skipped" value={compliance.skipped} hint={compliance.lastDate ? `last ${compliance.lastDate}` : ""} />
+              <Card label="Avg nutrition" value={num(compliance.avgNutrition)} />
+              <Card label="Avg sleep" value={num(compliance.avgSleep)} />
+            </div>
+          ) : (
+            <Empty>No check-ins in the last {COMPLIANCE_WINDOW} days.</Empty>
+          )}
+        </ComplianceDetailModal>
       </Section>
 
       {/* The planned counterpart to the actuals above, so it sits beside them

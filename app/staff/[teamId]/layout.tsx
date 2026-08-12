@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { after } from "next/server";
 import { cookies } from "next/headers";
 import { recordLastUsedContext } from "@/lib/lastUsedContext";
-import { Activity, CircleUser, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Users, Zap } from "lucide-react";
+import { Activity, CircleUser, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Users, Zap, CircleCheckBig } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import Link from "next/link";
@@ -92,6 +92,7 @@ export default async function TeamLayout({
     { label: "VALD", href: `/staff/${teamId}/vald`, icon: Zap },
     { label: "Injury Log", href: `/staff/${teamId}/injuries`, icon: HeartPulse },
     { label: "Comments", href: `/staff/${teamId}/comments`, icon: MessageCircle },
+    { label: "Compliance", href: `/staff/${teamId}/compliance`, icon: CircleCheckBig },
   ] },
   // My Profile is the practitioner's work-history timeline (/staff/profile),
   // NOT their account settings — those moved to /account in the header
