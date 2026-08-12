@@ -264,7 +264,7 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
       .limit(10),
     supabase
       .from("checkins")
-      .select("date, status, nutrition_score, hydration_score, sleep_score, energy_level")
+      .select("date, status, nutrition_value, hydration_score, sleep_score, energy_level")
       .eq("athlete_id", athleteId)
       .gte("date", since)
       .order("date", { ascending: false }),
@@ -342,7 +342,7 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
   const pastProtocols = protocols.filter((p) => p.end_date !== null);
 
   const checkins = (checkinsRes.data ?? []) as {
-    date: string; status: string; nutrition_score: number | null;
+    date: string; status: string; nutrition_value: number | null;
     hydration_score: number | null; sleep_score: number | null; energy_level: number | null;
   }[];
   const completed = checkins.filter((c) => c.status === "completed").length;
@@ -546,7 +546,11 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
       skipped,
       rate: checkins.length ? Math.round((completed / checkins.length) * 100) : null,
       lastDate: checkins[0]?.date ?? null,
-      avgNutrition: avg(checkins.map((c) => c.nutrition_score)),
+      // nutrition_value, not nutrition_score: the latter is the human-readable
+    // label the report prompts print, and averaging it silently produced null
+    // for every athlete — which is why this card always showed "—". See
+    // migration 034.
+    avgNutrition: avg(checkins.map((c) => c.nutrition_value)),
       avgHydration: avg(checkins.map((c) => c.hydration_score)),
       avgSleep: avg(checkins.map((c) => c.sleep_score)),
       avgEnergy: avg(checkins.map((c) => c.energy_level)),

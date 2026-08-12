@@ -556,7 +556,9 @@ create table checkins (
   athlete_id uuid not null references athletes(id) on delete cascade,
   date date not null,
   supplements_taken text,
-  nutrition_score text,
+  nutrition_score text, -- human-readable label; numeric twin below
+
+  nutrition_value smallint check (nutrition_value is null or (nutrition_value between 1 and 10)),
   hydration_score int check (hydration_score between 1 and 10),
   energy_level int check (energy_level between 1 and 10),
   sleep_score int check (sleep_score between 1 and 10),
@@ -1038,6 +1040,13 @@ language sql stable security definer set search_path = public, pg_temp as $$
       and a.profile_id = current_profile_id()
   )
 $$;
+
+-- Keyed on the day a check-in is ABOUT, unlike within_edit_window() below
+-- which measures from created_at. See migration 034.
+create or replace function within_checkin_window(p_date date, p_days int) returns boolean
+language sql immutable as $
+  select p_date <= current_date and p_date >= current_date - make_interval(days => p_days)
+$;
 
 create or replace function within_edit_window(p_created_at timestamptz, p_days int) returns boolean
 language sql stable as $$
@@ -1539,8 +1548,18 @@ create policy "admin scoped access" on checkins for all
         and is_admin_for_club(a.club_id)
     )
   );
-create policy "athlete manages own checkins" on checkins for all
+-- Split from a single FOR ALL policy by migration 034, which added the first
+-- real edit window on this table. Keyed on `date` (the day being logged), not
+-- created_at — a backfilled day must not earn a fresh window. No delete policy:
+-- an athlete never removes a check-in; the old FOR ALL allowed it only as a
+-- side effect of its breadth.
+create policy "athlete reads own checkins" on checkins for select
   using (is_own_athlete_profile(athlete_id));
+create policy "athlete logs own checkin within window" on checkins for insert
+  with check (is_own_athlete_profile(athlete_id) and within_checkin_window(date, 7));
+create policy "athlete edits own checkin within window" on checkins for update
+  using (is_own_athlete_profile(athlete_id) and within_checkin_window(date, 7))
+  with check (is_own_athlete_profile(athlete_id) and within_checkin_window(date, 7));
 create policy "club practitioner proxy entry for club athletes" on checkins for all
   using (
     exists (select 1 from athletes a where a.id = athlete_id and a.club_id is not null)
