@@ -9,7 +9,7 @@ import {
 import { useFormStatus } from "react-dom";
 import {
   NUTRITION_OPTIONS, SLIDERS, SLIDER_DEFAULT, SUPPLEMENT_STATES,
-  nextSupplementState, nutritionByLabel, CHECKIN_EDIT_WINDOW_DAYS,
+  nutritionByLabel, CHECKIN_EDIT_WINDOW_DAYS,
   type NutritionKey, type SupplementState,
 } from "@/lib/checkin";
 import { BADGE, BTN_PRIMARY, BTN_SECONDARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
@@ -279,9 +279,27 @@ export default function CheckInWizard({
   const activeCell = days.find((d) => d.date === activeDate);
   const editable = activeCell?.editable ?? false;
 
-  // A completed day opens read-only; "Edit" enters the wizard pre-filled.
-  const [editing, setEditing] = useState(false);
+  // THREE PLACES THE ATHLETE CAN BE, and the date strip is only shown in two
+  // of them:
+  //
+  //   browsing   strip + either a read-only day or a "start" card   strip SHOWN
+  //   answering  the four-step wizard                               strip HIDDEN
+  //   done       the completion summary                             strip SHOWN
+  //
+  // Hiding the strip mid-flow fixes a real confusion: it sat above every step,
+  // so a mis-tap jumped to another date and silently abandoned answers that had
+  // not been submitted, with nothing to say whether the entry had saved. There
+  // is now an explicit gate into the wizard, and Back on step 1 leaves it — so
+  // "navigate away without finishing" is a deliberate act rather than a slip.
+  const [started, setStarted] = useState(false);
   const [step, setStep] = useState(1);
+
+  // `state.saved` persists in useActionState across a router.refresh(), so the
+  // completion screen cannot be dismissed by refreshing — that was the reason
+  // "Log another day" appeared to do nothing. Dismissal is tracked explicitly
+  // against the savedAt it belongs to, so the next save shows its own summary.
+  const [dismissedSavedAt, setDismissedSavedAt] = useState<number | null>(null);
+  const showCompletion = Boolean(state.saved) && state.savedAt !== dismissedSavedAt;
 
   // Seeded from the existing entry so an edit starts where they left off.
   const [supplements, setSupplements] = useState<Record<string, SupplementState>>(() => {
@@ -298,18 +316,21 @@ export default function CheckInWizard({
   const [notes, setNotes] = useState(existing?.notes ?? "");
 
   const goToDay = (date: string) => {
-    setEditing(false);
+    setStarted(false);
     setStep(1);
+    setDismissedSavedAt(state.savedAt ?? null);
     // A real navigation, so the server re-reads that day's entry rather than
     // the client guessing what it holds.
     router.push(`/athlete/${athleteId}/checkin?date=${date}`);
   };
 
   // ---- completion ----------------------------------------------------------
-  if (state.saved) {
+  if (showCompletion && state.saved) {
     const s = state.saved;
     return (
-      <div className="flex flex-col items-center gap-6 py-4 text-center">
+      <div className="flex flex-col gap-6">
+        <DateStrip days={days} active={activeDate} onPick={goToDay} />
+        <div className="flex flex-col items-center gap-6 py-4 text-center">
         <span className="flex h-14 w-14 items-center justify-center rounded-full"
           style={{ backgroundColor: "color-mix(in srgb, var(--success) 14%, transparent)", color: "var(--success)" }}>
           <CircleCheckBig size={28} aria-hidden="true" />
@@ -340,21 +361,52 @@ export default function CheckInWizard({
             </div>
           ))}
         </div>
-        <button type="button" onClick={() => router.refresh()} className={BTN_TERTIARY} style={{ color: "var(--brand-blue)" }}>
+        <button
+          type="button"
+          onClick={() => {
+            // Dismiss THIS save, drop out of the wizard, and re-read the server
+            // so the strip shows the day just logged as completed. refresh()
+            // alone left the completion screen mounted — see dismissedSavedAt.
+            setDismissedSavedAt(state.savedAt ?? null);
+            setStarted(false);
+            setStep(1);
+            router.push(`/athlete/${athleteId}/checkin`);
+            router.refresh();
+          }}
+          className={BTN_TERTIARY}
+          style={{ color: "var(--brand-blue)" }}
+        >
           Log another day
         </button>
+        </div>
       </div>
     );
   }
 
-  // ---- read-only ----------------------------------------------------------
-  const showReadOnly = existing !== null && !editing;
-  if (showReadOnly || (!editable && !existing)) {
+  // ---- browsing (strip visible) --------------------------------------------
+  if (!started) {
     return (
       <div className="flex flex-col gap-6">
         <DateStrip days={days} active={activeDate} onPick={goToDay} />
         {existing ? (
-          <ReadOnlyDay entry={existing} editable={editable} onEdit={() => setEditing(true)} dateLabel={dateLabel} />
+          <ReadOnlyDay entry={existing} editable={editable} onEdit={() => { setStarted(true); setStep(1); }} dateLabel={dateLabel} />
+        ) : editable ? (
+          <div className="flex flex-col gap-4">
+            <div>
+              <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
+                {dateLabel}
+              </h2>
+              <p className="mt-0.5 text-sm" style={{ color: "var(--text-muted)" }}>
+                Not logged yet — four quick steps, about a minute.
+              </p>
+            </div>
+            {/* The gate. Until this is pressed the strip is live and switching
+                dates costs nothing, because no answers exist to lose. */}
+            <button type="button" onClick={() => { setStarted(true); setStep(1); }}
+              className={`${BTN_PRIMARY} self-start`} style={{ backgroundImage: "var(--brand-gradient-action)" }}>
+              Start check-in
+            </button>
+          </div>
         ) : (
           <p className={NOTICE} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             {dateLabel} wasn&apos;t logged, and it&apos;s outside the {CHECKIN_EDIT_WINDOW_DAYS}-day window,
@@ -370,8 +422,7 @@ export default function CheckInWizard({
 
   return (
     <div className="flex flex-col gap-6">
-      <DateStrip days={days} active={activeDate} onPick={goToDay} />
-
+      {/* No date strip here on purpose — see the note on `started`. */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
           Step {step} of {STEP_COUNT}
@@ -411,33 +462,55 @@ export default function CheckInWizard({
         {step === 1 && (
           <div className="flex flex-col gap-4">
             <StepHeader icon={<Pill size={18} />} title="Did you take your supplements?"
-              prompt="Tap each one to mark it taken, not sure, or missed." />
+              prompt="Pick the answer that’s true for each one." />
             {protocolSupplements.length === 0 ? (
               <p className={NOTICE} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
                 You don&apos;t have an active supplement protocol yet. Your practitioner sets this up after
                 reviewing your assessments — skip ahead for now.
               </p>
             ) : (
-              <ul className="flex flex-col gap-2">
+              /* All three options visible under each supplement, rather than
+                 one control cycling through hidden states. Cycling meant the
+                 other two answers were invisible and reaching "missed" took
+                 three taps, with no way to tell at a glance what the current
+                 value was — reported from real use. A radio group states the
+                 choices and takes one tap to answer truthfully. */
+              <ul className="flex flex-col gap-3">
                 {protocolSupplements.map((name) => {
                   const st = supplements[name] ?? "taken";
-                  const meta = SUPPLEMENT_STATES.find((s) => s.value === st)!;
                   return (
-                    <li key={name}>
-                      <button
-                        type="button"
-                        onClick={() => setSupplements((p) => ({ ...p, [name]: nextSupplementState(st) }))}
-                        aria-label={`${name}: ${meta.label}. Tap to change.`}
-                        className={`flex w-full items-center justify-between gap-3 ${CARD} px-4 py-3 text-left transition-colors duration-150`}
-                        style={{ borderColor: STATE_COLOR[st], backgroundColor: "var(--surface)" }}
-                      >
-                        <span className="text-sm font-medium" style={{ color: "var(--text)" }}>{name}</span>
-                        <span className="inline-flex items-center gap-1.5 text-sm font-medium"
-                          style={{ color: STATE_COLOR[st] }}>
-                          <StateIcon state={st} />
-                          {meta.label}
-                        </span>
-                      </button>
+                    <li key={name} className={`${CARD} px-4 py-3`}
+                      style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+                      {/* A real radiogroup: arrow keys move between options and
+                          a screen reader announces "2 of 3", which a row of
+                          buttons would not. */}
+                      <div role="radiogroup" aria-label={`${name} — did you take it?`}>
+                        <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{name}</p>
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          {SUPPLEMENT_STATES.map((opt) => {
+                            const on = st === opt.value;
+                            const tone = STATE_COLOR[opt.value];
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                onClick={() => setSupplements((p) => ({ ...p, [name]: opt.value }))}
+                                className="flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition-colors duration-150"
+                                style={{
+                                  borderColor: on ? tone : "var(--border)",
+                                  backgroundColor: on ? `color-mix(in srgb, ${tone} 12%, transparent)` : "var(--bg)",
+                                  color: on ? tone : "var(--text-muted)",
+                                }}
+                              >
+                                <StateIcon state={opt.value} size={14} />
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </li>
                   );
                 })}
@@ -503,12 +576,11 @@ export default function CheckInWizard({
         )}
 
         <div className="flex items-center justify-between gap-3 border-t pt-4" style={{ borderColor: "var(--border)" }}>
-          <button type="button" onClick={() => (step === 1 ? setEditing(false) : setStep(step - 1))}
-            disabled={step === 1 && !existing}
+          <button type="button" onClick={() => (step === 1 ? setStarted(false) : setStep(step - 1))}
             className={`${BTN_TERTIARY} inline-flex items-center gap-1.5`}
-            style={{ color: "var(--text-muted)", opacity: step === 1 && !existing ? 0.4 : 1 }}>
+            style={{ color: "var(--text-muted)" }}>
             <ArrowLeft size={15} aria-hidden="true" />
-            Back
+            {step === 1 ? "Back to dates" : "Back"}
           </button>
 
           {step < STEP_COUNT ? (
