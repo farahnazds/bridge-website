@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { useOnSaved } from "@/lib/useOnSaved";
+import AthleteSelectField, { type FieldAthlete } from "@/components/AthleteSelectField";
 import { AssessmentDetailModal } from "@/components/EntryDetailModals";
 import { logAssessment, updateAssessment, type ActionState } from "./actions";
 
@@ -203,16 +204,31 @@ function AssessmentFields({ defaults }: { defaults?: Partial<AssessmentRecord> }
   );
 }
 
-function LogAssessmentForm({
+// Exported so the Athlete Profile's quick-add opens THIS form rather than a
+// second implementation of it — same reasoning as EditAssessmentForm below.
+// `lockedAthlete` fixes the athlete to the profile being viewed; everything
+// else (fields, validation, the server action, its role check and RLS) is
+// unchanged, so a quick-add save and a save from the Assessments page are the
+// same write.
+export function LogAssessmentForm({
   teamId,
   athletes,
+  lockedAthlete,
   onDone,
+  onSaved,
 }: {
   teamId: string;
   athletes: Athlete[];
+  lockedAthlete?: FieldAthlete | null;
   onDone: () => void;
+  onSaved?: () => void;
 }) {
   const [state, formAction] = useActionState(logAssessment, initialState);
+  // Closes the modal and refreshes the page behind it on a real save — the
+  // same hook the edit forms use, for the same reason (the action's
+  // revalidatePath points at the Assessments page, not at whatever route the
+  // modal was opened from).
+  useOnSaved(state.savedAt, onSaved);
 
   return (
     <form action={formAction} className={`flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
@@ -220,21 +236,11 @@ function LogAssessmentForm({
       <ErrorBanner error={state.error} />
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="athlete_id" className={labelClass} style={{ color: "var(--text)" }}>
-            Athlete
-          </label>
-          <select id="athlete_id" name="athlete_id" required defaultValue="" className={INPUT} style={INPUT_STYLE}>
-            <option value="" disabled>
-              Select an athlete…
-            </option>
-            {athletes.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.firstName} {a.lastName} ({a.code})
-              </option>
-            ))}
-          </select>
-        </div>
+        <AthleteSelectField
+          id="athlete_id"
+          athletes={athletes.map((a) => ({ id: a.id, label: `${a.firstName} ${a.lastName} (${a.code})` }))}
+          locked={lockedAthlete}
+        />
         <div className="flex flex-col gap-1.5">
           <label htmlFor="date" className={labelClass} style={{ color: "var(--text)" }}>
             Date

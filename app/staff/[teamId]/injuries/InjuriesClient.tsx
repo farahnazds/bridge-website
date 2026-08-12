@@ -5,6 +5,7 @@ import { BTN_PRIMARY, BTN_TERTIARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANE
 import { useFormStatus } from "react-dom";
 import { INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 import { useOnSaved } from "@/lib/useOnSaved";
+import AthleteSelectField, { type FieldAthlete } from "@/components/AthleteSelectField";
 import { InjuryDetailModal } from "@/components/EntryDetailModals";
 import { logInjury, updateInjury, type ActionState } from "./actions";
 
@@ -152,16 +153,23 @@ function InjuryFields({ defaults }: { defaults?: Partial<InjuryRecord> }) {
   );
 }
 
-function LogInjuryForm({
+// Exported for the Athlete Profile's quick-add — see the note on
+// LogAssessmentForm in the assessments client.
+export function LogInjuryForm({
   teamId,
   athletes,
+  lockedAthlete,
   onDone,
+  onSaved,
 }: {
   teamId: string;
   athletes: Athlete[];
+  lockedAthlete?: FieldAthlete | null;
   onDone: () => void;
+  onSaved?: () => void;
 }) {
   const [state, formAction] = useActionState(logInjury, initialState);
+  useOnSaved(state.savedAt, onSaved);
 
   return (
     <form action={formAction} className={`flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
@@ -169,21 +177,11 @@ function LogInjuryForm({
       <ErrorBanner error={state.error} />
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="athlete_id" className={labelClass} style={{ color: "var(--text)" }}>
-            Athlete
-          </label>
-          <select id="athlete_id" name="athlete_id" required defaultValue="" className={INPUT} style={INPUT_STYLE}>
-            <option value="" disabled>
-              Select an athlete…
-            </option>
-            {athletes.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.firstName} {a.lastName} ({a.code})
-              </option>
-            ))}
-          </select>
-        </div>
+        <AthleteSelectField
+          id="injury_athlete_id"
+          athletes={athletes.map((a) => ({ id: a.id, label: `${a.firstName} ${a.lastName} (${a.code})` }))}
+          locked={lockedAthlete}
+        />
         <div className="flex flex-col gap-1.5">
           <label htmlFor="date" className={labelClass} style={{ color: "var(--text)" }}>
             Date

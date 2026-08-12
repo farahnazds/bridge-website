@@ -5,6 +5,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import { getAthleteProfileData } from "@/lib/athleteProfile";
 import AthleteProfile from "@/components/AthleteProfile";
+import { clubDefaultLanguage, clubIdForTeam } from "@/lib/reportLanguage";
 
 export const metadata: Metadata = { title: "Athlete — Bridgetx" };
 
@@ -56,6 +57,25 @@ export default async function TeamAthleteProfilePage({
   const canEdit = profile?.role !== undefined &&
     ["club_manager", "club_practitioner", "admin", "super_admin"].includes(profile.role);
 
+  // Context for the quick-add "+" buttons and Generate Report. The two extra
+  // reads exist only because the report generator needs them — the same
+  // practitioner list and club default language the Reports page assembles, so
+  // the generator behaves identically wherever it is opened from.
+  //
+  // Fetched unconditionally rather than behind `canEdit`: the buttons are
+  // rendered for anyone the layout admits, and each action performs its own
+  // role check with RLS behind it. Gating the DATA on a role guess here would
+  // add a second, weaker permission rule — see components/QuickAddModals.tsx.
+  const [practitionerRows, defaultLanguage] = await Promise.all([
+    supabase.from("staff_team_assignments").select("staff_profile_id, profiles(id, first_name, last_name)").eq("team_id", teamId),
+    clubDefaultLanguage(await clubIdForTeam(teamId)),
+  ]);
+  type PractitionerRow = { profiles: { id: string; first_name: string | null; last_name: string | null } | null };
+  const practitioners = ((practitionerRows.data ?? []) as unknown as PractitionerRow[])
+    .map((r) => r.profiles)
+    .filter((p): p is { id: string; first_name: string | null; last_name: string | null } => p !== null && p.id !== profile?.id)
+    .map((p) => ({ id: p.id, label: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Practitioner" }));
+
   return (
     <AthleteProfile
       data={data}
@@ -65,6 +85,13 @@ export default async function TeamAthleteProfilePage({
       // dedicated pages' real edit forms can run — see the header of
       // components/AthleteEntryRows.tsx.
       edit={{ teamId }}
+      quickAdd={{
+        teamId,
+        athlete: { id: data.athlete.id, label: `${data.athlete.first_name} ${data.athlete.last_name}` },
+        teamName: context.team.name,
+        practitioners,
+        defaultLanguage,
+      }}
       viewerNote={
         context.isOversight ? "You are viewing this athlete as oversight, not as assigned staff." : undefined
       }

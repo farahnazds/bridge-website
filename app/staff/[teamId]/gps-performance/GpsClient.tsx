@@ -5,6 +5,7 @@ import { BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } fr
 import { useFormStatus } from "react-dom";
 import DataCsvImportPanel from "@/components/DataCsvImportPanel";
 import { useOnSaved } from "@/lib/useOnSaved";
+import AthleteSelectField, { type FieldAthlete } from "@/components/AthleteSelectField";
 import { GpsDetailModal } from "@/components/EntryDetailModals";
 import { logGps, updateGps, previewGpsCsv, confirmGpsCsv, type ActionState, type GpsValues } from "./actions";
 
@@ -103,8 +104,20 @@ function GpsFields({ defaults }: { defaults?: GpsValues }) {
   );
 }
 
-function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athlete[]; onDone: () => void }) {
+// Exported for the Athlete Profile's quick-add — see the note on
+// LogAssessmentForm in the assessments client. `lockedAthlete` fixes the
+// athlete; nothing else about the form or its action changes.
+export function LogForm({
+  teamId, athletes, lockedAthlete, onDone, onSaved,
+}: {
+  teamId: string;
+  athletes: Athlete[];
+  lockedAthlete?: FieldAthlete | null;
+  onDone: () => void;
+  onSaved?: () => void;
+}) {
   const [state, formAction] = useActionState(logGps, initialState);
+  useOnSaved(state.savedAt, onSaved);
   return (
     <form
       action={formAction}
@@ -115,21 +128,11 @@ function LogForm({ teamId, athletes, onDone }: { teamId: string; athletes: Athle
       <input type="hidden" name="team_id" value={teamId} />
       <Banner error={state.error} />
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
-            Athlete
-          </label>
-          <select name="athlete_id" required defaultValue="" className={INPUT} style={INPUT_STYLE}>
-            <option value="" disabled>
-              Select an athlete…
-            </option>
-            {athletes.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.firstName} {a.lastName} ({a.code})
-              </option>
-            ))}
-          </select>
-        </div>
+        <AthleteSelectField
+          id="gps_athlete_id"
+          athletes={athletes.map((a) => ({ id: a.id, label: `${a.firstName} ${a.lastName} (${a.code})` }))}
+          locked={lockedAthlete}
+        />
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
             Session date

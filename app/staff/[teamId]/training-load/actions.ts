@@ -7,6 +7,11 @@ import { SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
 
 export interface ActionState {
   error: string | null;
+  /** Set only on a successful save. `{ error: null }` doubles as the initial
+   *  state, so a timestamp is what lets a caller detect a save — same shape the
+   *  four data-entry actions already use, added here so the Athlete Profile's
+   *  quick-add modal can close itself and refresh. */
+  savedAt?: number;
 }
 
 const INTENSITY_VALUES = ["high", "medium", "low", "rest"];
@@ -133,7 +138,7 @@ export async function saveTrainingLoad(_prevState: ActionState, formData: FormDa
   }
 
   revalidatePath(`/staff/${teamId}/training-load`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 // A mis-dated plan entry is otherwise unfixable, so removal is part of

@@ -6,6 +6,11 @@ import { getCurrentProfile } from "@/lib/auth";
 
 export interface ActionState {
   error: string | null;
+  /** Set only on a successful save. `{ error: null }` doubles as the initial
+   *  state, so a timestamp is what lets a caller detect a save — same shape the
+   *  four data-entry actions already use, added here so the Athlete Profile's
+   *  quick-add modal can close itself and refresh. */
+  savedAt?: number;
 }
 
 // RLS ("linked staff creates comments") independently re-verifies the
@@ -51,7 +56,7 @@ export async function createComment(_prevState: ActionState, formData: FormData)
   }
 
   revalidatePath(`/staff/${teamId}/comments`);
-  return { error: null };
+  return { error: null, savedAt: Date.now() };
 }
 
 // "author deletes own comment" RLS scopes this to the caller's own rows —

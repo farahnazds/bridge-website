@@ -27,13 +27,29 @@ export default function ReportsClient({
   athletes,
   practitioners,
   defaultLanguage,
+  lockedAthleteId,
+  lookbackByType,
 }: {
   teamId: string;
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
   practitioners: RecipientCandidate[];
   defaultLanguage: string;
+  /** Athlete Profile quick-add: every tab's form is pre-scoped to this athlete
+   *  and its picker becomes read-only. The tabs themselves stay, because which
+   *  KIND of report to generate is still a real choice. */
+  lockedAthleteId?: string | null;
+  /** Last period end per report type for the pre-filled athlete, so each tab
+   *  starts from the end of ITS OWN last report. See page.tsx. */
+  lookbackByType?: Record<string, string>;
 }) {
   const [activeTab, setActiveTab] = useState<ReportType>("compliance");
+
+  // Combined covers 2-3 domains at once, so its default window must be wide
+  // enough for whichever are ticked: the EARLIEST of the per-type lookbacks.
+  // Deliberately computed once rather than tracking the checkboxes — a date
+  // that moved on every toggle would overwrite one the practitioner had edited.
+  const lookbacks = Object.values(lookbackByType ?? {});
+  const combinedLookback = lookbacks.length > 0 ? lookbacks.reduce((a, b) => (a < b ? a : b)) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,22 +72,22 @@ export default function ReportsClient({
       </div>
 
       {activeTab === "compliance" && (
-        <ReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
+        <ReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} defaultPeriodStart={lookbackByType?.["compliance"] ?? null} />
       )}
       {activeTab === "body_composition" && (
-        <BodyCompositionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
+        <BodyCompositionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} defaultPeriodStart={lookbackByType?.["body_composition"] ?? null} />
       )}
       {activeTab === "nutrition" && (
-        <NutritionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
+        <NutritionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} />
       )}
       {activeTab === "performance" && (
-        <PerformanceReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
+        <PerformanceReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} defaultPeriodStart={lookbackByType?.["performance"] ?? null} />
       )}
       {activeTab === "injury" && (
-        <InjuryReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
+        <InjuryReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} defaultPeriodStart={lookbackByType?.["injury"] ?? null} />
       )}
       {activeTab === "combined" && (
-        <CombinedReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} />
+        <CombinedReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} defaultPeriodStart={combinedLookback} />
       )}
     </div>
   );

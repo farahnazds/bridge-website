@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { clubDefaultLanguage, clubIdForTeam } from "@/lib/reportLanguage";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
@@ -21,10 +22,19 @@ function personName(p: { first_name: string | null; last_name: string | null } |
 
 export default async function TeamReportsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ teamId: string }>;
+  // Deep link from an Athlete Profile's "Generate Report": ?athlete=<id>
+  // No date travels in the URL — per-type lookback is derived below from the
+  // reports this page already loaded.
+  // Full navigation rather than a modal, deliberately — the generator carries
+  // audience, type combining, period and safety checks, and that needs the
+  // page's space rather than a cramped dialog.
+  searchParams: Promise<{ athlete?: string }>;
 }) {
   const { teamId } = await params;
+  const { athlete: athleteParam } = await searchParams;
   const supabase = await createClient();
   // Reuses the layout's cached context query — no extra round trip.
   const profile = (await getStaffTeamContext(teamId))?.profile ?? null;
@@ -108,6 +118,55 @@ export default async function TeamReportsPage({
     };
   });
 
+  // PREFILL FROM THE DEEP LINK.
+  //
+  // The athlete id is VALIDATED against the roster this page already loaded
+  // rather than trusted: a hand-edited ?athlete= for someone on another team
+  // resolves to nothing. That is a usability guard, not the boundary — the
+  // generate actions and RLS decide what may actually be written, exactly as
+  // they do without the link.
+  const prefillAthleteId = athleteParam && athleteById.has(athleteParam) ? athleteParam : null;
+  const prefillAthlete = prefillAthleteId ? athleteById.get(prefillAthleteId) : null;
+
+  // A link that asked for an athlete we could not resolve is reported, not
+  // swallowed. Silently showing an unfilled form would look like the link was
+  // broken; silently picking someone else would be worse. The form renders
+  // normally and the reader is told why it is empty.
+  const prefillFailed = Boolean(athleteParam) && prefillAthleteId === null;
+
+  // PER-TYPE LOOKBACK.
+  //
+  // "Since the last Compliance report", "since the last Nutrition report", and
+  // so on — not one date from the most recent report of any type. Generating a
+  // Performance report should not have its window cut short because a Nutrition
+  // report happened to be produced last week.
+  //
+  // Derived here rather than carried in the URL: this page already holds every
+  // report it may see, so the link needs to say nothing but which athlete.
+  //
+  // Combined reports COUNT TOWARDS EACH DOMAIN THEY CONTAIN, matching the
+  // CONTAINS semantics the type filter uses — a Compliance + Body Composition
+  // report is genuinely the last Compliance report.
+  //
+  // Scope caveat, deliberate: `reports` is RLS-scoped, so this reflects the
+  // last report of that type THIS CALLER CAN SEE. A colleague's unshared draft
+  // is invisible here and cannot move the window. Widening that would mean
+  // reading reports the caller may not read, which is not a trade worth making
+  // for a default date the practitioner can edit.
+  const today = new Date().toISOString().slice(0, 10);
+  const lookbackByType: Record<string, string> = {};
+  if (prefillAthleteId) {
+    for (const r of reports) {
+      if (r.athleteId !== prefillAthleteId) continue;
+      const end = r.periodEnd;
+      // A period ending today or later cannot serve as a start date.
+      if (!end || end >= today) continue;
+      for (const t of r.reportTypes) {
+        if (!lookbackByType[t] || end > lookbackByType[t]) lookbackByType[t] = end;
+      }
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -118,9 +177,50 @@ export default async function TeamReportsPage({
           Reports
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Single athlete, generated for you as the practitioner. Combined report types
-          aren&apos;t built yet.
+          Single athlete, generated for you as the practitioner.
         </p>
+        {/* Tells the reader why the athlete is fixed and where the period came
+            from — arriving at a pre-filled form with no explanation is the part
+            of a deep link that normally feels broken. */}
+        {prefillAthlete && (
+          <p
+            role="status"
+            className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--brand-blue) 8%, transparent)",
+              color: "var(--text)",
+            }}
+          >
+            <span>
+              Generating for <strong>{prefillAthlete.first_name} {prefillAthlete.last_name}</strong>
+              {Object.keys(lookbackByType).length > 0 ? (
+                <> · each report type starts from the end of its own last report</>
+              ) : (
+                <> · no previous reports, so each type uses its default period</>
+              )}
+            </span>
+            <Link href={`/staff/${teamId}/reports`} className="font-medium underline-offset-2 hover:underline"
+              style={{ color: "var(--brand-blue)" }}>
+              Choose a different athlete
+            </Link>
+          </p>
+        )}
+
+        {/* Pre-fill failed: say so plainly. The form below is fully usable — it
+            just has not been filled in for anyone. */}
+        {prefillFailed && (
+          <p
+            role="status"
+            className="mt-2 rounded-lg px-3 py-2 text-xs"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--warning) 10%, transparent)",
+              color: "var(--text)",
+            }}
+          >
+            That link didn&apos;t match an athlete on this team, so nothing has been pre-filled.
+            Pick an athlete below to generate a report.
+          </p>
+        )}
       </div>
 
       <div
@@ -133,6 +233,8 @@ export default async function TeamReportsPage({
             athletes={athletes}
             practitioners={practitioners}
             defaultLanguage={defaultLanguage}
+            lockedAthleteId={prefillAthleteId}
+            lookbackByType={lookbackByType}
           />
         ) : (
           <p style={{ color: "var(--text-muted)" }}>

@@ -5,6 +5,9 @@ import { BTN_PRIMARY, BTN_TERTIARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANE
 import { useFormStatus } from "react-dom";
 import { INTENSITIES, SEASON_PHASES, OTHER_SEASON_PHASE, SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
 import AthleteMultiSelect, { type SelectableAthlete } from "@/components/AthleteMultiSelect";
+import { Lock } from "lucide-react";
+import { useOnSaved } from "@/lib/useOnSaved";
+import { type FieldAthlete } from "@/components/AthleteSelectField";
 import { saveTrainingLoad, deleteTrainingLoad, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -66,18 +69,38 @@ function SubmitButton() {
   );
 }
 
-function PlanForm({
+// Exported for the Athlete Profile's quick-add — see the note on
+// LogAssessmentForm in the assessments client.
+//
+// TRAINING LOAD IS THE ONE THAT NEEDED A REAL DECISION. A plan entry is either
+// team-wide (athlete_id null) or individually targeted, chosen through
+// AthleteMultiSelect's all/selected radio. Launched from an athlete's profile
+// the answer is not ambiguous — you are looking at one athlete — so
+// `lockedAthlete` replaces that control with a fixed "this athlete only",
+// submitting the same `applies_to=selected` + single `athlete_ids` the
+// dedicated page submits when you tick exactly one box. saveTrainingLoad is
+// unchanged and cannot tell the two apart.
+//
+// Deliberately NOT offered from the profile: adding a team-wide entry. It would
+// write a row that has nothing to do with the athlete whose page you are on,
+// and the Training Load Plan page is one click away for that.
+export function PlanForm({
   teamId,
   athletes,
+  lockedAthlete,
   onDone,
+  onSaved,
 }: {
   teamId: string;
   athletes: SelectableAthlete[];
+  lockedAthlete?: FieldAthlete | null;
   onDone: () => void;
+  onSaved?: () => void;
 }) {
   const [state, formAction] = useActionState(saveTrainingLoad, initialState);
   const [phase, setPhase] = useState("");
   const [intensity, setIntensity] = useState("");
+  useOnSaved(state.savedAt, onSaved);
 
   return (
     <form
@@ -241,7 +264,28 @@ function PlanForm({
         <legend className={labelClass} style={{ color: "var(--text)" }}>
           Applies to
         </legend>
-        <AthleteMultiSelect athletes={athletes} />
+        {lockedAthlete ? (
+          // Exactly what AthleteMultiSelect emits for "one athlete ticked", so
+          // the action receives an identical payload and stays unaware of which
+          // surface produced it.
+          <>
+            <input type="hidden" name="applies_to" value="selected" />
+            <input type="hidden" name="athlete_ids" value={lockedAthlete.id} />
+            <div
+              aria-readonly="true"
+              className={`${INPUT} flex items-center gap-2`}
+              style={{ ...INPUT_STYLE, color: "var(--text-muted)" }}
+            >
+              <Lock size={13} aria-hidden="true" />
+              <span style={{ color: "var(--text)" }}>{lockedAthlete.label} only</span>
+            </div>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Planning for this athlete alone. Use the Training Load Plan page for a team-wide session.
+            </p>
+          </>
+        ) : (
+          <AthleteMultiSelect athletes={athletes} />
+        )}
       </fieldset>
 
       <div className="flex gap-2">

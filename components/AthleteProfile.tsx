@@ -13,6 +13,8 @@ import {
 } from "@/components/AthleteEntryRows";
 import { COMPLIANCE_WINDOW, type AthleteProfileData } from "@/lib/athleteProfile";
 import { goalBodyWeightKg, gap } from "@/lib/bodyComposition";
+import { SectionQuickAdd, type QuickAddContext } from "@/components/QuickAddModals";
+import GenerateReportAction from "@/components/GenerateReportAction";
 import { BADGE, CARD, NOTICE_EMPTY } from "@/lib/ui";
 
 // The staff-facing athlete profile, rendered identically for the Club Manager
@@ -44,9 +46,12 @@ export interface ProfileLinks {
 }
 
 function Section({
-  title, href, hint, children,
+  title, href, hint, action, children,
 }: {
-  title: string; href?: string | null; hint?: string; children: React.ReactNode;
+  title: string; href?: string | null; hint?: string;
+  /** Quick-add "+" for this section, or nothing on routes that cannot write. */
+  action?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-3">
@@ -54,12 +59,15 @@ function Section({
         <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
           {title}
         </h2>
-        {href && (
-          <Link href={href} className="text-xs font-medium underline-offset-2 hover:underline"
-            style={{ color: "var(--brand-blue)" }}>
-            Open {title} →
-          </Link>
-        )}
+        <div className="flex items-center gap-3">
+          {action}
+          {href && (
+            <Link href={href} className="text-xs font-medium underline-offset-2 hover:underline"
+              style={{ color: "var(--brand-blue)" }}>
+              Open {title} →
+            </Link>
+          )}
+        </div>
       </div>
       {hint && <p className="-mt-1 text-xs" style={{ color: "var(--text-muted)" }}>{hint}</p>}
       {children}
@@ -116,7 +124,7 @@ const num = (v: number | null, digits = 1, suffix = "") =>
   v === null || v === undefined ? "—" : `${Number(v).toFixed(digits)}${suffix}`;
 
 export default function AthleteProfile({
-  data, links, canEdit, edit, viewerNote,
+  data, links, canEdit, edit, quickAdd = null, viewerNote,
 }: {
   data: AthleteProfileData;
   links: ProfileLinks;
@@ -125,6 +133,11 @@ export default function AthleteProfile({
    *  null for a route that has no team in scope (the club dashboard), where
    *  the modals stay read-only. See components/AthleteEntryRows.tsx. */
   edit: EntryEditContext;
+  /** Context for the per-section quick-add "+" buttons and Generate Report.
+   *  Null wherever writing is not offered — the club route, for the same two
+   *  reasons its row modals are read-only: no team_id in scope, and no
+   *  data-entry pages of its own to mirror. See components/QuickAddModals.tsx. */
+  quickAdd?: QuickAddContext | null;
   viewerNote?: string;
 }) {
   const { athlete, compliance, assessments, injuries, vald, gps, reports, comments, trainingLoad, threads } = data;
@@ -167,6 +180,15 @@ export default function AthleteProfile({
               style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}>
               {openInjuries.length} open injur{openInjuries.length === 1 ? "y" : "ies"}
             </span>
+          )}
+          {/* Profile-level rather than section-level: generating a report is
+              about the athlete as a whole, not about the Reports list. Opens
+              the real tabbed generator with athlete selection already answered
+              — the type tabs stay, because that is still a real choice. */}
+          {quickAdd && (
+            <div className="ml-auto">
+              <GenerateReportAction teamId={quickAdd.teamId} athleteId={athlete.id} />
+            </div>
           )}
         </div>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: ".8rem" }}>
@@ -271,7 +293,8 @@ export default function AthleteProfile({
       {/* The assessment history the cards above summarise. It exists as its
           own table because the cards can only ever show the latest two, and
           because a row is what opens the real assessment edit form. */}
-      <Section title="Assessment history" href={links.assessments} hint="Ten most recent assessments.">
+      <Section title="Assessment history" href={links.assessments} hint="Ten most recent assessments."
+        action={quickAdd && <SectionQuickAdd kind="assessment" ctx={quickAdd} label="Log an assessment for this athlete" />}>
         {assessments.length === 0 ? (
           <Empty>No assessments recorded.</Empty>
         ) : (
@@ -299,7 +322,8 @@ export default function AthleteProfile({
           applies to this athlete but is not about them, and the club route has
           no team in scope to resolve one against. */}
       <Section title="Training load" href={links.trainingLoad}
-        hint="Plan entries written for this athlete specifically. Team-wide entries apply too and live on the Training Load Plan.">
+        hint="Plan entries written for this athlete specifically. Team-wide entries apply too and live on the Training Load Plan."
+        action={quickAdd && <SectionQuickAdd kind="training_load" ctx={quickAdd} label="Plan a session for this athlete" />}>
         {trainingLoad.length === 0 ? (
           <Empty>No individual plan entries for this athlete.</Empty>
         ) : (
@@ -309,7 +333,8 @@ export default function AthleteProfile({
         )}
       </Section>
 
-      <Section title="Injuries" href={links.injuries}>
+      <Section title="Injuries" href={links.injuries}
+        action={quickAdd && <SectionQuickAdd kind="injury" ctx={quickAdd} label="Log an injury for this athlete" />}>
         {injuries.length === 0 ? (
           <Empty>No injuries recorded.</Empty>
         ) : (
@@ -320,7 +345,8 @@ export default function AthleteProfile({
       </Section>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <Section title="GPS" href={links.gps} hint="Five most recent sessions.">
+        <Section title="GPS" href={links.gps} hint="Five most recent sessions."
+          action={quickAdd && <SectionQuickAdd kind="gps" ctx={quickAdd} label="Add a GPS session for this athlete" />}>
           {gps.length === 0 ? <Empty>No GPS sessions recorded.</Empty> : (
             <Table head={["Date", "Distance", "m/min", "Max vel."]}>
               <GpsRows entries={gps} edit={edit} />
@@ -328,7 +354,8 @@ export default function AthleteProfile({
           )}
         </Section>
 
-        <Section title="VALD" href={links.vald} hint="Five most recent tests.">
+        <Section title="VALD" href={links.vald} hint="Five most recent tests."
+          action={quickAdd && <SectionQuickAdd kind="vald" ctx={quickAdd} label="Log a VALD test for this athlete" />}>
           {vald.length === 0 ? <Empty>No VALD tests recorded.</Empty> : (
             <Table head={["Date", "Test", "Asymmetry"]}>
               <ValdRows entries={vald} edit={edit} />
@@ -354,7 +381,8 @@ export default function AthleteProfile({
           this file performs, because this file performs none. See the note on
           CommentEntry in lib/athleteProfile.ts. */}
       <Section title="Comments" href={links.comments}
-        hint="Official Comments from anyone with access to this athlete, plus your own Private Notes. Another author's Private Notes are never shown.">
+        hint="Official Comments from anyone with access to this athlete, plus your own Private Notes. Another author's Private Notes are never shown."
+        action={quickAdd && <SectionQuickAdd kind="comment" ctx={quickAdd} label="Post a comment about this athlete" />}>
         {comments.length === 0 ? (
           <Empty>No comments about this athlete.</Empty>
         ) : (

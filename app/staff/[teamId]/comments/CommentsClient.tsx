@@ -3,6 +3,8 @@
 import { useActionState, useState } from "react";
 import { BADGE, BTN_PRIMARY, BTN_TERTIARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
+import { useOnSaved } from "@/lib/useOnSaved";
+import AthleteSelectField, { type FieldAthlete } from "@/components/AthleteSelectField";
 import { createComment, deleteComment, toggleReflection, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -61,19 +63,30 @@ function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: st
   );
 }
 
-function NewCommentForm({
+// Exported for the Athlete Profile's quick-add. `lockedAthlete` fixes the
+// comment's TARGET to that athlete — note the field name here is `target`, not
+// `athlete_id`, because this form's picker chooses between the team and an
+// athlete (see createComment in ./actions.ts, which branches on it). Locking
+// therefore also removes "team-wide" as an option, which is correct: a comment
+// posted from an athlete's profile is about that athlete.
+export function NewCommentForm({
   teamId,
   teamName,
   athletes,
+  lockedAthlete,
   onDone,
+  onSaved,
 }: {
   teamId: string;
   teamName: string;
   athletes: Athlete[];
+  lockedAthlete?: FieldAthlete | null;
   onDone: () => void;
+  onSaved?: () => void;
 }) {
   const [state, formAction] = useActionState(createComment, initialState);
   const [commentType, setCommentType] = useState<"private_note" | "official_comment">("private_note");
+  useOnSaved(state.savedAt, onSaved);
 
   return (
     <form action={formAction} className={`flex flex-col gap-4 ${PANEL} p-4`} style={{ borderColor: "var(--border)" }} noValidate>
@@ -81,19 +94,17 @@ function NewCommentForm({
       <ErrorBanner error={state.error} />
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="target" className={labelClass} style={{ color: "var(--text)" }}>
-            About
-          </label>
-          <select id="target" name="target" required defaultValue="team" className={INPUT} style={INPUT_STYLE}>
-            <option value="team">{teamName} (team-wide)</option>
-            {athletes.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.firstName} {a.lastName} ({a.code})
-              </option>
-            ))}
-          </select>
-        </div>
+        <AthleteSelectField
+          id="comment_target"
+          name="target"
+          labelText="About"
+          athletes={[
+            { id: "team", label: `${teamName} (team-wide)` },
+            ...athletes.map((a) => ({ id: a.id, label: `${a.firstName} ${a.lastName} (${a.code})` })),
+          ]}
+          locked={lockedAthlete}
+          defaultValue="team"
+        />
 
         <div className="flex flex-col gap-1.5">
           <label className={labelClass} style={{ color: "var(--text)" }}>

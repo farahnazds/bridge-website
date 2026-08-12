@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import AthleteSelectField from "@/components/AthleteSelectField";
 import { useFormStatus } from "react-dom";
 import AudienceField from "./AudienceField";
 import { generateInjuryReport, type GenerateReportState } from "./actions";
@@ -40,16 +41,32 @@ function SubmitButton() {
 export default function InjuryReportForm({
   teamId,
   athletes,
+  lockedAthleteId,
+  defaultPeriodStart,
   practitioners,
   defaultLanguage,
 }: {
   teamId: string;
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
+  /** Athlete Profile quick-add: fixes the report to that athlete. */
+  lockedAthleteId?: string | null;
+  /** Deep link from an Athlete Profile carries a suggested period start —
+   *  30 days back, or the end of this athlete's last report if that is more
+   *  recent, so a new report picks up where the last one stopped. */
+  defaultPeriodStart?: string | null;
   practitioners: RecipientCandidate[];
   defaultLanguage: string;
 }) {
   const [state, formAction] = useActionState(generateInjuryReport, initialState);
-  const [athleteId, setAthleteId] = useState("");
+  const [athleteId, setAthleteId] = useState(lockedAthleteId ?? "");
+
+  // Athlete Profile quick-add: the athlete is fixed and the picker becomes a
+  // read-only field. Derived once rather than inline in the JSX so the lookup
+  // is not repeated and can be null-checked properly.
+  const lockedRow = lockedAthleteId ? athletes.find((a) => a.id === lockedAthleteId) : undefined;
+  const lockedAthlete = lockedAthleteId
+    ? { id: lockedAthleteId, label: lockedRow ? `${lockedRow.first_name} ${lockedRow.last_name} (${lockedRow.code})` : "This athlete" }
+    : null;
 
   const selected = athletes.find((a) => a.id === athleteId);
   const recipients: RecipientCandidate[] = selected
@@ -87,29 +104,13 @@ export default function InjuryReportForm({
           included. Practitioner-facing — athletes only ever see a simplified status.
         </p>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="inj_athlete_id" className={labelClass} style={{ color: "var(--text)" }}>
-            Athlete
-          </label>
-          <select
-            id="inj_athlete_id"
-            name="athlete_id"
-            required
-            value={athleteId}
-            onChange={(e) => setAthleteId(e.target.value)}
-            className={INPUT}
-            style={INPUT_STYLE}
-          >
-            <option value="" disabled>
-              Select an athlete…
-            </option>
-            {athletes.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.first_name} {a.last_name} ({a.code})
-              </option>
-            ))}
-          </select>
-        </div>
+        <AthleteSelectField
+          id="inj_athlete_id"
+          athletes={athletes.map((a) => ({ id: a.id, label: `${a.first_name} ${a.last_name} (${a.code})` }))}
+          locked={lockedAthlete}
+          value={athleteId}
+          onChange={setAthleteId}
+        />
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
@@ -121,7 +122,7 @@ export default function InjuryReportForm({
               name="period_start"
               type="date"
               required
-              defaultValue={defaultDate(30)}
+              defaultValue={defaultPeriodStart ?? defaultDate(30)}
               max={defaultDate(0)}
               className={INPUT}
               style={INPUT_STYLE}
