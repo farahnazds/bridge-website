@@ -83,6 +83,26 @@ async function mapWithConcurrency<T, R>(
 // Shared shapes between the two actions and the client
 // ---------------------------------------------------------------------------
 
+/**
+ * The Training Load Plan entry sitting behind one day, flattened for the client.
+ *
+ * PER ATHLETE, not per date: an athlete-specific entry overrides the team-wide
+ * one for that day, so two athletes can be looking at genuinely different
+ * sessions on the same date. The review grid used to infer the day's load by
+ * sampling whichever athlete happened to come first, which is only correct when
+ * nobody has an override — so it showed one athlete's session under everybody's
+ * column, and showed nothing at all on days the sample had no suggestion for.
+ */
+export interface PlanLoadDay {
+  date: string;
+  intensity: string | null;
+  sessionType: string | null;
+  rpe: number | null;
+  durationBand: string | null;
+  /** Whose entry this is — the athlete's own, or the team's. */
+  scope: "athlete" | "team" | null;
+}
+
 export interface AthletePlanRow {
   athleteId: string;
   athleteName: string;
@@ -94,6 +114,9 @@ export interface AthletePlanRow {
   /** Overlapping the period, so the grid can show what the athlete is already
    *  on in each cell before the suggestion. */
   currentProtocol: { supplementName: string; dose: string; timing: string; startDate: string; endDate: string | null }[];
+  /** One entry per date in the range, in order. Empty in general mode, where
+   *  there is no day to attach a session to. */
+  loadDays: PlanLoadDay[];
   periodSummary: string;
   suggestions: PlanSuggestion[];
   /** Per-athlete failure. One athlete's model call failing must not discard
@@ -128,18 +151,32 @@ export interface PlanState {
   plan: GeneratedPlan | null;
 }
 
-export interface ConfirmResult {
+/** What was written for one athlete, and therefore what a report should cover. */
+export interface ReportJob {
+  athleteId: string;
   athleteName: string;
-  reportId: string | null;
-  error: string | null;
-  note: string | null;
   ranges: { label: string; supplementName: string; dose: string; timing: string; dayCount: number }[];
+}
+
+/** Everything generateReportForAthlete needs that is not athlete-specific. */
+export interface ConfirmContext {
+  teamId: string;
+  mode: PlanMode;
+  periodStart: string;
+  periodEnd: string;
+  language: string;
+  audience: string;
+  additionalInstructions: string | null;
+  includePerformanceSignals: boolean;
 }
 
 export interface ConfirmState {
   error: string | null;
   done: boolean;
-  results: ConfirmResult[];
+  /** Athletes whose protocols were written and who now need a report. Empty
+   *  when nothing was written — in which case there is nothing to report on. */
+  jobs: ReportJob[];
+  context: ConfirmContext | null;
   /** Items the re-check refused at confirm time. Never written. */
   safetyBlocked: PlanSafetyFinding[];
   skippedCount: number;
@@ -150,7 +187,26 @@ export interface ConfirmState {
 // PART 3 — generation
 // ---------------------------------------------------------------------------
 
+/** Same reasoning as confirmNutritionPlan's wrapper: a throw here would leave
+ *  the practitioner on the selection screen with no error after waiting through
+ *  a generation. Generation writes nothing, so the message can say so flatly. */
 export async function generateNutritionPlan(
+  prevState: PlanState,
+  formData: FormData
+): Promise<PlanState> {
+  try {
+    return await runGeneratePlan(prevState, formData);
+  } catch (err) {
+    return {
+      error: `Generating the plan failed: ${
+        err instanceof Error ? err.message : "unknown error"
+      }. Nothing was written — generation never touches an athlete's protocol.`,
+      plan: null,
+    };
+  }
+}
+
+async function runGeneratePlan(
   _prevState: PlanState,
   formData: FormData
 ): Promise<PlanState> {
@@ -239,7 +295,7 @@ export async function generateNutritionPlan(
         athleteId,
         athleteName: "Unknown athlete",
         allergies: [], intolerances: [], conditions: [],
-        redSFlag: false, ironFlag: false, currentProtocol: [],
+        redSFlag: false, ironFlag: false, currentProtocol: [], loadDays: [],
         periodSummary: "", suggestions: [],
         error: "Couldn't load this athlete's clinical profile.",
       } satisfies AthletePlanRow;
@@ -255,6 +311,16 @@ export async function generateNutritionPlan(
       redSFlag: clinical.redSFlag,
       ironFlag: clinical.ironFlag,
       currentProtocol: extras.currentProtocol,
+      // Sent whether or not the model produces a suggestion for the day, so a
+      // quiet day still shows the session it was quiet about.
+      loadDays: (loadDaysById.get(athleteId) ?? []).map((d) => ({
+        date: d.date,
+        intensity: d.load?.intensity ?? null,
+        sessionType: d.load?.sessionType ?? null,
+        rpe: d.load?.rpe ?? null,
+        durationBand: d.load?.durationBand ?? null,
+        scope: d.load?.scope ?? null,
+      })),
       periodSummary: "",
       suggestions: [],
       error: null,
@@ -426,12 +492,63 @@ interface ConfirmPayload {
   items: ConfirmedItem[];
 }
 
+/** How far the confirm got, so a thrown error can say whether anything was
+ *  already written. Request-local: created per invocation, never module state. */
+interface ConfirmProgress {
+  protocolsWritten: number;
+}
+
+/**
+ * A THROWN action is worse than a failed one.
+ *
+ * useActionState does not update its state when the action throws — it
+ * re-throws during render instead. With no error boundary above this component
+ * that meant the practitioner clicked "Confirm & Generate", waited, and got
+ * nothing: `done` stayed false, `error` stayed null, and the review screen sat
+ * there as if the click had never happened. Reported from real use.
+ *
+ * Several things in the body can throw rather than return an error object. The
+ * clearest is loadNutritionCitations() -> getClinicalLibraryEntries(), whose
+ * serviceClient() throws outright when the service-role credentials are absent;
+ * the Supabase loaders can also reject on a network fault. So the whole body is
+ * wrapped and any escape is converted into a state the UI can actually show.
+ *
+ * The message distinguishes the two cases that matter clinically: whether
+ * protocol rows had already been written before the failure. A practitioner who
+ * is told "nothing was saved" must be able to trust that.
+ */
 export async function confirmNutritionPlan(
-  _prevState: ConfirmState,
+  prevState: ConfirmState,
   formData: FormData
 ): Promise<ConfirmState> {
+  const progress: ConfirmProgress = { protocolsWritten: 0 };
+  try {
+    return await runConfirm(prevState, formData, progress);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : "unknown error";
+    const written =
+      progress.protocolsWritten > 0
+        ? ` ${progress.protocolsWritten} protocol row${progress.protocolsWritten === 1 ? "" : "s"} had already been saved before this failed — check the Supplement Protocols page before retrying, or you may duplicate work. No reports were generated.`
+        : " Nothing was written — no protocols were saved and no reports were generated, so it is safe to try again.";
+    return {
+      error: `Confirming failed: ${detail}.${written}`,
+      done: false,
+      jobs: [],
+      context: null,
+      safetyBlocked: [],
+      skippedCount: 0,
+      writtenCount: progress.protocolsWritten,
+    };
+  }
+}
+
+async function runConfirm(
+  _prevState: ConfirmState,
+  formData: FormData,
+  progress: ConfirmProgress
+): Promise<ConfirmState> {
   const empty: ConfirmState = {
-    error: null, done: false, results: [], safetyBlocked: [], skippedCount: 0, writtenCount: 0,
+    error: null, done: false, jobs: [], context: null, safetyBlocked: [], skippedCount: 0, writtenCount: 0,
   };
   const profile = await getCurrentProfile();
   if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
@@ -544,87 +661,218 @@ export async function confirmNutritionPlan(
       end_date: range.endDate,
     };
 
-    const { error } = existingId
+    // `.select("id")` IS LOAD-BEARING, not a convenience.
+    //
+    // Without it, PostgREST reports an UPDATE that matched zero rows as a
+    // success: `error` is null and there is nothing else to inspect. Zero rows
+    // is exactly what an RLS refusal looks like, so a protocol the caller was
+    // never allowed to write would have been counted as written, added to
+    // writtenByAthlete, included in writtenCount, and described to the
+    // practitioner as saved — while the athlete's record was untouched.
+    //
+    // The same omission on INSERT hides a refused insert the same way. Both
+    // branches now return the affected ids and an empty result is treated as
+    // the failure it is. The dedicated Supplement Protocol page already did
+    // this; the planner's confirm step did not.
+    const { data: writtenRows, error } = existingId
       ? await supabase
           .from("supplement_protocols")
           .update({ ...payloadRow, updated_by: profile.id, updated_at: new Date().toISOString() })
           .eq("id", existingId)
+          .select("id")
       : await supabase
           .from("supplement_protocols")
-          .insert({ ...payloadRow, athlete_id: range.athleteId, prescribed_by: profile.id });
+          .insert({ ...payloadRow, athlete_id: range.athleteId, prescribed_by: profile.id })
+          .select("id");
+
+    const who = contexts.get(range.athleteId);
+    const label = `${who ? `${who.firstName} ${who.lastName}` : range.athleteId} — ${range.supplementName} (${rangeLabel(range)})`;
 
     if (error) {
-      const who = contexts.get(range.athleteId);
+      writeErrors.push(`${label}: ${error.message}`);
+      continue;
+    }
+    if (!writtenRows || writtenRows.length === 0) {
       writeErrors.push(
-        `${who ? `${who.firstName} ${who.lastName}` : range.athleteId} — ${range.supplementName} (${rangeLabel(range)}): ${error.message}`
+        `${label}: refused by row-level security — nothing was written for this athlete. You may not have permission to prescribe for them.`
       );
       continue;
     }
+
+    progress.protocolsWritten += 1;
     const list = writtenByAthlete.get(range.athleteId);
     if (list) list.push(range);
     else writtenByAthlete.set(range.athleteId, [range]);
   }
 
-  // ---- REPORTS ----
-  // One per athlete that actually had something written, built from the rows
-  // that were written rather than from what was suggested or even from what
-  // was confirmed — anything dropped above is absent here too.
-  const reportAthleteIds = [...writtenByAthlete.keys()];
-  const [extrasById, loadDaysById, citations] = await Promise.all([
-    loadAthletePlanningExtras(reportAthleteIds, payload.periodStart, payload.periodEnd),
-    mode === "day_specific"
-      ? loadTrainingLoadDays(teamId, reportAthleteIds, payload.periodStart, payload.periodEnd)
-      : Promise.resolve(new Map<string, never[]>()),
-    loadNutritionCitations(),
-  ]);
-  const prescriptions = await loadPrescriptions(
-    reportAthleteIds.map((id) => ({
-      athleteId: id,
-      clubId: extrasById.get(id)?.clubId ?? null,
-      segmentId: extrasById.get(id)?.segmentId ?? null,
-    }))
-  );
-
-  const generatedByName = `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email;
-
-  const results = await mapWithConcurrency(reportAthleteIds, GENERATION_CONCURRENCY, async (athleteId) => {
-    const clinical = contexts.get(athleteId);
-    const extras = extrasById.get(athleteId);
-    const ranges = writtenByAthlete.get(athleteId) ?? [];
-    const rangeSummary = ranges.map((r) => ({
-      label: rangeLabel(r),
-      supplementName: r.supplementName,
-      dose: r.dose,
-      timing: r.timing,
-      dayCount: r.dayCount,
-    }));
-
-    if (!clinical || !extras) {
-      return {
-        athleteName: clinical ? `${clinical.firstName} ${clinical.lastName}` : athleteId,
-        reportId: null,
-        error: "Protocol saved, but the athlete's profile couldn't be loaded to write the report.",
-        note: null,
-        ranges: rangeSummary,
-      } satisfies ConfirmResult;
-    }
-
-    const confirmedProtocol: ConfirmedProtocolLine[] = ranges.map((r) => ({
-      supplementName: r.supplementName,
-      dose: r.dose,
-      timing: r.timing,
-      rationale: r.rationale,
-      window: rangeLabel(r),
-    }));
-
-    const report = await generateAndSaveNutritionReport({
-      profileId: profile.id,
-      generatedByName,
-      teamId,
+  // ---- HAND OFF, DO NOT GENERATE ----
+  //
+  // Report generation used to happen right here, inside this same action: one
+  // 60-90 second model call plus a PDF render per athlete, all before the
+  // practitioner heard anything back. That is fine on a dev server with no
+  // execution limit and fatal on a serverless platform with one — a two-athlete
+  // confirm is roughly three minutes and a squad is fifteen.
+  //
+  // The split follows the principle the whole feature is built on: WRITING THE
+  // PROTOCOL IS THE CLINICALLY SIGNIFICANT ACT, and it must never be hostage to
+  // a slow model call. By the time this action returns, every protocol is
+  // already in the database and visible on Daily Check-In and My Protocol.
+  // Reports are documents about that decision, generated afterwards, one short
+  // action per athlete, each retryable on its own.
+  //
+  // So this returns JOBS rather than results. If the practitioner closes the tab
+  // half way through, the protocols stand and the missing reports can be
+  // regenerated; nothing clinical is left half-applied.
+  const jobs: ReportJob[] = [...writtenByAthlete.entries()].map(([athleteId, ranges]) => {
+    const who = contexts.get(athleteId);
+    return {
       athleteId,
+      athleteName: who ? `${who.firstName} ${who.lastName}` : athleteId,
+      ranges: ranges.map((r) => ({
+        label: rangeLabel(r),
+        supplementName: r.supplementName,
+        dose: r.dose,
+        timing: r.timing,
+        dayCount: r.dayCount,
+      })),
+    };
+  });
+
+  revalidatePath(`/staff/${teamId}/reports`);
+  revalidatePath(`/staff/${teamId}/reports/nutrition`);
+  revalidatePath(`/staff/${teamId}/supplements`);
+  revalidatePath(`/staff/${teamId}`);
+
+  const writtenCount = merged.length - writeErrors.length;
+  return {
+    error: writeErrors.length > 0 ? `Some protocol rows couldn't be saved. ${writeErrors.join(" ")}` : null,
+    done: true,
+    jobs,
+    // Everything the per-athlete report action needs, so the results screen can
+    // drive generation without holding the plan in memory.
+    context: {
+      teamId,
       mode,
       periodStart: payload.periodStart,
       periodEnd: payload.periodEnd,
+      language,
+      audience,
+      additionalInstructions: payload.additionalInstructions ?? null,
+      includePerformanceSignals: payload.includePerformanceSignals === true,
+    },
+    safetyBlocked: safety.findings,
+    skippedCount,
+    writtenCount,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// One report, one athlete, one short action
+// ---------------------------------------------------------------------------
+
+export interface ReportRunState {
+  athleteId: string | null;
+  reportId: string | null;
+  error: string | null;
+  note: string | null;
+}
+
+/**
+ * Generates and saves the Nutrition report for a single athlete.
+ *
+ * Split out of confirmNutritionPlan so each report is its own request with its
+ * own time budget, and so one athlete's failure — a refusal, a rate limit, a
+ * timeout — cannot take the others down or roll back protocols that are already
+ * correctly written.
+ *
+ * THE CONFIRMED PROTOCOL IS RE-READ FROM THE DATABASE, not passed in from the
+ * client. That is deliberate and is a strengthening of the old behaviour: the
+ * report now describes what the athlete's record ACTUALLY holds for this period,
+ * so it cannot drift from the rows even if the client state is stale, tampered
+ * with, or from a half-finished earlier run.
+ */
+export async function generateReportForAthlete(
+  _prev: ReportRunState,
+  formData: FormData
+): Promise<ReportRunState> {
+  const base: ReportRunState = { athleteId: null, reportId: null, error: null, note: null };
+  try {
+    const profile = await getCurrentProfile();
+    if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+      return { ...base, error: "You don't have permission to do this." };
+    }
+
+    let ctx: ConfirmContext & { athleteId: string };
+    try {
+      ctx = JSON.parse(String(formData.get("job") ?? ""));
+    } catch {
+      return { ...base, error: "Couldn't read the report request." };
+    }
+    const { athleteId, teamId, mode, periodStart, periodEnd } = ctx;
+    if (!athleteId || !teamId) return { ...base, error: "Missing athlete or team." };
+
+    const supabase = await createClient();
+
+    // Roster membership re-derived server-side, exactly as the other actions do.
+    const { data: onTeam } = await supabase
+      .from("athlete_teams")
+      .select("athlete_id")
+      .eq("team_id", teamId)
+      .eq("athlete_id", athleteId)
+      .maybeSingle();
+    if (!onTeam) return { ...base, athleteId, error: "That athlete isn't on this team." };
+
+    // The rows as they actually stand, overlapping the report period.
+    const { data: rows } = await supabase
+      .from("supplement_protocols")
+      .select("supplement_name, dose, timing, rationale, start_date, end_date")
+      .eq("athlete_id", athleteId)
+      .lte("start_date", periodEnd)
+      .or(`end_date.is.null,end_date.gte.${periodStart}`)
+      .order("start_date", { ascending: true });
+
+    const confirmedProtocol: ConfirmedProtocolLine[] = (rows ?? []).map((r) => ({
+      supplementName: r.supplement_name as string,
+      dose: r.dose as string,
+      timing: r.timing as string,
+      rationale: (r.rationale as string | null) ?? "",
+      window: (r.end_date as string | null)
+        ? `${r.start_date} to ${r.end_date}`
+        : `from ${r.start_date}, standing`,
+    }));
+
+    const [contexts, library, extrasById, loadDaysById, citations] = await Promise.all([
+      loadAthleteClinicalContext([athleteId]),
+      loadSupplementLibrary(),
+      loadAthletePlanningExtras([athleteId], periodStart, periodEnd),
+      mode === "day_specific"
+        ? loadTrainingLoadDays(teamId, [athleteId], periodStart, periodEnd)
+        : Promise.resolve(new Map<string, never[]>()),
+      loadNutritionCitations(),
+    ]);
+
+    const clinical = contexts.get(athleteId);
+    const extras = extrasById.get(athleteId);
+    if (!clinical || !extras) {
+      return {
+        ...base,
+        athleteId,
+        error: "Protocols are saved, but this athlete's profile couldn't be loaded to write the report.",
+      };
+    }
+
+    const prescriptions = await loadPrescriptions([
+      { athleteId, clubId: extras.clubId, segmentId: extras.segmentId },
+    ]);
+
+    const report = await generateAndSaveNutritionReport({
+      profileId: profile.id,
+      generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+      teamId,
+      athleteId,
+      mode,
+      periodStart,
+      periodEnd,
       days: loadDaysById.get(athleteId) ?? [],
       confirmedProtocol,
       clinical,
@@ -632,32 +880,26 @@ export async function confirmNutritionPlan(
       prescription: prescriptions.get(athleteId) ?? null,
       supplementLibrary: library,
       citations,
-      includePerformanceSignals: payload.includePerformanceSignals === true,
-      additionalInstructions: payload.additionalInstructions ?? null,
-      language,
-      audience,
+      includePerformanceSignals: ctx.includePerformanceSignals === true,
+      additionalInstructions: ctx.additionalInstructions ?? null,
+      language: await resolveReportLanguage(ctx.language, teamId),
+      audience: resolveReportAudience(ctx.audience),
     });
 
+    if (report.reportId) revalidatePath(`/staff/${teamId}/reports`);
+
     return {
-      athleteName: report.athleteName,
+      athleteId,
       reportId: report.reportId,
       error: report.error,
       note: report.note,
-      ranges: rangeSummary,
-    } satisfies ConfirmResult;
-  });
-
-  revalidatePath(`/staff/${teamId}/reports`);
-  revalidatePath(`/staff/${teamId}/reports/nutrition`);
-  revalidatePath(`/staff/${teamId}`);
-
-  const writtenCount = merged.length - writeErrors.length;
-  return {
-    error: writeErrors.length > 0 ? `Some protocol rows couldn't be saved. ${writeErrors.join(" ")}` : null,
-    done: true,
-    results,
-    safetyBlocked: safety.findings,
-    skippedCount,
-    writtenCount,
-  };
+    };
+  } catch (err) {
+    return {
+      ...base,
+      error: `Report generation failed: ${
+        err instanceof Error ? err.message : "unknown error"
+      }. The athlete's protocols are unaffected — you can retry just this report.`,
+    };
+  }
 }

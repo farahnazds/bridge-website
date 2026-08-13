@@ -10,6 +10,19 @@ import type { RecipientCandidate } from "../ShareReportPanel";
 
 export const metadata: Metadata = { title: "Nutrition Planner — Bridgetx" };
 
+// Applies to the server actions in this segment, which is where the model calls
+// live. Vercel's default is 15s on the Hobby/Pro fluid runtime — long enough for
+// a page render, nowhere near enough for a generation.
+//
+// Generation is one call per athlete run four at a time, and each report is now
+// its own request (see actions.ts), so the ceiling that matters is a single
+// athlete's call rather than a whole roster's. 300s is the Pro maximum and is
+// comfortably above the ~60–90s a plan or report actually takes; nothing here
+// is expected to approach it. Note that this bounds the request only — it is not
+// a substitute for the split, which is what keeps a slow report from holding
+// protocol writes hostage.
+export const maxDuration = 300;
+
 type PractitionerEmbed = { id: string; first_name: string | null; last_name: string | null };
 type AssignmentRow = { staff_profile_id: string; profiles: PractitionerEmbed | null };
 

@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSessionValue, writeSessionValue } from "@/lib/useSessionValue";
 import { useFormStatus } from "react-dom";
 import { BTN_PRIMARY_FULL, BTN_SECONDARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import ClinicalFlagChips from "@/components/ClinicalFlagChips";
+import { INTENSITIES, SESSION_DURATION_BANDS, SESSION_TYPES } from "@/lib/constants";
 import type { PlanSuggestion } from "@/lib/supplementPlan";
-import type { AthletePlanRow, GeneratedPlan } from "./actions";
+import type { AthletePlanRow, GeneratedPlan, PlanLoadDay } from "./actions";
 
 // The review screen. Approve-by-default, edit in place, skip by unchecking.
 //
@@ -58,6 +60,72 @@ function normalise(name: string): string {
   return name.trim().toLowerCase();
 }
 
+// Labels come from the shared constants, not from title-casing the stored
+// value — "hiit" would render as "Hiit" and "45_90" as "45 90".
+const labelOf = (list: { value: string; label: string }[], value: string | null) =>
+  value === null ? null : list.find((x) => x.value === value)?.label ?? value;
+
+/** Only the four values `training_load_plans.intensity` actually allows. */
+const INTENSITY_COLOUR: Record<string, string> = {
+  rest: "var(--text-muted)",
+  low: "var(--brand-teal)",
+  medium: "var(--brand-blue)",
+  high: "var(--warning)",
+};
+
+/**
+ * The day's session in one line — intensity, session type, RPE, duration.
+ *
+ * Shown for EVERY day of the range, including days with no plan entry and days
+ * with no suggestion. A blank where a session should be is indistinguishable
+ * from a rest day, and the two call for opposite decisions: one means "nothing
+ * to fuel", the other means "nobody logged what they're doing".
+ */
+function TrainingLoadLine({ day }: { day: PlanLoadDay | undefined }) {
+  if (!day || day.intensity === null) {
+    return (
+      <p className="text-[11px] leading-tight" style={{ color: "var(--warning)" }}>
+        No training load logged
+      </p>
+    );
+  }
+  const parts = [
+    labelOf(SESSION_TYPES, day.sessionType),
+    day.rpe !== null ? `RPE ${day.rpe}` : null,
+    labelOf(SESSION_DURATION_BANDS, day.durationBand),
+  ].filter(Boolean);
+  const colour = INTENSITY_COLOUR[day.intensity] ?? "var(--text-muted)";
+  return (
+    <p className="flex flex-wrap items-center gap-1 text-[11px] leading-tight" style={{ color: "var(--text-muted)" }}>
+      <span
+        aria-hidden
+        className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: colour }}
+      />
+      <span className="font-medium" style={{ color: "var(--text)" }}>
+        {labelOf(INTENSITIES, day.intensity)}
+      </span>
+      {parts.length > 0 && <span>{parts.join(" · ")}</span>}
+      {/* Says whose entry it is, because an athlete-specific override and the
+          team-wide default read identically otherwise. */}
+      {day.scope === "athlete" && <span style={{ color: "var(--brand-blue)" }}>own session</span>}
+    </p>
+  );
+}
+
+/** A one-word status marker. Deliberately tiny — several of these have to fit
+ *  on one line inside a grid cell without wrapping into a paragraph. */
+function Tag({ label, colour }: { label: string; colour: string }) {
+  return (
+    <span
+      className="rounded px-1 py-px text-[10px] font-medium leading-tight"
+      style={{ color: colour, backgroundColor: `color-mix(in srgb, ${colour} 12%, transparent)` }}
+    >
+      {label}
+    </span>
+  );
+}
+
 function SubmitButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
@@ -68,7 +136,7 @@ function SubmitButton({ count }: { count: number }) {
       style={{ backgroundImage: "var(--brand-gradient-action)", opacity: count === 0 ? 0.6 : undefined }}
     >
       {pending
-        ? "Confirming, saving protocols and writing reports…"
+        ? "Saving protocols…"
         : count === 0
           ? "Nothing selected"
           : `Confirm & Generate — ${count} item${count === 1 ? "" : "s"}`}
@@ -80,14 +148,20 @@ export default function ReviewStep({
   plan,
   formAction,
   error,
+  storageKey,
   onBack,
 }: {
   plan: GeneratedPlan;
   formAction: (formData: FormData) => void;
   error: string | null;
+  /** Where to persist review decisions so a remount does not discard them. */
+  storageKey: string;
   onBack: () => void;
 }) {
-  const [cells, setCells] = useState<Record<string, CellState>>(() => {
+  const [openItem, setOpenItem] = useState<string | null>(null);
+
+  // Approve-by-default, derived from the plan itself.
+  const defaults = useMemo(() => {
     const init: Record<string, CellState> = {};
     for (const a of plan.athletes) {
       a.suggestions.forEach((s, i) => {
@@ -97,8 +171,42 @@ export default function ReviewStep({
       });
     }
     return init;
-  });
-  const [openItem, setOpenItem] = useState<string | null>(null);
+  }, [plan]);
+
+  // Recovering the plan without the review decisions would be a half-measure:
+  // the expensive part (the model calls) would come back, but the unchecks and
+  // dose edits — the part carrying the practitioner's judgement — would silently
+  // reset to approve-everything.
+  const storedJson = useSessionValue(storageKey);
+  const restored = useMemo(() => {
+    if (!storedJson) return defaults;
+    try {
+      const saved = JSON.parse(storedJson) as Record<string, CellState>;
+      // MERGED ONTO THE DEFAULTS, never substituted for them: a stored blob
+      // from a differently-shaped plan must not be able to drop an item the
+      // practitioner still has to review, or invent one that no longer exists.
+      const next: Record<string, CellState> = { ...defaults };
+      for (const key of Object.keys(defaults)) {
+        if (saved[key]) next[key] = { ...defaults[key], ...saved[key] };
+      }
+      return next;
+    } catch {
+      return defaults;
+    }
+  }, [storedJson, defaults]);
+
+  // `edits` is null until the practitioner touches something, so the rendered
+  // state is derived from storage rather than copied into state on mount —
+  // which is what removes the cascading render the linter objected to.
+  const [edits, setEdits] = useState<Record<string, CellState> | null>(null);
+  const cells = edits ?? restored;
+
+  const setCells = (updater: (prev: Record<string, CellState>) => Record<string, CellState>) =>
+    setEdits((prev) => updater(prev ?? restored));
+
+  useEffect(() => {
+    writeSessionValue(storageKey, JSON.stringify(cells));
+  }, [cells, storageKey]);
 
   const totalItems = plan.athletes.reduce((n, a) => n + a.suggestions.length, 0);
   const checkedCount = Object.values(cells).filter((c) => c.checked).length;
@@ -146,7 +254,20 @@ export default function ReviewStep({
   }, [cells, plan]);
 
   /** One suggestion, rendered the same way in the grid and the list layouts. */
-  const Chip = ({ row, s, index }: { row: AthletePlanRow; s: PlanSuggestion; index: number }) => {
+  const Chip = ({
+    row,
+    s,
+    index,
+    loadDay,
+  }: {
+    row: AthletePlanRow;
+    s: PlanSuggestion;
+    index: number;
+    /** This athlete's entry for this day. The AUTHORITATIVE answer to "was
+     *  there training load?" — `s.trainingLoadKnown` is only the model's own
+     *  report of what it used, and the two can disagree. */
+    loadDay?: PlanLoadDay;
+  }) => {
     const key = itemKey(row.athleteId, index);
     const cell = cells[key];
     if (!cell) return null;
@@ -162,6 +283,15 @@ export default function ReviewStep({
     const rationaleStale = prescriptionEdited && !rationaleEdited;
     const isOpen = openItem === key;
 
+    // Continuing / changing / starting — the one thing about the baseline worth
+    // a glance at grid scale. The detail of what it is changing FROM lives in
+    // the expanded panel, where there is room to state it properly.
+    const relation: "new" | "same" | "changed" = !current
+      ? "new"
+      : current.dose.trim() === cell.dose.trim() && current.timing.trim() === cell.timing.trim()
+        ? "same"
+        : "changed";
+
     return (
       <div
         className={`${PANEL} p-2`}
@@ -171,12 +301,10 @@ export default function ReviewStep({
           opacity: cell.checked ? 1 : 0.55,
         }}
       >
-        {/* Current -> suggestion, in that order, so the change is legible
-            rather than the suggestion arriving with no baseline. */}
-        <p className="text-[11px] leading-tight" style={{ color: "var(--text-muted)" }}>
-          {current ? `Now: ${current.dose} · ${current.timing}` : "Not currently prescribed"}
-        </p>
-        <label className="mt-1 flex cursor-pointer items-start gap-1.5">
+        {/* Two lines and a row of tags. A cell in a fourteen-column grid is
+            scanned, not read — anything longer than this pushes the next day
+            off the screen and gets skimmed rather than checked. */}
+        <label className="flex cursor-pointer items-start gap-1.5">
           <input
             type="checkbox"
             checked={cell.checked}
@@ -188,37 +316,49 @@ export default function ReviewStep({
             {s.supplementName}
           </span>
         </label>
-        <p className="mt-0.5 text-[11px] leading-tight" style={{ color: "var(--text)" }}>
-          {cell.dose} · {cell.timing}
-          {edited && (
-            <span className="ml-1 font-medium" style={{ color: "var(--brand-blue)" }}>
-              edited
-            </span>
-          )}
-        </p>
-        {!s.trainingLoadKnown && plan.mode === "day_specific" && (
-          <p className="mt-0.5 text-[11px] leading-tight" style={{ color: "var(--warning)" }}>
-            No training-load data for this day — baseline suggestion.
-          </p>
-        )}
-        {/* Visible without opening the editor, so the mismatch is noticed even
-            if the practitioner moves straight on to the next cell. */}
-        {rationaleStale && (
-          <p className="mt-0.5 text-[11px] leading-tight" style={{ color: "var(--warning)" }}>
-            Reason still describes the original — worth a look.
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={() => setOpenItem(isOpen ? null : key)}
-          className="mt-1 text-[11px] font-medium underline-offset-2 hover:underline"
-          style={{ color: "var(--brand-blue)" }}
+        <p
+          className="mt-0.5 truncate text-[11px] leading-tight"
+          style={{ color: "var(--text)" }}
+          title={`${cell.dose} · ${cell.timing}`}
         >
-          {isOpen ? "Close" : "Edit / why"}
-        </button>
+          {cell.dose} · {cell.timing}
+        </p>
+
+        <div className="mt-1 flex flex-wrap items-center gap-1">
+          <Tag
+            colour={relation === "changed" ? "var(--brand-blue)" : "var(--text-muted)"}
+            label={relation === "new" ? "new" : relation === "same" ? "continuing" : "changed"}
+          />
+          {edited && <Tag colour="var(--brand-blue)" label="edited" />}
+          {rationaleStale && <Tag colour="var(--warning)" label="check reason" />}
+          {/* No "no load" tag here: the day's line sits directly above every
+              cell and already says so, from the real entry rather than the
+              model's account of it. */}
+          <button
+            type="button"
+            onClick={() => setOpenItem(isOpen ? null : key)}
+            aria-expanded={isOpen}
+            className="ml-auto text-[11px] font-medium underline-offset-2 hover:underline"
+            style={{ color: "var(--brand-blue)" }}
+          >
+            {isOpen ? "Close" : "Details"}
+          </button>
+        </div>
 
         {isOpen && (
           <div className="mt-2 flex flex-col gap-2">
+            {/* Current -> suggestion, in that order, so the change is legible
+                rather than the suggestion arriving with no baseline. */}
+            <p className="text-[11px] leading-snug" style={{ color: "var(--text-muted)" }}>
+              {current
+                ? `Currently on ${current.dose} · ${current.timing}`
+                : "Not currently prescribed."}
+            </p>
+            {plan.mode === "day_specific" && s.date !== null && !loadDay?.intensity && (
+              <p className="text-[11px] leading-snug" style={{ color: "var(--warning)" }}>
+                No training-load data for this day — this is a baseline suggestion.
+              </p>
+            )}
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
                 Dose
@@ -371,28 +511,14 @@ export default function ReviewStep({
                 >
                   Athlete
                 </th>
-                {plan.dates.map((d) => {
-                  // Every athlete shares the team-wide entry unless they have
-                  // their own, so the header samples the first athlete that has
-                  // one — enough to label the column without implying it is
-                  // identical for everyone.
-                  const sample = plan.athletes
-                    .flatMap((a) => a.suggestions)
-                    .find((s) => s.date === d);
-                  return (
-                    <th key={d} className="px-3 py-3 align-bottom font-medium" style={{ color: "var(--text-muted)", minWidth: "200px" }}>
-                      <span className="block" style={{ color: "var(--text)" }}>
-                        {new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" })}
-                      </span>
-                      <span className="block text-xs font-normal" style={{ fontVariantNumeric: "tabular-nums" }}>{d}</span>
-                      {sample && !sample.trainingLoadKnown && (
-                        <span className="block text-[11px] font-normal" style={{ color: "var(--warning)" }}>
-                          no load logged
-                        </span>
-                      )}
-                    </th>
-                  );
-                })}
+                {plan.dates.map((d) => (
+                  <th key={d} className="px-3 py-3 align-bottom font-medium" style={{ color: "var(--text-muted)", minWidth: "200px" }}>
+                    <span className="block" style={{ color: "var(--text)" }}>
+                      {new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" })}
+                    </span>
+                    <span className="block text-xs font-normal" style={{ fontVariantNumeric: "tabular-nums" }}>{d}</span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -417,14 +543,23 @@ export default function ReviewStep({
                     const forDay = a.suggestions
                       .map((s, i) => ({ s, i }))
                       .filter(({ s }) => s.date === d);
+                    const loadDay = a.loadDays.find((l) => l.date === d);
                     return (
                       <td key={d} className="px-3 py-3 align-top" style={{ minWidth: "200px" }}>
+                        {/* In the cell rather than the column header, because
+                            the entry is this athlete's: an athlete-specific
+                            session overrides the team-wide one, so a single
+                            header value would be wrong for exactly the athletes
+                            whose day differs. */}
+                        <TrainingLoadLine day={loadDay} />
                         {forDay.length === 0 ? (
-                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>
+                          <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                            No supplement suggested
+                          </p>
                         ) : (
-                          <div className="flex flex-col gap-2">
+                          <div className="mt-1.5 flex flex-col gap-2">
                             {forDay.map(({ s, i }) => (
-                              <Chip key={i} row={a} s={s} index={i} />
+                              <Chip key={i} row={a} s={s} index={i} loadDay={loadDay} />
                             ))}
                           </div>
                         )}
@@ -446,7 +581,24 @@ export default function ReviewStep({
               if (list) list.push({ s, i });
               else byDate.set(k, [{ s, i }]);
             });
-            const groups = [...byDate.entries()].sort((x, y) => x[0].localeCompare(y[0]));
+            // EVERY day in the range gets a heading in day-specific mode, not
+            // only the days that produced a suggestion. A day that silently
+            // vanishes from the list is indistinguishable from a day that was
+            // never in the range — and it takes its training load with it.
+            const groups: [string, { s: PlanSuggestion; i: number }[]][] =
+              plan.mode === "day_specific"
+                ? [
+                    ...plan.dates.map(
+                      (d) => [d, byDate.get(d) ?? []] as [string, { s: PlanSuggestion; i: number }[]]
+                    ),
+                    ...(byDate.has("standing")
+                      ? ([["standing", byDate.get("standing")!]] as [
+                          string,
+                          { s: PlanSuggestion; i: number }[],
+                        ][])
+                      : []),
+                  ]
+                : [...byDate.entries()].sort((x, y) => x[0].localeCompare(y[0]));
             return (
               <div key={a.athleteId} className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
                 <p className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
@@ -459,24 +611,43 @@ export default function ReviewStep({
                     {a.periodSummary}
                   </p>
                 )}
-                {groups.length === 0 && !a.error && (
+                {a.suggestions.length === 0 && !a.error && (
                   <p className="mt-3 text-sm" style={{ color: "var(--text-muted)" }}>
                     No supplements suggested for this period.
                   </p>
                 )}
                 <div className="mt-4 flex flex-col gap-4">
-                  {groups.map(([date, entries]) => (
+                  {groups.map(([date, entries]) => {
+                    const loadDay = a.loadDays.find((l) => l.date === date);
+                    return (
                     <div key={date}>
                       <p className="text-xs font-medium" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
-                        {date === "standing" ? "Standing protocol" : date}
+                        {date === "standing"
+                          ? "Standing protocol"
+                          : `${new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
+                              weekday: "short",
+                              timeZone: "UTC",
+                            })} ${date}`}
                       </p>
-                      <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {entries.map(({ s, i }) => (
-                          <Chip key={i} row={a} s={s} index={i} />
-                        ))}
-                      </div>
+                      {date !== "standing" && plan.mode === "day_specific" && (
+                        <div className="mt-0.5">
+                          <TrainingLoadLine day={loadDay} />
+                        </div>
+                      )}
+                      {entries.length === 0 ? (
+                        <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                          No supplement suggested for this day.
+                        </p>
+                      ) : (
+                        <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          {entries.map(({ s, i }) => (
+                            <Chip key={i} row={a} s={s} index={i} loadDay={loadDay} />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -497,9 +668,10 @@ export default function ReviewStep({
           Start over
         </button>
         <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
-          Confirming writes the checked items to each athlete&apos;s protocol and generates one nutrition report
-          per athlete. Unchecked items are discarded and any existing protocol for those supplements is left
-          untouched.
+          Confirming writes the checked items to each athlete&apos;s protocol. That happens first and on its
+          own; the reports are then generated one athlete at a time on the next screen, so a slow report
+          never holds up a protocol. Unchecked items are discarded and any existing protocol for those
+          supplements is left untouched.
         </p>
       </div>
     </form>
