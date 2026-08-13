@@ -26,6 +26,35 @@ import {
 // private bucket, so a stored link would be either permanently public or an
 // expiring signed URL rotting in the database. Callers mint a short-lived
 // signed URL at download time instead.
+//
+// ---------------------------------------------------------------------------
+// KNOWN GAP — nothing couples a report row's lifetime to its stored object
+// ---------------------------------------------------------------------------
+// Low priority, but real, and it accumulates silently. Deleting a `reports` row
+// does NOT remove the PDF this module uploaded for it: there is no cascade, no
+// trigger, and no cleanup helper. The object simply stops being referenced.
+//
+// It has not bitten anything yet because THE APP HAS NO REPORT-DELETE PATH AT
+// ALL — verified 2026-08-13, there is no `.delete()` against `reports` anywhere
+// in app/, lib/ or components/. Reports are generated, shared and flagged, never
+// removed. So today the only way to orphan a PDF is to delete a row out of band
+// (SQL editor, Studio), which is how the four orphans found and swept on
+// 2026-08-13 got there.
+//
+// The trap is that the obvious fix is not sufficient. Migration 019 grants
+// DELETE on report-pdfs to super admins only ("super admin manages report
+// pdfs"); every other policy in that file is SELECT. So a practitioner-facing
+// "delete report" button could remove the row through RLS and would silently
+// fail to remove the object. Whoever builds that path needs one of:
+//
+//   - a DB trigger on `reports` AFTER DELETE that removes the object, or
+//   - a service-role cleanup step in the delete action, or
+//   - a widened storage DELETE policy mirroring the report's own scope.
+//
+// Until a delete path exists this is latent. It should be closed as part of
+// building one, not before — and a periodic orphan sweep (compare every
+// `reports.file_url` against a bucket listing) is the cheap way to confirm
+// there is no drift in the meantime.
 
 // pdfkit can only embed PNG and JPEG. A logo in any other format is skipped
 // and the header falls back to the club wordmark — never a failed report.

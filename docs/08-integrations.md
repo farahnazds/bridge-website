@@ -10,6 +10,23 @@ staging/testing (not just separate code) — this lets schema changes and
 CSV import testing happen with zero risk to real athlete data. Free tier
 is sufficient at current scale.
 
+**Known gap — storage cleanup on report deletion (low priority).** A
+report's PDF in the `report-pdfs` bucket is not tied to the lifetime of
+its `reports` row: no cascade, no trigger, no cleanup helper. Deleting the
+row orphans the object. This is latent rather than active — the app has
+**no report-delete path at all** (verified 2026-08-13: no `.delete()`
+against `reports` anywhere in `app/`, `lib/` or `components/`), so the
+only way to orphan a PDF today is deleting a row out of band. Four such
+orphans were found and swept on 2026-08-13.
+
+Worth closing properly *when a delete path is built*, not before — and
+note the trap: migration 019 grants storage DELETE to super admins only,
+so a practitioner-facing delete would remove the row through RLS and
+silently leave the file. See the KNOWN GAP block in
+`lib/reportPdfDelivery.ts` for the three viable fixes. Meanwhile, a
+periodic sweep comparing every `reports.file_url` against a bucket
+listing is enough to confirm no drift.
+
 ## Vercel — ACTIVE
 Hosting, connected to GitHub. Two domains: one pointed at the
 **production** branch, one pointed at a **staging** branch — push to
