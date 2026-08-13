@@ -102,7 +102,7 @@ export default async function ClubLayout({
     { label: "Injuries", href: `/club/${clubId}/injuries`, icon: HeartPulse },
   ] },
   { label: "PLANNING", items: [
-    { label: "Periodization", href: `/club/${clubId}/periodization`, icon: CalendarRange },
+    { label: "Season Phases", href: `/club/${clubId}/periodization`, icon: CalendarRange },
     { label: "Competitions", href: `/club/${clubId}/competitions`, icon: Trophy },
     { label: "Content", href: `/club/${clubId}/content`, icon: Newspaper },
   ] },

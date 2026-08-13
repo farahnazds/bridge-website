@@ -241,3 +241,23 @@ body:has(.bx-modal[open]) {
     animation-delay: 0ms !important; transition-duration: .001ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Native date/time inputs on a dark surface
+   ---------------------------------------------------------------------------
+   The browser draws the little calendar glyph inside <input type="date">
+   itself, and it defaults to a near-black icon that is effectively invisible
+   against our surfaces. `color-scheme: dark` is the supported way to tell the
+   engine which palette to draw its built-in controls in — it fixes the glyph,
+   the spin buttons and the picker popup together, which a filter hack on the
+   indicator alone does not.
+
+   Applied to the input types that have built-in chrome rather than globally,
+   so nothing else inherits a scheme change it did not ask for. */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"],
+input[type="week"] {
+  color-scheme: dark;
+}

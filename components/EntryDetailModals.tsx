@@ -92,7 +92,9 @@ const num = (v: number | null | undefined, digits = 1, suffix = "") =>
   v === null || v === undefined ? "—" : `${Number(v).toFixed(digits)}${suffix}`;
 
 /** Label/value grid for the read-only half of a modal. */
-function Fields({ rows }: { rows: [string, ReactNode][] }) {
+/** Exported alongside EntryModal so a page composing its own modal renders the
+ *  same label/value grid as every other detail view. */
+export function Fields({ rows }: { rows: [string, ReactNode][] }) {
   return (
     <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
       {rows.map(([label, value]) => (
@@ -179,7 +181,19 @@ function EditAffordance({
  * its own dedicated page, which is right for that page and simply does not
  * cover whichever route this modal was opened from.
  */
-function EntryModal({
+/**
+ * Read-first modal: the entry's values, then an Edit affordance that swaps in
+ * the dedicated page's own form.
+ *
+ * EXPORTED so the Training Load Plan page can open its own entries through the
+ * same shell rather than growing a parallel one. The other modals in this file
+ * wrap it because they are opened from the Athlete Profile, which does not have
+ * their forms in scope; the training-load page does, so it composes EntryModal
+ * directly and passes PlanForm in. That also avoids the import cycle the
+ * assessment modal has to live with (this file imports EditAssessmentForm,
+ * AssessmentsClient imports AssessmentDetailModal).
+ */
+export function EntryModal({
   title,
   subtitle,
   detail,
@@ -590,7 +604,7 @@ export function TrainingLoadDetailModal({ entry, onClose }: { entry: TrainingLoa
     <DetailOnlyModal
       title={`Planned session · ${entry.date}`}
       subtitle={`added by ${entry.createdByName}`}
-      managedNote="Planned load is added and removed from the Training Load Plan page. Entries are not edited in place."
+      managedNote="Planned load is added and edited on the Load & Periodization page."
       onClose={onClose}
     >
       <Fields

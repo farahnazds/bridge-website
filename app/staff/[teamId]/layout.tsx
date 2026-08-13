@@ -82,7 +82,7 @@ export default async function TeamLayout({
   const navGroups = [
   { label: null, items: [
     { label: "Roster", href: `/staff/${teamId}`, icon: Users },
-    { label: "Training Load Plan", href: `/staff/${teamId}/training-load`, icon: Gauge },
+    { label: "Load & Periodization", href: `/staff/${teamId}/training-load`, icon: Gauge },
     { label: "Reports", href: `/staff/${teamId}/reports`, icon: FileText },
     { label: "Messenger", href: `/staff/${teamId}/messenger`, icon: MessageSquare },
   ] },

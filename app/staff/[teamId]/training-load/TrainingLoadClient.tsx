@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
-import { Check, CalendarDays, Lock } from "lucide-react";
+import { Check, CalendarDays, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { BTN_PRIMARY, BTN_TERTIARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import {
   INTENSITIES,
@@ -16,6 +16,7 @@ import {
 import AthleteMultiSelect, { type SelectableAthlete } from "@/components/AthleteMultiSelect";
 import type { FieldAthlete } from "@/components/AthleteSelectField";
 import { useOnSaved } from "@/lib/useOnSaved";
+import { EntryModal, Fields } from "@/components/EntryDetailModals";
 import { saveTrainingLoad, deleteTrainingLoad, type ActionState } from "./actions";
 
 // The Training Load Plan, rebuilt around a date strip.
@@ -31,6 +32,19 @@ import { saveTrainingLoad, deleteTrainingLoad, type ActionState } from "./action
 const initialState: ActionState = { error: null };
 
 const labelClass = "text-sm font-medium";
+
+/** How far the arrows and a swipe move the visible window. A week rather than
+ *  the full fortnight: shifting by the whole window leaves no overlap, so the
+ *  days either side of the boundary are never visible together. */
+const WINDOW_STEP_DAYS = 7;
+/** Below this, a drag is a scroll or a mis-tap rather than a swipe. */
+const SWIPE_THRESHOLD_PX = 50;
+
+function shiftIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 const INTENSITY_LABEL: Record<string, string> = Object.fromEntries(INTENSITIES.map((i) => [i.value, i.label]));
 const PHASE_LABEL: Record<string, string> = Object.fromEntries(SEASON_PHASES.map((p) => [p.value, p.label]));
@@ -49,6 +63,12 @@ export interface PlanEntry {
   athleteId: string | null;
   athleteName: string | null;
   createdByName: string;
+  /** False when another squad planned this athlete. An athlete has one
+   *  individual entry per day across every team they are in (migration 041), so
+   *  the row surfaces on both pages — editable only on the one that owns it. */
+  ownedByThisTeam: boolean;
+  /** The owning team's name when it is not this one, for the read-only label. */
+  ownerTeamName: string | null;
 }
 
 export interface DayCell {
@@ -116,14 +136,66 @@ function DateStrip({
   days,
   active,
   onPick,
+  onShift,
 }: {
   days: DayCell[];
   active: string;
   onPick: (d: string) => void;
+  onShift: (deltaDays: number) => void;
 }) {
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const touch = useRef<{ x: number; y: number } | null>(null);
+
+  /**
+   * Swipe moves the window — but only from the edge.
+   *
+   * The strip is `overflow-x-auto` and fourteen cells is wider than a phone, so
+   * a horizontal drag is ALREADY a native scroll. Treating every swipe as a
+   * window change would fight that and make the strip impossible to scroll
+   * through. So a swipe only shifts the window when the scroller has nothing
+   * left to give in that direction — the same "pull past the end" behaviour a
+   * paged carousel uses.
+   */
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touch.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touch.current;
+    touch.current = null;
+    if (!start) return;
+
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+
+    // Ignore anything that is mostly vertical — that is the page scrolling.
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) <= Math.abs(dy)) return;
+
+    const el = scroller.current;
+    if (el) {
+      const atStart = el.scrollLeft <= 1;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+      // Swiping right (dx > 0) reveals earlier days, and is only a window shift
+      // once the scroller is already showing the first cell.
+      if (dx > 0 && !atStart) return;
+      if (dx < 0 && !atEnd) return;
+    }
+
+    onShift(dx > 0 ? -WINDOW_STEP_DAYS : WINDOW_STEP_DAYS);
+  };
+
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
-      {days.map((d) => {
+    <div className="flex w-full min-w-0 items-center gap-2">
+      <StripArrow direction="back" onClick={() => onShift(-WINDOW_STEP_DAYS)} />
+      <div
+        ref={scroller}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1"
+      >
+        {days.map((d) => {
         const isActive = d.date === active;
         const label =
           d.status === "complete"
@@ -176,9 +248,28 @@ function DateStrip({
               />
             )}
           </button>
-        );
-      })}
+          );
+        })}
+      </div>
+      <StripArrow direction="forward" onClick={() => onShift(WINDOW_STEP_DAYS)} />
     </div>
+  );
+}
+
+/** The desktop equivalent of the swipe. A gesture is not discoverable and not
+ *  available to a mouse, so the same navigation gets real buttons. */
+function StripArrow({ direction, onClick }: { direction: "back" | "forward"; onClick: () => void }) {
+  const Icon = direction === "back" ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={direction === "back" ? "Show the previous week" : "Show the next week"}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors duration-150 hover:bg-white/[0.04]"
+      style={{ borderColor: "var(--border)", color: "var(--text)" }}
+    >
+      <Icon size={16} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -189,7 +280,7 @@ function DateJump({ teamId, focus }: { teamId: string; focus: string }) {
   const router = useRouter();
   return (
     <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-muted)" }}>
-      <CalendarDays size={16} aria-hidden="true" />
+      <CalendarDays size={16} aria-hidden="true" style={{ color: "var(--text)" }} />
       <span className="sr-only">Jump to date</span>
       <input
         type="date"
@@ -417,7 +508,7 @@ export function PlanForm({
               <span style={{ color: "var(--text)" }}>{lockedAthlete.label} only</span>
             </div>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Planning for this athlete alone. Use the Training Load Plan page for a team-wide session.
+              Planning for this athlete alone. Use Load &amp; Periodization for a team-wide session.
             </p>
           </>
         ) : (
@@ -460,26 +551,70 @@ function DeleteButton({ teamId, entryId }: { teamId: string; entryId: string }) 
   );
 }
 
-function EntryRow({ teamId, entry }: { teamId: string; entry: PlanEntry }) {
-  const colour = INTENSITY_COLOUR[entry.intensity] ?? "var(--text-muted)";
-  const detail = [
+function entryDetailParts(entry: PlanEntry): string[] {
+  return [
     entry.rpe !== null ? `RPE ${entry.rpe}` : null,
     entry.sessionType ? TYPE_LABEL[entry.sessionType] ?? entry.sessionType : null,
     entry.durationBand ? BAND_LABEL[entry.durationBand] ?? entry.durationBand : null,
     entry.sweatRateMl !== null ? `${entry.sweatRateMl} ml/hr` : null,
-  ].filter(Boolean);
+  ].filter((x): x is string => x !== null);
+}
+
+function EntryRow({
+  teamId,
+  entry,
+  supersedesTeamWide,
+  onOpen,
+}: {
+  teamId: string;
+  entry: PlanEntry;
+  /** True on an athlete override that sits over a team-wide entry for the same
+   *  day. Shown because the two coexisting is intended — the override wins for
+   *  that athlete — but nothing on screen used to say so, which read as two
+   *  conflicting plans rather than one plan and one exception. */
+  supersedesTeamWide: boolean;
+  onOpen: () => void;
+}) {
+  const colour = INTENSITY_COLOUR[entry.intensity] ?? "var(--text-muted)";
+  const detail = entryDetailParts(entry);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b py-3 last:border-b-0"
-      style={{ borderColor: "var(--border)" }}>
+    <div
+      onClick={onOpen}
+      className="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b py-3 transition-colors duration-150 last:border-b-0 hover:bg-white/[0.03]"
+      style={{ borderColor: "var(--border)" }}
+    >
       <div className="flex flex-wrap items-center gap-3">
         <span className="inline-flex items-center gap-1.5 text-sm font-medium" style={{ color: colour }}>
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colour }} />
           {INTENSITY_LABEL[entry.intensity] ?? entry.intensity}
         </span>
-        <span className="text-sm" style={{ color: "var(--text)" }}>
+        {/* A real button, because the row's onClick is a pointer convenience
+            and this is the only thing in it that reaches the keyboard. Same
+            reasoning as the assessment table's athlete-name button. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          className="text-left text-sm underline-offset-2 hover:underline"
+          style={{ color: "var(--text)" }}
+        >
           {entry.athleteName ?? "Whole team"}
-        </span>
+        </button>
+        {supersedesTeamWide && (
+          <span
+            className={CHIP}
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--brand-blue) 12%, transparent)",
+              color: "var(--brand-blue)",
+              border: "1px solid color-mix(in srgb, var(--brand-blue) 30%, transparent)",
+            }}
+          >
+            takes precedence
+          </span>
+        )}
         {detail.length > 0 && (
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>{detail.join(" · ")}</span>
         )}
@@ -490,11 +625,125 @@ function EntryRow({ teamId, entry }: { teamId: string; entry: PlanEntry }) {
           </span>
         )}
       </div>
-      <div className="flex items-center gap-3">
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>{entry.createdByName}</span>
-        <DeleteButton teamId={teamId} entryId={entry.id} />
+      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {entry.ownedByThisTeam
+            ? entry.createdByName
+            : `${entry.ownerTeamName} · ${entry.createdByName}`}
+        </span>
+        {entry.ownedByThisTeam ? (
+          <DeleteButton teamId={teamId} entryId={entry.id} />
+        ) : (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Read-only
+          </span>
+        )}
       </div>
     </div>
+  );
+}
+
+/**
+ * One entry, read-first, with Edit inside — the shell every other data type in
+ * this app opens through (Assessments, GPS, VALD, the Athlete Profile rows).
+ *
+ * `edit` is null on a past day, which makes EntryModal render its own "this is
+ * read-only" note rather than an Edit button. That is the same affordance the
+ * strip uses for past cells, so the two cannot disagree about what is editable.
+ */
+function PlanEntryModal({
+  teamId,
+  entry,
+  athletes,
+  editable,
+  supersedesTeamWide,
+  onClose,
+}: {
+  teamId: string;
+  entry: PlanEntry;
+  athletes: SelectableAthlete[];
+  editable: boolean;
+  supersedesTeamWide: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <EntryModal
+      title={`Planned session · ${longDate(entry.date)}`}
+      subtitle={
+        entry.ownedByThisTeam
+          ? `${entry.athleteName ?? "Whole team"} · added by ${entry.createdByName}`
+          : `${entry.athleteName ?? "Whole team"} · set by ${entry.ownerTeamName} (${entry.createdByName})`
+      }
+      noun="plan entry"
+      // Two independent reasons this can be read-only, and EntryModal renders a
+      // different explanation for each: a past day (isEditable false) and an
+      // entry another squad owns (edit null → "edited from the team workspace").
+      // The owning-team case gets its own notice below, because that wording
+      // alone would not say WHOSE workspace.
+      isEditable={editable}
+      edit={editable && entry.ownedByThisTeam ? { teamId } : null}
+      onClose={onClose}
+      detail={
+        <div className="flex flex-col gap-4">
+          {!entry.ownedByThisTeam && (
+            <p
+              className={NOTICE}
+              style={{
+                borderColor: "var(--warning)",
+                color: "var(--text)",
+                backgroundColor: "color-mix(in srgb, var(--warning) 8%, transparent)",
+              }}
+            >
+              <strong>{entry.ownerTeamName} planned this athlete for this day</strong>, and{" "}
+              {entry.createdByName} set it. This athlete is on both squads, and an athlete can only
+              have one individual plan per day — so it is read-only here. If the session needs to
+              change, agree it with {entry.ownerTeamName} rather than planning a second one.
+            </p>
+          )}
+          {supersedesTeamWide && (
+            <p
+              className={NOTICE}
+              style={{
+                borderColor: "var(--brand-blue)",
+                color: "var(--text)",
+                backgroundColor: "color-mix(in srgb, var(--brand-blue) 8%, transparent)",
+              }}
+            >
+              This athlete has an individual entry for this day, and it{" "}
+              <strong>takes precedence over the team-wide session</strong> when their reports and
+              fuelling plans are generated. Both are intended to exist — the team-wide entry still
+              covers everyone else.
+            </p>
+          )}
+          <Fields
+            rows={[
+              ["Applies to", entry.athleteName ?? "Whole team"],
+              ["Intensity", INTENSITY_LABEL[entry.intensity] ?? entry.intensity],
+              ["RPE", entry.rpe ?? "Not recorded"],
+              ["Season phase", entry.seasonPhase ? PHASE_LABEL[entry.seasonPhase] ?? entry.seasonPhase : "—"],
+              ["Session type", entry.sessionType ? TYPE_LABEL[entry.sessionType] ?? entry.sessionType : "Not recorded"],
+              ["Session duration", entry.durationBand ? BAND_LABEL[entry.durationBand] ?? entry.durationBand : "Not recorded"],
+              ["Est. sweat rate", entry.sweatRateMl === null ? "Not recorded" : `${entry.sweatRateMl} ml/hr`],
+            ]}
+          />
+        </div>
+      }
+      form={({ onDone, onSaved }) => (
+        <PlanForm
+          teamId={teamId}
+          athletes={athletes}
+          date={entry.date}
+          existing={entry}
+          lockedAthlete={
+            entry.athleteId && entry.athleteName
+              ? { id: entry.athleteId, label: entry.athleteName }
+              : null
+          }
+          onDone={onDone}
+          onSaved={onSaved}
+        />
+      )}
+    />
   );
 }
 
@@ -515,8 +764,17 @@ export default function TrainingLoadClient({
   today: string;
   rosterSize: number;
 }) {
+  const router = useRouter();
   const [selected, setSelected] = useState(focus);
   const [showForm, setShowForm] = useState(false);
+  const [openEntry, setOpenEntry] = useState<PlanEntry | null>(null);
+
+  // The window lives in the URL, so arrows and swipes navigate rather than
+  // setting state — same mechanism as the date jump, and for the same reason:
+  // the server fetches the fortnight being looked at.
+  const shiftWindow = (deltaDays: number) => {
+    router.push(`/staff/${teamId}/training-load?d=${shiftIso(focus, deltaDays)}`);
+  };
 
   const day = days.find((d) => d.date === selected) ?? days[0];
   const forDay = entries.filter((e) => e.date === selected);
@@ -531,8 +789,8 @@ export default function TrainingLoadClient({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <DateStrip days={days} active={selected} onPick={pick} />
+      <div className="flex flex-col gap-3">
+        <DateStrip days={days} active={selected} onPick={pick} onShift={shiftWindow} />
         <DateJump teamId={teamId} focus={focus} />
       </div>
 
@@ -588,14 +846,27 @@ export default function TrainingLoadClient({
         {forDay.length > 0 && (
           <div className="mt-4">
             {teamWide.map((e) => (
-              <EntryRow key={e.id} teamId={teamId} entry={e} />
+              <EntryRow key={e.id} teamId={teamId} entry={e} supersedesTeamWide={false}
+                onOpen={() => setOpenEntry(e)} />
             ))}
             {overrides.map((e) => (
-              <EntryRow key={e.id} teamId={teamId} entry={e} />
+              <EntryRow key={e.id} teamId={teamId} entry={e} supersedesTeamWide={teamWide.length > 0}
+                onOpen={() => setOpenEntry(e)} />
             ))}
           </div>
         )}
       </div>
+
+      {openEntry && (
+        <PlanEntryModal
+          teamId={teamId}
+          entry={openEntry}
+          athletes={athletes}
+          editable={canPlan}
+          supersedesTeamWide={openEntry.athleteId !== null && teamWide.length > 0}
+          onClose={() => setOpenEntry(null)}
+        />
+      )}
     </div>
   );
 }

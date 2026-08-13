@@ -69,8 +69,11 @@ Admin only).
 - Athletes (register, CSV import, profile with Activity/History tab)
 - Assessments, GPS/Performance, Body Composition, VALD, Compliance
 - Injury Log / Return to Play
-- Periodization (season/phase settings — same concept as Training Load
-  Plan, dedicated page)
+- Season Phases (`/club/[club-id]/periodization`) — club-level season and
+  training-phase configuration. Related to but distinct from the team-level
+  **Load & Periodization** page, which plans intensity/RPE day by day. Both
+  were called "Periodization" until 2026-08-14; the route kept its name, the
+  label did not.
 - Competition Intelligence (club's own upcoming fixtures)
 - Reports — generate, share, view history
 - Messenger
@@ -95,7 +98,9 @@ Admin only).
     Club Manager's `/club/[club-id]` copy of the same profile shows the
     modals read-only: the update actions need a `team_id`, and the club
     dashboard has no data-entry pages of its own.
-- Training Load Plan (intensity/RPE calendar, team-wide or individual)
+- Load & Periodization (`/staff/[team-id]/training-load`) — date-strip planner
+  for intensity/RPE/session detail, team-wide or per athlete. Named "Training
+  Load Plan" until 2026-08-14; the route is unchanged.
 - Reports — generate (individual or team-combined), share
   - `/staff/[team-id]/reports/nutrition` — **Nutrition Planner**, its own
     full-width page rather than a tab. Bulk day-by-day supplement planning:
@@ -167,7 +172,8 @@ Unchanged from v3 — aggregate/pipeline views only.
   (acute → sub-acute → return-to-training, with target date)
 - **Competition Intelligence** — upcoming events/fixtures (date,
   opponent, location, home/away) feeding report context
-- **Periodization** — season/phase configuration
+- **Season Phases** — club-level season/phase configuration (distinct from the
+  team-level Load & Periodization planner)
 - **Clinical + Research** — Super Admin-authored, topic-tagged citation
   library; browsable by Super Admin only; referenced automatically by
   the AI when generating reports (see `07-ai-engine.md`)

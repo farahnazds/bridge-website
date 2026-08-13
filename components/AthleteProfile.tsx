@@ -333,7 +333,7 @@ export default function AthleteProfile({
           applies to this athlete but is not about them, and the club route has
           no team in scope to resolve one against. */}
       <Section title="Training load"
-        hint="Plan entries written for this athlete specifically. Team-wide entries apply too and live on the Training Load Plan."
+        hint="Plan entries written for this athlete specifically. Team-wide entries apply too and live on Load & Periodization."
         action={quickAdd && <SectionQuickAdd kind="training_load" ctx={quickAdd} label="Plan a session for this athlete" />}>
         {trainingLoad.length === 0 ? (
           <Empty>No individual plan entries for this athlete.</Empty>

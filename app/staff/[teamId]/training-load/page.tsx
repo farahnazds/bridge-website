@@ -4,7 +4,7 @@ import TrainingLoadClient, { type DayCell, type PlanEntry } from "./TrainingLoad
 import type { SelectableAthlete } from "@/components/AthleteMultiSelect";
 import { NOTICE } from "@/lib/ui";
 
-export const metadata: Metadata = { title: "Training Load Plan — Bridgetx" };
+export const metadata: Metadata = { title: "Load & Periodization — Bridgetx" };
 
 // How many days the strip shows, and where today sits in it.
 //
@@ -103,6 +103,19 @@ export default async function TrainingLoadPage({
 
   const rows = (planData ?? []) as PlanRow[];
 
+  // Which team owns each entry. Since migration 041 an athlete has at most one
+  // individual entry per day ACROSS teams, so a shared athlete's row appears on
+  // both squads' pages — and on the one that does not own it, it is read-only
+  // and has to say whose it is.
+  const foreignTeamIds = [
+    ...new Set(rows.map((r) => r.team_id).filter((t): t is string => t !== null && t !== teamId)),
+  ];
+  let teamNameById = new Map<string, string>();
+  if (foreignTeamIds.length > 0) {
+    const { data: teamRows } = await supabase.from("teams").select("id, name").in("id", foreignTeamIds);
+    teamNameById = new Map((teamRows ?? []).map((t) => [t.id as string, t.name as string]));
+  }
+
   const creatorIds = [...new Set(rows.map((r) => r.created_by))];
   let creatorById = new Map<string, string>();
   if (creatorIds.length > 0) {
@@ -129,6 +142,8 @@ export default async function TrainingLoadPage({
       athleteId: r.athlete_id,
       athleteName: athlete ? `${athlete.first_name} ${athlete.last_name}` : null,
       createdByName: creatorById.get(r.created_by) ?? "—",
+      ownedByThisTeam: r.team_id === teamId,
+      ownerTeamName: r.team_id === teamId ? null : teamNameById.get(r.team_id ?? "") ?? "another team",
     };
   });
 
@@ -189,7 +204,7 @@ export default async function TrainingLoadPage({
           className="text-2xl font-semibold"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}
         >
-          Training Load Plan
+          Load &amp; Periodization
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
           Plan intensity and RPE ahead, for the whole team or specific athletes. Pick a day to see or

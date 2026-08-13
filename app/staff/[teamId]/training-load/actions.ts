@@ -33,6 +33,41 @@ async function requireStaff() {
   return profile;
 }
 
+/**
+ * Turns a cross-team unique violation into something a practitioner can act on.
+ *
+ * The constraint is doing its job — an athlete trains one day, so two squads
+ * planning them separately is a real disagreement about what the person will
+ * do. But the person who hits it did nothing wrong and cannot see the other
+ * team's page, so the error has to carry the missing context: which team, which
+ * practitioner, and what they planned. Resolution is a conversation between the
+ * two, which is the point of refusing rather than overwriting.
+ */
+async function describeCrossTeamConflict(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  athleteId: string,
+  date: string
+): Promise<string> {
+  const { data } = await supabase
+    .from("training_load_plans")
+    .select("intensity, teams:team_id(name), profiles:created_by(first_name, last_name)")
+    .eq("athlete_id", athleteId)
+    .eq("date", date)
+    .maybeSingle();
+
+  if (!data) {
+    return `That athlete already has an individual plan for ${date}, set by another team. Only that team can change it.`;
+  }
+
+  const team = (data.teams as { name?: string } | null)?.name ?? "another team";
+  const who = data.profiles as { first_name?: string | null; last_name?: string | null } | null;
+  const setBy = who ? `${who.first_name ?? ""} ${who.last_name ?? ""}`.trim() : "";
+
+  return `That athlete already has an individual plan for ${date} — ${data.intensity} intensity, set by ${team}${
+    setBy ? ` (${setBy})` : ""
+  }. An athlete can only have one individual plan per day, and only ${team} can change theirs. Agree the session with them, or plan this day for the rest of the squad instead.`;
+}
+
 export async function saveTrainingLoad(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await requireStaff();
   if (!profile) return { error: "You don't have permission to do this." };
@@ -180,7 +215,30 @@ export async function saveTrainingLoad(_prevState: ActionState, formData: FormDa
 
     const { error: insertError } = await supabase.from("training_load_plans").insert(row);
     if (insertError) {
-      return { error: `Couldn't save the training load: ${insertError.message}` };
+      // PARTIAL WRITES ARE POSSIBLE HERE and must be reported.
+      //
+      // Each athlete is its own statement — there is no transaction around the
+      // loop — so selecting five athletes and hitting a conflict on the third
+      // leaves the first two saved. Returning a bare failure would tell the
+      // practitioner nothing was written when half of it was, and they would
+      // plan those athletes again. Same reasoning as confirmNutritionPlan's
+      // "N protocol rows had already been saved before this failed".
+      const alreadySaved =
+        written > 0
+          ? ` ${written} athlete${written === 1 ? "" : "s"} before this one ${
+              written === 1 ? "was" : "were"
+            } already saved — they don't need planning again.`
+          : "";
+
+      // 23505 here means migration 041's index fired: this athlete already has
+      // an individual entry for this date, owned by a DIFFERENT team (a same-team
+      // one would have been updated above, not inserted). A bare constraint
+      // message across a team boundary is baffling, so name who set it.
+      if (insertError.code === "23505" && row.athlete_id) {
+        const conflict = await describeCrossTeamConflict(supabase, row.athlete_id, row.date);
+        return { error: `${conflict}${alreadySaved}` };
+      }
+      return { error: `Couldn't save the training load: ${insertError.message}${alreadySaved}` };
     }
     written += 1;
   }
@@ -209,14 +267,32 @@ export async function deleteTrainingLoad(_prevState: ActionState, formData: Form
   if (!teamId || !entryId) return { error: "Missing entry." };
 
   const supabase = await createClient();
+
+  // AN ENTRY BELONGS TO THE TEAM THAT PLANNED IT.
+  //
+  // Since migration 041 an athlete has at most one individual entry per day
+  // across every squad they are in, so that row shows up on the Load &
+  // Periodization page of BOTH teams. It is read-only on the team that does not
+  // own it — otherwise a shared athlete's plan could be deleted by a squad that
+  // never set it, silently, and the owning practitioner would find it gone with
+  // no record of who removed it.
+  //
+  // Scoped by team_id in the DELETE itself rather than checked first: RLS
+  // ("club staff access") admits any club staff member at the club, so it would
+  // not stop this on its own, and a read-then-delete leaves a race between the
+  // two statements.
   const { data, error } = await supabase
     .from("training_load_plans")
     .delete()
     .eq("id", entryId)
+    .eq("team_id", teamId)
     .select("id");
   if (error) return { error: `Couldn't remove the entry: ${error.message}` };
   if (!data || data.length === 0) {
-    return { error: "You don't have permission to remove that entry." };
+    return {
+      error:
+        "That entry belongs to another team, so it can't be removed from here. Only staff on the team that planned it can change it.",
+    };
   }
 
   revalidatePath(`/staff/${teamId}/training-load`);
