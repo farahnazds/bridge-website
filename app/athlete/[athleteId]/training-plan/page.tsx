@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
-import { INTENSITIES, SEASON_PHASES, SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
+import { INTENSITIES, INTENSITY_COLOUR, SEASON_PHASES, SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
 import { BADGE, CARD, NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "My Training Plan — Bridgetx" };
@@ -41,12 +41,9 @@ const DURATION_LABEL: Record<string, string> = Object.fromEntries(SESSION_DURATI
 
 // The same four colours the staff Training Load Plan and the Athlete Profile
 // use for intensity, so one session does not change colour between surfaces.
-const INTENSITY_COLOR: Record<string, string> = {
-  high: "var(--danger)",
-  medium: "var(--warning)",
-  low: "var(--brand-blue)",
-  rest: "var(--success)",
-};
+// Intensity colours come from lib/constants.ts#INTENSITY_COLOUR. There used to
+// be a local copy here; five of them existed across the app and the practitioner
+// and athlete surfaces had drifted to different palettes for the same value.
 
 type PlanRow = {
   id: string;
@@ -101,7 +98,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function SessionCard({ row, isPast }: { row: PlanRow; isPast: boolean }) {
-  const color = INTENSITY_COLOR[row.intensity] ?? "var(--text-muted)";
+  const color = INTENSITY_COLOUR[row.intensity] ?? "var(--text-muted)";
   // athlete_id set means this entry names this athlete — RLS guarantees it
   // cannot be anyone else's. athlete_id null means a whole-team session.
   const isIndividual = row.athlete_id !== null;

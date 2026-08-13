@@ -132,9 +132,63 @@ export async function saveTrainingLoad(_prevState: ActionState, formData: FormDa
       : [{ ...base, team_id: teamId, athlete_id: null }];
 
   const supabase = await createClient();
-  const { error } = await supabase.from("training_load_plans").insert(rows);
-  if (error) {
-    return { error: `Couldn't save the training load: ${error.message}` };
+
+  // CREATE-OR-UPDATE, keyed on the natural key (team, scope, date).
+  //
+  // This used to be a bare insert, which meant planning the same day twice left
+  // two rows for one scope and nothing to choose between them — loadTrainingLoadDays
+  // resolves a date with map.set(), so the LAST row returned silently won and a
+  // Nutrition report could describe either session. Migration 040 adds the two
+  // partial unique indexes that make that impossible; this is the half that
+  // makes re-planning a day work instead of failing on them.
+  //
+  // Not supabase-js `.upsert()`: its onConflict takes column names only, and the
+  // real constraint is two PARTIAL indexes (athlete_id IS NULL / IS NOT NULL),
+  // whose predicates cannot be expressed there. Update-then-insert is the same
+  // shape the supplement confirm action uses for the same reason, and the unique
+  // indexes remain the actual guarantee behind it.
+  let written = 0;
+  for (const row of rows) {
+    const match = supabase
+      .from("training_load_plans")
+      .update({
+        season_phase: row.season_phase,
+        intensity: row.intensity,
+        rpe: row.rpe,
+        session_type: row.session_type,
+        session_duration_band: row.session_duration_band,
+        estimated_sweat_rate_ml: row.estimated_sweat_rate_ml,
+      })
+      .eq("team_id", row.team_id)
+      .eq("date", row.date);
+
+    // `.is()` rather than `.eq()` for the team-wide branch: athlete_id = NULL
+    // matches nothing in SQL, so an eq here would update no rows and then insert
+    // a duplicate — the exact bug this replaces.
+    const scoped = row.athlete_id === null
+      ? match.is("athlete_id", null)
+      : match.eq("athlete_id", row.athlete_id);
+
+    const { data: updated, error: updateError } = await scoped.select("id");
+    if (updateError) {
+      return { error: `Couldn't save the training load: ${updateError.message}` };
+    }
+    if (updated && updated.length > 0) {
+      written += updated.length;
+      continue;
+    }
+
+    const { error: insertError } = await supabase.from("training_load_plans").insert(row);
+    if (insertError) {
+      return { error: `Couldn't save the training load: ${insertError.message}` };
+    }
+    written += 1;
+  }
+
+  if (written === 0) {
+    // Zero rows touched with no error is how RLS refuses an update — the same
+    // detection the edit-window checks use elsewhere in this app.
+    return { error: "You don't have permission to plan load for this team." };
   }
 
   revalidatePath(`/staff/${teamId}/training-load`);

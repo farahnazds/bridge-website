@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { INTENSITIES, SESSION_TYPES } from "@/lib/constants";
+import { INTENSITIES, INTENSITY_COLOUR, SESSION_TYPES } from "@/lib/constants";
 import { BADGE, CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
@@ -29,12 +29,9 @@ const RTP_PHASE_LABEL: Record<string, string> = {
 
 const INTENSITY_LABEL: Record<string, string> = Object.fromEntries(INTENSITIES.map((i) => [i.value, i.label]));
 const SESSION_TYPE_LABEL: Record<string, string> = Object.fromEntries(SESSION_TYPES.map((t) => [t.value, t.label]));
-const INTENSITY_COLOR: Record<string, string> = {
-  high: "var(--danger)",
-  medium: "var(--warning)",
-  low: "var(--brand-blue)",
-  rest: "var(--success)",
-};
+// Intensity colours come from lib/constants.ts#INTENSITY_COLOUR. There used to
+// be a local copy here; five of them existed across the app and the practitioner
+// and athlete surfaces had drifted to different palettes for the same value.
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -263,12 +260,12 @@ export default async function AthleteHomePage({
               className="mt-1 inline-flex items-center gap-1.5 text-lg font-semibold"
               style={{
                 fontFamily: "var(--font-heading)",
-                color: INTENSITY_COLOR[nextSession.intensity] ?? "var(--text)",
+                color: INTENSITY_COLOUR[nextSession.intensity] ?? "var(--text)",
               }}
             >
               <span
                 className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: INTENSITY_COLOR[nextSession.intensity] ?? "var(--text-muted)" }}
+                style={{ backgroundColor: INTENSITY_COLOUR[nextSession.intensity] ?? "var(--text-muted)" }}
               />
               {INTENSITY_LABEL[nextSession.intensity] ?? nextSession.intensity}
               {nextSession.session_type

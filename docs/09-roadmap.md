@@ -34,6 +34,50 @@ listed here as deferred, do not build it unless explicitly instructed.
   club-athlete minors" — required before scaling past pilot, not a code
   change but a policy decision to revisit
 
+## Known issue, scheduled separately: "today" is computed in UTC
+
+**Raised 2026-08-13. Not a bug in any one feature — an app-wide convention,
+which is why it is its own task rather than part of any page's work.**
+
+Every surface derives the current date the same way:
+
+```ts
+new Date().toISOString().slice(0, 10)
+```
+
+That is the date in **UTC**, not in the club's timezone. The pilot market is the
+UAE at **UTC+4**, so from **20:00 to midnight local, every day, the whole
+application is a day behind**. Observed live: at 00:27 local on 14 August the
+Training Load Plan marked 13 August as "today".
+
+Surfaces that read a current date, and therefore all inherit it:
+
+- Daily Check-In — which day is being logged, and the 7-day backfill window
+- Training Load Plan — which days are plannable (the action refuses `date < today`)
+- Supplement protocols — active vs scheduled vs ended
+- Assessments — the skinfold age-at-assessment-date gate
+- Report period defaults, compliance windows, edit windows
+
+Two things make this **less urgent than it first looks**, and worth fixing
+carefully rather than quickly:
+
+1. **Client and server currently agree.** Both use the same expression, so a day
+   the UI offers is a day the server accepts. The bug is that both are wrong
+   together, not that they disagree — so a partial fix that corrects one side
+   would introduce a worse failure than the one it removes.
+2. **Nothing is silently corrupted.** Entries land on the date the user was
+   shown; that date is just occasionally a day earlier than their wall clock.
+
+What a real fix needs to decide:
+
+- Whose timezone is authoritative — the club's, the team's, or the viewer's?
+  A club setting is the likely answer (`clubs` has no timezone column today),
+  since an academy's "training day" is a club-level concept.
+- Whether historical rows need reinterpreting, or only new writes change.
+- One shared helper (`todayFor(club)`) that every surface adopts at once —
+  a per-page migration would leave the app internally inconsistent mid-flight,
+  which is worse than being uniformly off by a few hours.
+
 ## Target market rollout
 
 1. UAE clubs and academies (launch)

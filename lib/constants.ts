@@ -241,6 +241,28 @@ export const INTENSITIES = [
   { value: "rest", label: "Rest" },
 ];
 
+/**
+ * One colour per intensity, for every surface that shows one.
+ *
+ * Intensity has to mean the same thing visually wherever it appears — the
+ * Training Load Plan's entry buttons and the Nutrition Planner's review grid
+ * are looking at the same field on the same rows, and a practitioner reading
+ * "high" as amber in one place and something else in another has to re-learn
+ * the scale each time.
+ *
+ * It lives here rather than in either consumer because it started module-
+ * private inside the review grid, and a second copy is the thing that drifts.
+ * Keys are exactly the four values the CHECK constraint allows — note there is
+ * no "match" intensity (that is a SESSION_TYPE) and the middle value is
+ * "medium", not "moderate".
+ */
+export const INTENSITY_COLOUR: Record<string, string> = {
+  rest: "var(--text-muted)",
+  low: "var(--brand-teal)",
+  medium: "var(--brand-blue)",
+  high: "var(--warning)",
+};
+
 // Matches the `training_load_plans.session_type` / `session_duration_band`
 // check constraints added in migration 027 — fixed DB enums, so no "Other"
 // escape hatch. Both are optional on an entry: the nutrition prompt reports

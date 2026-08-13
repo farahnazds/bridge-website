@@ -15,7 +15,7 @@ import {
   ThreadDetailModal,
   type EntryEditContext,
 } from "@/components/EntryDetailModals";
-import { INJURY_STATUSES, RTP_PHASES, VALD_TEST_TYPES, INTENSITIES, REPORT_TYPE_LABELS } from "@/lib/constants";
+import { INJURY_STATUSES, RTP_PHASES, VALD_TEST_TYPES, INTENSITIES, INTENSITY_COLOUR, REPORT_TYPE_LABELS } from "@/lib/constants";
 import { BADGE, NOTICE_EMPTY, PANEL } from "@/lib/ui";
 import type {
   InjuryRecord, AssessmentRecord, GpsEntry, ValdEntry, ReportDetail,
@@ -67,13 +67,11 @@ const STATUS_LABEL: Record<string, string> = Object.fromEntries(INJURY_STATUSES.
 const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
 const VALD_LABEL: Record<string, string> = Object.fromEntries(VALD_TEST_TYPES.map((t) => [t.value, t.label]));
 const INTENSITY_LABEL: Record<string, string> = Object.fromEntries(INTENSITIES.map((i) => [i.value, i.label]));
-// Same four colours the Training Load Plan page uses for its intensity dot.
-const INTENSITY_COLOR: Record<string, string> = {
-  high: "var(--danger)",
-  medium: "var(--warning)",
-  low: "var(--brand-blue)",
-  rest: "var(--success)",
-};
+// Intensity colours come from lib/constants.ts#INTENSITY_COLOUR. There used to
+// be a local copy here — the comment above it claimed it matched the Training
+// Load Plan page, and by the time anyone checked, it didn't. Five copies existed
+// across the app and the practitioner and athlete surfaces had drifted to
+// different palettes for the same value.
 
 /** One-line preview for a body of free text in a table cell. */
 function preview(text: string, max = 70): string {
@@ -372,7 +370,7 @@ export function TrainingLoadRows({ entries }: { entries: TrainingLoadEntry[] }) 
   return (
     <>
       {entries.map((e, i) => {
-        const color = INTENSITY_COLOR[e.intensity] ?? "var(--text-muted)";
+        const color = INTENSITY_COLOUR[e.intensity] ?? "var(--text-muted)";
         return (
           <ClickableRow
             key={e.id}

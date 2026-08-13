@@ -5,7 +5,7 @@ import { useSessionValue, writeSessionValue } from "@/lib/useSessionValue";
 import { useFormStatus } from "react-dom";
 import { BTN_PRIMARY_FULL, BTN_SECONDARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import ClinicalFlagChips from "@/components/ClinicalFlagChips";
-import { INTENSITIES, SESSION_DURATION_BANDS, SESSION_TYPES } from "@/lib/constants";
+import { INTENSITIES, INTENSITY_COLOUR, SESSION_DURATION_BANDS, SESSION_TYPES } from "@/lib/constants";
 import type { PlanSuggestion } from "@/lib/supplementPlan";
 import type { AthletePlanRow, GeneratedPlan, PlanLoadDay } from "./actions";
 
@@ -65,13 +65,9 @@ function normalise(name: string): string {
 const labelOf = (list: { value: string; label: string }[], value: string | null) =>
   value === null ? null : list.find((x) => x.value === value)?.label ?? value;
 
-/** Only the four values `training_load_plans.intensity` actually allows. */
-const INTENSITY_COLOUR: Record<string, string> = {
-  rest: "var(--text-muted)",
-  low: "var(--brand-teal)",
-  medium: "var(--brand-blue)",
-  high: "var(--warning)",
-};
+// INTENSITY_COLOUR now lives in lib/constants.ts, imported above — the
+// Training Load Plan's entry buttons render the same scale, and two copies of
+// a colour mapping is how the two surfaces would come to disagree.
 
 /**
  * The day's session in one line — intensity, session type, RPE, duration.
