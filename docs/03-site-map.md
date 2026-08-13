@@ -97,6 +97,17 @@ Admin only).
     dashboard has no data-entry pages of its own.
 - Training Load Plan (intensity/RPE calendar, team-wide or individual)
 - Reports — generate (individual or team-combined), share
+  - `/staff/[team-id]/reports/nutrition` — **Nutrition Planner**, its own
+    full-width page rather than a tab. Bulk day-by-day supplement planning:
+    pick one athlete, a subset or the whole squad, pick a range of 1–14 days,
+    pick day-specific (uses each day's Training Load Plan entry) or
+    general/standing. Generates suggestions — one AI call per athlete for the
+    whole range — then a review grid of athlete rows against day columns where
+    every suggestion is approved by default, editable in place, and skippable.
+    Confirming writes each athlete's supplement protocol and generates one
+    nutrition report per athlete. The Nutrition tab on the Reports page links
+    here; `?athlete=<id>` preselects one athlete. Nothing is written before
+    confirmation, so athletes never see a suggestion.
 - Messenger, Official/Private Comments
 - Practitioner profile (auto-generated work history timeline)
 

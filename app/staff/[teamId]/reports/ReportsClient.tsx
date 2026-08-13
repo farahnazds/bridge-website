@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { BTN_PRIMARY } from "@/lib/ui";
 import ReportForm from "./ReportForm";
 import BodyCompositionReportForm from "./BodyCompositionReportForm";
-import NutritionReportForm from "./NutritionReportForm";
 import PerformanceReportForm from "./PerformanceReportForm";
 import InjuryReportForm from "./InjuryReportForm";
 import CombinedReportForm from "./CombinedReportForm";
@@ -77,8 +78,36 @@ export default function ReportsClient({
       {activeTab === "body_composition" && (
         <BodyCompositionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} defaultPeriodStart={lookbackByType?.["body_composition"] ?? null} />
       )}
+      {/* Nutrition generation moved out of this tab entirely. It is now a bulk,
+          day-by-day planner with a review-and-confirm step, and its review grid
+          (athlete rows against day columns) does not fit the max-w-2xl card the
+          other tabs render inside. The tab stays as the signpost, because
+          "which kind of report" is still the question a practitioner arrives
+          with. */}
       {activeTab === "nutrition" && (
-        <NutritionReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} />
+        <div className="flex flex-col gap-4">
+          <div>
+            <h3 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
+              Nutrition Planner
+            </h3>
+            <p className="mt-1 text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
+              Plan supplements day by day across a period — one athlete, a subset, or the whole squad — then
+              review, edit and confirm every suggestion before anything is saved. Confirming writes each
+              athlete&apos;s protocol and generates their nutrition report.
+            </p>
+          </div>
+          <Link
+            href={
+              lockedAthleteId
+                ? `/staff/${teamId}/reports/nutrition?athlete=${lockedAthleteId}`
+                : `/staff/${teamId}/reports/nutrition`
+            }
+            className={BTN_PRIMARY}
+            style={{ backgroundImage: "var(--brand-gradient-action)", alignSelf: "flex-start" }}
+          >
+            Open the Nutrition Planner
+          </Link>
+        </div>
       )}
       {activeTab === "performance" && (
         <PerformanceReportForm teamId={teamId} athletes={athletes} practitioners={practitioners} defaultLanguage={defaultLanguage} lockedAthleteId={lockedAthleteId} defaultPeriodStart={lookbackByType?.["performance"] ?? null} />

@@ -9,7 +9,30 @@ import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
 import { SESSION_TYPES, SESSION_DURATION_BANDS, RTP_PHASES, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
 
-export type NutritionSubMode = "next_day" | "general";
+// "next_day" became "day_specific" when the single-athlete/single-day Nutrition
+// form was replaced by the bulk planner: the same day-anchored logic, generalised
+// across a range of up to two weeks. "general" is unchanged — a standing plan
+// with no day-anchoring and no RPE requirement.
+export type NutritionSubMode = "day_specific" | "general";
+
+/**
+ * A line the practitioner CONFIRMED on the review screen, after any edits.
+ *
+ * This is the load-bearing addition to this builder. The report is written
+ * after confirmation, so the supplement section is no longer the model's to
+ * decide — these lines are the decision, and the prompt says so in the
+ * strongest terms it can. A report that recommended something the practitioner
+ * unchecked, or a dose they edited away, would describe a prescription that
+ * does not exist in the database.
+ */
+export interface ConfirmedProtocolLine {
+  supplementName: string;
+  dose: string;
+  timing: string;
+  rationale: string;
+  /** Human-readable window, e.g. "2026-08-20 to 2026-08-26" or "from …, standing". */
+  window: string;
+}
 
 const SESSION_TYPE_LABEL: Record<string, string> = Object.fromEntries(SESSION_TYPES.map((t) => [t.value, t.label]));
 const DURATION_BAND_LABEL: Record<string, string> = Object.fromEntries(SESSION_DURATION_BANDS.map((d) => [d.value, d.label]));
@@ -135,7 +158,14 @@ export interface NutritionPromptInput {
   allergies: string[];
   intolerances: string[];
   latestAssessment: AssessmentContext | null;
-  trainingLoad: TrainingLoadContext | null;
+  /** Every day in the report period, with whatever the Training Load Plan
+   *  holds. A `load` of null means no entry was logged for that date — the
+   *  prompt renders that as an explicit gap rather than as a rest day. Empty
+   *  in general mode. */
+  trainingLoadDays: { date: string; load: TrainingLoadContext | null }[];
+  /** What the practitioner confirmed. Authoritative over anything the model
+   *  would otherwise have recommended. */
+  confirmedProtocol: ConfirmedProtocolLine[];
   /** Every unresolved injury, not just one: an athlete can sit at several RTP
    *  phases at once, and the most acute one governs recovery nutrition. */
   activeInjuries: ActiveInjuryContext[];
@@ -149,6 +179,18 @@ export interface NutritionPromptInput {
   periodEnd: string;
   additionalInstructions: string | null;
   language: string;
+}
+
+/**
+ * The weekday for an ISO date, computed in UTC so it matches the date string
+ * rather than the server's locale. Supplied to the model rather than inferred:
+ * see the note on the day-by-day load block.
+ */
+export function weekdayOf(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString("en-GB", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
 }
 
 export function ageInYears(dob: string | null): number | null {
@@ -172,7 +214,16 @@ export function nutritionSystemPrompt(audience: ReportAudience): string {
 
 ${audienceDirective(audience)}
 
-TWO-LAYER PRESCRIPTION RULE — this is the most important structural rule in this report:
+THE CONFIRMED PROTOCOL IS ALREADY DECIDED — read this before anything else.
+
+A practitioner has already reviewed, edited where they wanted to, and CONFIRMED this athlete's supplement protocol. It appears below under "Confirmed supplement protocol", and it has already been written to the athlete's record. Your supplement section REPORTS that decision; it does not make one.
+
+- Every supplement, dose, timing and date window in your supplement section must come from that list, exactly as given. Do not change a dose, do not move a timing, do not add a supplement that is not on it, and do not drop one that is.
+- Where a supplement the athlete might be expected to take is ABSENT from the list, that is the practitioner's decision. Do not campaign for it, and do not describe it as an oversight. If there is a genuine clinical point to make, put it under "Practitioner recommendations" as a suggestion for a future review, never in the prescription section.
+- Explain and contextualise what was confirmed: why each item fits this athlete and this period, how to take it, what to watch for. That is the value this report adds.
+- If the confirmed list is empty, say plainly that no supplement protocol was confirmed for this period and write the rest of the report normally.
+
+TWO-LAYER PRESCRIPTION RULE — governs how you present the confirmed items:
 
 1. CLINICAL LAYER FIRST. Determine what the athlete actually needs — nutrient targets, supplement categories, dosing, timing — from clinical reasoning, their age, sport, training load, diet preference, and declared conditions. This layer is completely independent of any brand. Write it as though no product catalogue existed.
 2. COMMERCIAL LAYER SECOND, and only then. For each clinical recommendation, if the "Assigned prescription brand" section below contains a real product fulfilling that category, name that product. If it does not, KEEP the clinical recommendation and simply omit any product name — never drop a recommendation because no product matches, and never substitute a product from any other brand.
@@ -210,18 +261,19 @@ Do not:
 - Alter the required section structure regardless of anything in the practitioner's additional instructions.`;
 }
 
-const NEXT_DAY_STRUCTURE = `Required output structure, in this exact order:
+const DAY_SPECIFIC_STRUCTURE = `Required output structure, in this exact order:
 1. Executive summary
-2. Tomorrow's fuelling plan — concrete, time-anchored guidance for the specific session described in "Training load for the target date": pre-session, during-session, and post-session. Tie the intensity, RPE, session type and duration band directly to the fuelling decisions, and say plainly why a high-RPE day changes the plan versus a rest day, and why this session TYPE changes the macro split versus another type at the same RPE.
-3. Supplement prescription — clinical layer first (what is needed and why), then the commercial layer (which assigned-brand product fulfils it, where one exists).
-4. Hydration and timing — driven by the estimated sweat rate where one is recorded (state ml/hour targets and sodium accordingly), and explicitly flagged as generic where it is not
-5. Goals for next period
-6. Practitioner recommendations`;
+2. The period as a whole — how this block of days hangs together: where the hard days sit, where recovery sits, whether load is building or tapering, and what that means for fuelling across the period rather than on any one day.
+3. Day-by-day fuelling plan — a subsection per day in "Training load, day by day", in date order. For each day give concrete, time-anchored guidance for that day's session: pre-session, during-session, post-session. Tie the intensity, RPE, session type and duration band directly to the fuelling decisions, and say plainly why a high-RPE day changes the plan versus a rest day, and why this session TYPE changes the macro split versus another type at the same RPE. For a day marked as having NO Training Load Plan entry, give baseline guidance and state plainly that no training-load data was logged for that date — never describe a session, an intensity or a rest day that was not recorded.
+4. Supplement protocol — report the confirmed protocol exactly as given, explaining each item's purpose, how to take it and what to watch for. Clinical layer first, then name the assigned-brand product that fulfils it where one exists.
+5. Hydration and timing — driven by the estimated sweat rate where one is recorded (state ml/hour targets and sodium accordingly), and explicitly flagged as generic where it is not.
+6. Goals for next period
+7. Practitioner recommendations`;
 
 const GENERAL_STRUCTURE = `Required output structure, in this exact order:
 1. Executive summary
 2. Focus areas — the two to four nutrition priorities that matter most for this athlete right now, given their sport, tier, body composition trend and declared profile. This is a general standing plan, NOT a single-day plan: do not invent a specific day's session or fuelling timetable, because no training load entry was requested for this mode.
-3. Supplement prescription — clinical layer first (what is needed and why), then the commercial layer (which assigned-brand product fulfils it, where one exists).
+3. Supplement protocol — report the confirmed protocol exactly as given, explaining each item's purpose, how to take it and what to watch for. Clinical layer first, then name the assigned-brand product that fulfils it where one exists.
 4. Hydration and timing
 5. Goals for next period
 6. Practitioner recommendations`;
@@ -234,7 +286,8 @@ export function buildNutritionPrompt(input: NutritionPromptInput): string {
     allergies,
     intolerances,
     latestAssessment,
-    trainingLoad,
+    trainingLoadDays,
+    confirmedProtocol,
     activeInjuries,
     performanceSignals,
     prescription,
@@ -351,18 +404,21 @@ How to use this: read the ACCUMULATED load across the window, not any single ses
 SAMPLE SIZE HONESTY: with only one or two sessions in the window, say that the sample is too thin to call a trend and give the guidance you can defend from it. State the number of sessions you are reasoning from. Never describe a direction of travel that two points cannot support.`;
   })();
 
-  // Fires only when the plan entry for the target date says Ramadan. Note that
-  // season phase lives on the training-load entry, so this is reachable in
-  // next-day mode only — in general mode there is no plan entry and therefore
-  // no season phase to react to.
+  // Fires when any day in the range carries a Ramadan season phase. Season
+  // phase lives on the training-load entry, so this is reachable in
+  // day-specific mode only — in general mode there is no plan entry and
+  // therefore no season phase to react to.
   //
   // The content here is FRAMING, not clinical figures: what to reason about and
   // in what order. Every number (fluid volumes, electrolyte content) must come
   // from the library's Ramadan entry, which is supplied separately in the
   // nutrition-tagged library section. That keeps the citation rule intact.
-  const isRamadan = trainingLoad?.seasonPhase === "ramadan";
+  // Any day in the range being Ramadan brings the whole block in — the fasting
+  // guidance is about how the day is shaped, and a range that straddles the
+  // start of Ramadan needs it for the days that fall inside.
+  const isRamadan = trainingLoadDays.some((d) => d.load?.seasonPhase === "ramadan");
   const ramadanBlock = isRamadan
-    ? `Season phase for the target date is RAMADAN. The athlete is fasting between dawn and sunset, so build the plan around these points:
+    ? `At least one day in this range carries a season phase of RAMADAN. Apply the following to every day in the range whose season phase is Ramadan, and only to those days — check the day-by-day list above rather than assuming the whole range fasts. The athlete is fasting between dawn and sunset, so build those days around these points:
 
 1. TRAINING TIMING RELATIVE TO THE FAST. Say where this session most likely sits — shortly before Iftar (fasted and depleted, the hardest case), shortly after Iftar (fuelled but with digestion to manage), or late evening between Iftar and Suhoor (the best-fuelled window) — and give the fuelling plan for the placement the practitioner has actually scheduled. If the session's placement relative to Iftar is not stated in the data, give the plan for each realistic placement rather than assuming one.
 
@@ -373,7 +429,7 @@ SAMPLE SIZE HONESTY: with only one or two sessions in the window, say that the s
 4. POST-IFTAR RECOVERY. Where the session finishes while still fasting, the recovery window opens at Iftar rather than immediately — say so explicitly instead of giving a standard post-session timing.
 
 DATA GAP — state this plainly in the report: this platform does not record the athlete's local Iftar and Suhoor times, or their intended session time relative to those. Anchor all guidance to "at Iftar", "at Suhoor" and "between the two" rather than to clock times, and recommend the practitioner confirm the athlete's actual timings. Never invent a sunset or dawn time.`
-    : "Not applicable — the season phase for the target date is not Ramadan.";
+    : "Not applicable — no day in this range carries a season phase of Ramadan.";
 
   const goalBlock = goalSummaryLine(
     latestAssessment
@@ -382,16 +438,53 @@ DATA GAP — state this plainly in the report: this platform does not record the
     { goalBodyFatPct: athlete.goal_body_fat_pct, goalLeanMassKg: athlete.goal_lean_mass_kg }
   );
 
+  // Every day in the range, including the ones with nothing logged. A day with
+  // no entry is rendered as an explicit instruction rather than omitted from
+  // the list — a day that simply vanished would read as a day that does not
+  // exist, and the model would fill the gap with a plausible session.
+  //
+  // THE WEEKDAY IS SUPPLIED, not left to be inferred. Observed live: given ISO
+  // dates alone, the model wrote "Thursday 14 August 2026" for a Friday and
+  // "Friday 15 August" for a Saturday — 2 of 7 wrong in one report, and
+  // contradicting the review grid, which computes weekdays correctly. A weekday
+  // is derivable from the date, so there is no reason for it to be guessed.
   const loadBlock =
-    subMode === "next_day"
-      ? trainingLoad
-        ? `Date: ${trainingLoad.date}
-Intensity: ${trainingLoad.intensity} | RPE: ${trainingLoad.rpe} | Season phase: ${trainingLoad.seasonPhase ?? "not specified"}
-Session type: ${SESSION_TYPE_LABEL[trainingLoad.sessionType ?? ""] ?? "not recorded"} | Duration: ${DURATION_BAND_LABEL[trainingLoad.durationBand ?? ""] ?? "not recorded"}
-Estimated sweat rate: ${trainingLoad.sweatRateMl !== null ? `${trainingLoad.sweatRateMl} ml/hour` : "not recorded"}
-Scope: ${trainingLoad.scope === "team" ? "team-wide plan entry" : "individual plan entry for this athlete"}`
-        : "No training load entry — this should not happen in next-day mode; generation is blocked upstream when RPE is missing."
-      : "Not applicable — this is a general standing plan, not a single-day plan. No training load entry was requested.";
+    subMode === "day_specific"
+      ? trainingLoadDays.length === 0
+        ? "No days in range. Treat the period as unplanned and say so plainly."
+        : trainingLoadDays
+            .map((d) => {
+              const day = `${d.date} (${weekdayOf(d.date)})`;
+              if (!d.load) {
+                return `- ${day}: NO Training Load Plan entry exists for this date. Give baseline guidance and state the gap plainly. Do not describe a session, an intensity, an RPE or a rest day — none was logged.`;
+              }
+              const l = d.load;
+              return `- ${day}: intensity ${l.intensity} | RPE ${l.rpe ?? "not recorded"} | season phase ${
+                l.seasonPhase ?? "not specified"
+              } | session type ${SESSION_TYPE_LABEL[l.sessionType ?? ""] ?? "not recorded"} | duration ${
+                DURATION_BAND_LABEL[l.durationBand ?? ""] ?? "not recorded"
+              } | est. sweat rate ${l.sweatRateMl !== null ? `${l.sweatRateMl} ml/hour` : "not recorded"} | scope ${
+                l.scope === "team" ? "team-wide plan entry" : "individual plan entry for this athlete"
+              }`;
+            })
+            .join("\n")
+      : "Not applicable — this is a general standing plan, not a day-by-day plan. No training load entry was requested.";
+
+  // The prescription, already decided and already written to the athlete's
+  // record. Rendered as data rather than prose so there is nothing for the
+  // model to reinterpret.
+  const confirmedBlock =
+    confirmedProtocol.length === 0
+      ? "The practitioner confirmed NO supplements for this period. Say so plainly in the supplement section and prescribe nothing. Any clinical suggestion belongs under Practitioner recommendations as a point for the next review."
+      : confirmedProtocol
+          .map(
+            (c) =>
+              `- ${c.supplementName} | dose: ${c.dose} | timing: ${c.timing} | window: ${c.window}${
+                c.rationale ? `\n  Rationale recorded with this prescription: ${c.rationale}` : ""
+              }`
+          )
+          .join("\n") +
+        "\n\nThis list IS the prescription. Report it exactly — no additions, no removals, no changed doses, no changed timings.";
 
   const prescriptionBlock = prescription
     ? `Assigned prescription brand: ${prescription.brandName} (via the athlete's ${prescription.source})
@@ -442,9 +535,13 @@ ${
       : "None found in the library for this topic — do not cite any source in this report.";
 
   return `## Report mode
-${subMode === "next_day" ? "NEXT DAY PLAN — a specific fuelling plan for the target date below." : "GENERAL — a standing prescription and focus areas, not tied to one day's session."}
+${
+  subMode === "day_specific"
+    ? "DAY-SPECIFIC PLAN — a connected fuelling plan across the dated range below, expressed day by day."
+    : "GENERAL — a standing prescription and focus areas, not tied to one day's session."
+}
 
-${subMode === "next_day" ? NEXT_DAY_STRUCTURE : GENERAL_STRUCTURE}
+${subMode === "day_specific" ? DAY_SPECIFIC_STRUCTURE : GENERAL_STRUCTURE}
 
 ## Athlete
 Name: ${athlete.first_name} ${athlete.last_name}
@@ -472,8 +569,11 @@ ${ramadanBlock}
 ## Body-composition goal and gap to it
 ${goalBlock}
 
-## Training load for the target date
+## Training load, day by day
 ${loadBlock}
+
+## Confirmed supplement protocol (ALREADY DECIDED — report it, do not change it)
+${confirmedBlock}
 
 ## Unresolved injuries (recovery nutrition)
 ${injuryBlock}

@@ -17,6 +17,7 @@ import { SectionQuickAdd, type QuickAddContext } from "@/components/QuickAddModa
 import GenerateReportAction from "@/components/GenerateReportAction";
 import ComplianceDetailModal from "@/components/ComplianceDetailModal";
 import { BADGE, CARD, NOTICE_EMPTY } from "@/lib/ui";
+import { protocolWindowLabel } from "@/lib/supplementProtocols";
 
 // The staff-facing athlete profile, rendered identically for the Club Manager
 // route and the Club Practitioner route. Only `links` and `edit` differ, so
@@ -218,24 +219,40 @@ export default function AthleteProfile({
         </p>
       </div>
 
+      {/* Migration 035: several supplements run concurrently, each superseded
+          on its own timeline, so this is a list. Scheduled rows are shown
+          alongside active ones rather than folded into history — a plan
+          confirmed for next week is committed, not past. */}
       <Section title="Supplement protocol"
-        hint="One active prescription at a time; a new one supersedes the last rather than deleting it.">
-        {data.activeProtocol ? (
-          <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{data.activeProtocol.supplement_name}</p>
-              <span className={BADGE}
-                style={{ backgroundColor: "color-mix(in srgb, var(--success) 12%, transparent)", color: "var(--success)" }}>
-                Active
-              </span>
-            </div>
-            <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-              {[data.activeProtocol.dose, data.activeProtocol.timing].filter(Boolean).join(" · ") || "No dose recorded"}
-              {data.activeProtocol.start_date ? ` · since ${data.activeProtocol.start_date}` : ""}
-            </p>
-            {data.activeProtocol.rationale && (
-              <p className="mt-2 text-sm" style={{ color: "var(--text)" }}>{data.activeProtocol.rationale}</p>
-            )}
+        hint="One active prescription per supplement; a new one supersedes the last for that supplement rather than deleting it.">
+        {data.activeProtocols.length > 0 || data.scheduledProtocols.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {[
+              ...data.activeProtocols.map((p) => ({ row: p, tone: "active" as const })),
+              ...data.scheduledProtocols.map((p) => ({ row: p, tone: "scheduled" as const })),
+            ].map(({ row, tone }) => (
+              <div key={row.id} className={`${CARD} p-5`}
+                style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{row.supplement_name}</p>
+                  <span className={BADGE}
+                    style={
+                      tone === "active"
+                        ? { backgroundColor: "color-mix(in srgb, var(--success) 12%, transparent)", color: "var(--success)" }
+                        : { backgroundColor: "color-mix(in srgb, var(--brand-blue) 12%, transparent)", color: "var(--brand-blue)" }
+                    }>
+                    {tone === "active" ? "Active" : "Scheduled"}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+                  {[row.dose, row.timing].filter(Boolean).join(" · ") || "No dose recorded"}
+                  {` · ${protocolWindowLabel(row, data.protocolToday)}`}
+                </p>
+                {row.rationale && (
+                  <p className="mt-2 text-sm" style={{ color: "var(--text)" }}>{row.rationale}</p>
+                )}
+              </div>
+            ))}
           </div>
         ) : (
           <Empty>No active protocol.</Empty>

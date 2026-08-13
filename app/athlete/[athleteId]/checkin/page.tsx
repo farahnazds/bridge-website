@@ -4,6 +4,7 @@ import CheckInWizard, { type DayCell, type ExistingCheckin } from "./CheckInWiza
 import {
   CHECKIN_STRIP_DAYS, isWithinCheckinWindow, parseSupplements, recentDates, toDateStr,
 } from "@/lib/checkin";
+import { coversDate } from "@/lib/supplementProtocols";
 import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Daily Check-In — Bridgetx" };
@@ -89,16 +90,29 @@ export default async function CheckInPage({
       }
     : null;
 
-  // Step 1's list is the athlete's ACTIVE protocol — the same rows My Protocol
-  // shows, read through the same "athlete reads own protocol" policy. An ended
-  // prescription (end_date set) is excluded: it is history, not something to
-  // tick off today.
-  const { data: protocolRows } = await supabase
-    .from("supplement_protocols")
-    .select("supplement_name, end_date")
-    .eq("athlete_id", athleteId)
-    .is("end_date", null)
-    .order("start_date", { ascending: false });
+  // Step 1's list is the athlete's active protocol — the same rows My Protocol
+  // shows, read through the same "athlete reads own protocol" policy.
+  //
+  // SCOPED TO THE DAY BEING LOGGED, not to today. The strip allows backfilling
+  // any of the last 7 days (migration 034), and a prescription that started on
+  // Wednesday must not appear on Monday's check-in — the athlete was not on it
+  // then, and ticking it would record adherence to something never prescribed.
+  //
+  // COVERAGE, NOT `end_date is null` (migration 035). A day-specific plan sets
+  // both dates, so filtering on an open end_date would hide every bulk-planned
+  // supplement for the whole window it covers. `coversDate` is the same
+  // predicate the exclusion constraint is built on.
+  const { data: protocolRows } = await coversDate(
+    supabase
+      .from("supplement_protocols")
+      .select("supplement_name, start_date, end_date")
+      .eq("athlete_id", athleteId),
+    activeDate
+  ).order("start_date", { ascending: false });
+  // De-duplicated by name because that is the key the check-in ticks against:
+  // two rows for the same supplement cannot overlap (migration 035), but a
+  // library-mapped row and an unmapped one sharing a display name would render
+  // as two identical checkboxes.
   const protocolSupplements = [...new Set((protocolRows ?? []).map((p) => p.supplement_name as string))];
 
   return (

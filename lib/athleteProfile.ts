@@ -3,6 +3,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { getThreadsForCurrentProfile } from "@/lib/messaging";
 import { readComments, commentAuthorName } from "@/lib/comments";
 import { EDIT_WINDOW_MS } from "@/lib/constants";
+import { activeOn, endedBefore, scheduledAfter, todayIso } from "@/lib/supplementProtocols";
 // Type-only imports, erased at compile time — no client module is pulled into
 // this server loader. They exist so the rows this file produces ARE the props
 // the dedicated pages' edit forms already take, rather than a parallel shape
@@ -68,7 +69,20 @@ export interface AthleteProfileData {
   allergies: string[];
   intolerances: string[];
   teams: { id: string; name: string }[];
-  activeProtocol: ProtocolRow | null;
+  /** Migration 035: an athlete holds one active prescription PER SUPPLEMENT,
+   *  so this is a list. Was `activeProtocol: ProtocolRow | null` when the
+   *  schema allowed only one open row per athlete in total. */
+  activeProtocols: ProtocolRow[];
+  /** The date the three protocol buckets were split on, passed through rather
+   *  than recomputed by the renderer — otherwise a render that crosses UTC
+   *  midnight could label a row "Scheduled" that the split already counted as
+   *  active. */
+  protocolToday: string;
+  /** Confirmed and dated, but not started yet — what the bulk day-by-day
+   *  planner produces when a plan is approved ahead of the week it covers.
+   *  Distinct from `pastProtocols`: neither is running today, but only one of
+   *  them is going to. */
+  scheduledProtocols: ProtocolRow[];
   pastProtocols: ProtocolRow[];
   assessments: AssessmentRecord[];
   compliance: {
@@ -95,9 +109,13 @@ export interface AthleteProfileData {
 // app/staff/… client module for the shape of what it just received.
 export type { InjuryRecord, AssessmentRecord, GpsEntry, ValdEntry };
 
+// start_date is non-null in the schema (`not null default current_date`), and
+// the coverage helpers in lib/supplementProtocols.ts compare it directly, so
+// the type says so rather than leaving every reader to null-check a column
+// that cannot be null.
 export interface ProtocolRow {
   id: string; supplement_name: string; dose: string | null; timing: string | null;
-  rationale: string | null; start_date: string | null; end_date: string | null;
+  rationale: string | null; start_date: string; end_date: string | null;
   prescribed_by: string | null;
 }
 
@@ -336,10 +354,17 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     .filter((t): t is { id: string; name: string } => t !== null);
 
   const protocols = (protocolsRes.data ?? []) as ProtocolRow[];
-  // One active row per athlete is enforced by a partial unique index
-  // (migration 020); this mirrors that rule rather than assuming order.
-  const activeProtocol = protocols.find((p) => p.end_date === null) ?? null;
-  const pastProtocols = protocols.filter((p) => p.end_date !== null);
+  // Migration 035: one active row per athlete PER SUPPLEMENT, and "active"
+  // means the row COVERS today rather than having a null end_date — a
+  // day-specific plan carries both dates. Split through the shared helpers so
+  // this page, My Protocol and Daily Check-In cannot disagree about which
+  // prescriptions are running.
+  const protocolToday = todayIso();
+  const activeProtocols = activeOn(protocols, protocolToday);
+  const scheduledProtocols = scheduledAfter(protocols, protocolToday).sort((a, b) =>
+    a.start_date.localeCompare(b.start_date)
+  );
+  const pastProtocols = endedBefore(protocols, protocolToday);
 
   const checkins = (checkinsRes.data ?? []) as {
     date: string; status: string; nutrition_value: number | null;
@@ -537,7 +562,9 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     allergies: label(allergiesRes.data, "allergies"),
     intolerances: label(intolerancesRes.data, "intolerances"),
     teams,
-    activeProtocol,
+    activeProtocols,
+    protocolToday,
+    scheduledProtocols,
     pastProtocols,
     assessments,
     compliance: {

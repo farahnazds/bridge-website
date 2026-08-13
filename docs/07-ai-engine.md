@@ -253,40 +253,76 @@ athlete's assigned brand(s) fulfills that category — club assignment
 takes priority for hybrid athletes. If nothing fits, the clinical
 recommendation stays in the report without a product link.
 
-## RPE requirement — Nutrition "next day plan" sub-mode only
+## RPE and the Nutrition Planner (revised 2026-08-13)
 
-RPE is optional at day-to-day data-entry time everywhere. It becomes a
-**required, blocking input when generating a Nutrition report in "next
-day plan" mode** — generation is blocked with a prompt to enter it first
-if the Training Load Plan entry for the target date is missing or has no
-RPE.
+RPE is optional at day-to-day data-entry time everywhere, and it is **no
+longer a blocking input for Nutrition generation**. This section previously
+described a hard gate: generation in "next day plan" mode refused to run if
+the Training Load Plan entry for the target date was missing or had no RPE.
+That gate is gone, along with the single-athlete/single-day form it belonged
+to.
 
-**"General" mode does not require RPE.** A general Nutrition report is a
-standing prescription plus focus areas — there is no single session for
-an RPE value to attach to, so requiring one would block a report that
-never needed it. RPE earns its blocking status precisely because
-"next day plan" fuels one specific session: the intensity and RPE of that
-session are what change the pre/during/post guidance, so generating
-without them would produce a plan that looks specific but isn't.
+**Why it changed.** Nutrition generation is now the bulk **Nutrition
+Planner** (`/staff/[teamId]/reports/nutrition`), which plans a range of up to
+14 days for any number of athletes at once. A blocking gate does not
+generalise to a range: one unplanned Tuesday in a fortnight would have
+refused the whole batch for every athlete, which is a far worse outcome than
+planning the thirteen days that *are* logged.
 
-Two distinct block cases, with different messages — both pointing the
-practitioner at the Training Load Plan page:
+**What replaces it.** Graceful, *explicit* degradation, per day:
 
-1. **No Training Load Plan entry exists** for the target date.
-2. **An entry exists but its RPE is null.**
+| Day-specific mode | Behaviour |
+|---|---|
+| Plan entry exists, RPE recorded | Full day-anchored plan for that session. |
+| Plan entry exists, RPE null | Planned from the fields that *are* recorded (intensity, session type, duration band), with the missing RPE named in the output. `training_load_known` stays **true** — an entry does exist. |
+| No plan entry at all | A general/baseline suggestion for that day, flagged `training_load_known: false`, stating plainly that no training-load data was logged. |
 
-Where both a team-wide and an athlete-specific entry exist for the same
-date, the athlete-specific one governs — the more specific plan is the
+The rule the model is held to is the one that actually matters: **never
+invent a session that was not logged.** Absence of an entry is not a rest day
+and must not be described as one. The review grid marks those days visibly
+("no load logged" in the column header, "baseline suggestion" on the cell) so
+the practitioner can see exactly which days were planned without load data.
+
+**Where a team-wide and an athlete-specific entry exist for the same date,
+the athlete-specific one governs** — unchanged; the more specific plan is the
 one that applies to that athlete.
 
-The check runs **before any AI call**, so a blocked generation costs
-nothing. It is also surfaced as actionable guidance rather than an error:
-a missing RPE is something the practitioner can go and fix, not a
-failure of the report.
+**"General" mode is unchanged** and still requires no RPE: a standing
+prescription has no single session for an RPE value to attach to. It is now
+reached through the same planner rather than through a separate form.
 
-*(Narrowed from "all Nutrition reports" during the Nutrition build — the
-original wording predated the two sub-modes being implemented. See also
-`docs/04-user-flows.md` Flow 7 step 3, which carries the older phrasing.)*
+*(See also `docs/04-user-flows.md` Flow 7 step 3, which still carries the
+older blocking phrasing.)*
+
+## Nutrition Planner — generation shape and the confirmation gate
+
+Nutrition is the one forward-looking report type, and the only one whose
+generation is a two-call flow:
+
+1. **Suggest** — one model call **per athlete**, covering the entire selected
+   range at once. Structured JSON only, no prose. One call per athlete, never
+   one per day: a per-day call cannot reason about loading a supplement across
+   a block, spacing iron away from a heavy session, or carrying a taper
+   through to a match day. The call count is shown on the button before the
+   practitioner presses it, and again on the review screen.
+2. **Confirm** — the practitioner reviews a grid of athlete rows against day
+   columns, edits dose and timing in place, unchecks anything they don't want,
+   and confirms. Only then is anything written: protocol rows first, then one
+   model call per athlete for the real, saved report — built from what was
+   *confirmed*, not from what was suggested.
+
+**Athletes never see a suggestion.** This is structural rather than a filter:
+the generate action contains no insert, so an abandoned flow leaves the
+database untouched and there is no unconfirmed state for an athlete-facing
+surface to accidentally read.
+
+**Safety runs twice.** The structured check (declared allergies /
+intolerances / conditions against `supplement_library.contraindicated_conditions`,
+plus the library's age bounds) runs at generation to withhold unsafe
+suggestions, and **again at confirm against what was actually confirmed** —
+dose and timing can have changed since, so the first result cannot stand in
+for the second. `assertReportSafe` then runs on the generated report text
+before the insert, exactly as it does for every other report type.
 
 ## Pre-generation "Data Check"
 

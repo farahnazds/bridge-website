@@ -632,6 +632,13 @@ update.
   in, so an `after` trigger would fire only once the insert had already been
   rejected.
 
+> **Superseded by migration 035 (2026-08-13).** "One active row per athlete"
+> was clinically wrong — an athlete takes several supplements concurrently.
+> The rule is now one active row per athlete **per supplement**, the index is
+> replaced by an exclusion constraint over date ranges, and the trigger is
+> rescoped. The `before insert` reasoning above still holds. See the section at
+> the end of this file.
+
 **Links to both clinical and commercial layers** (`supplement_library_id`,
 `product_id`) so the protocol page, the AI prescription layer and
 `assertReportSafe` resolve to the same sources rather than becoming a third
@@ -1239,3 +1246,116 @@ Report History filter's unfiltered option is labelled **"Any author"**, not
 earlier wording implied a complete team picture that RLS does not provide —
 which matters most when a practitioner is checking whether a report already
 exists before generating another.
+
+## Changed: `supplement_protocols` — one active row per SUPPLEMENT (2026-08-13)
+
+Migration 035. RLS itself is **unchanged** — 020's policy set is scoped by
+athlete and by prescriber, neither of which this touches. What changed is the
+uniqueness rule the policies sit on top of, which is documented here because
+020's guarantees are recorded above and would otherwise read as still true.
+
+### Why
+
+020 enforced one active row per athlete, full stop. Prescribing iron silently
+closed the athlete's creatine row, because the supersession trigger matched on
+`athlete_id` alone. An athlete routinely holds creatine, iron and omega-3 at
+once, each started on its own date and superseded on its own timeline.
+
+### The supplement key
+
+`supplement_library_id` is nullable by design (020: a practitioner may
+prescribe something not yet in the library and must not be blocked by that), so
+it cannot be the key alone — Postgres treats NULLs as distinct and two unmapped
+"Creatine" rows would both stay open. The key is:
+
+```
+coalesce(supplement_library_id::text, 'name:' || lower(btrim(supplement_name)))
+```
+
+The `'name:'` prefix keeps names and uuids in separate value spaces.
+
+The trigger matches a **superset** of that key — same library id **or** same
+normalised name — so re-prescribing library entry X while relabelling it from
+"Creatine" to "Creatine Monohydrate" supersedes rather than duplicating. A
+trigger that closes more than the constraint strictly requires is safe; the
+reverse is not.
+
+### Exclusion constraint, not a partial unique index
+
+A protocol row now carries a real date **range**. The bulk planning tool merges
+continuous confirmed days for one supplement into a single row, so both shapes
+are legitimate:
+
+| mode | `start_date` | `end_date` |
+|---|---|---|
+| day-specific plan | first confirmed day | last confirmed day |
+| general / standing | today | `null` |
+
+**"Active" therefore means the row covers the date in question** —
+`start_date <= d and (end_date is null or end_date >= d)` — not
+`end_date is null`. A partial unique index on `where end_date is null` cannot
+express that: it would accept two *bounded* rows for the same supplement
+covering the same week, because neither is open-ended.
+
+```sql
+exclude using gist (
+  athlete_id with =,
+  (coalesce(supplement_library_id::text,
+            'name:' || lower(btrim(supplement_name)))) with =,
+  daterange(start_date, end_date, '[]') with &&
+)
+```
+
+This subsumes the old rule for free: two open-ended rows for one supplement
+necessarily overlap. It needs `btree_gist` for the `=` operator classes,
+installed into the `extensions` schema per Supabase convention.
+
+`end_date` is **inclusive**, hence `'[]'` — which is what the existing check
+constraint (`end_date >= start_date`) implies and what the "From / To" columns
+on My Protocol read as.
+
+### The inherited one-day overlap, and the repair
+
+020's trigger closed the old row with `end_date = new.start_date` — the same
+day the next prescription began. Under inclusive semantics those rows overlap
+by exactly one day, so the constraint would have rejected data this schema
+itself produced. Confirmed against live data before writing the migration: the
+two existing rows (athlete `ad6f1dd8…`, "Whey Protein") were `2026-06-01 ->
+2026-08-01` and `2026-08-01 -> null`, overlapping on `2026-08-01`.
+
+The migration therefore repairs before it constrains, pulling each row's
+`end_date` back to the day before its successor starts, and the trigger now
+writes `new.start_date - 1` so the overlap stops being produced. It touches
+only rows that would otherwise violate — a one-day correction to a boundary
+always meant to read as a handover, not a rewrite of clinical history.
+
+### Supersession truncates FORWARD — verified live
+
+The trigger fires before the constraint, so a new range starting *inside* an
+existing one is accepted: the old row is truncated to the day before the new
+one starts, and there is then nothing left to overlap. Prescribing iron for
+1–10 March and then iron at a different dose for 5–8 March leaves:
+
+```
+2027-03-01 → 2027-03-04    (old row, truncated)
+2027-03-05 → 2027-03-08    (new row)
+2027-03-09 → 2027-03-10    NOT COVERED
+```
+
+**The old prescription's tail is not preserved, and that is deliberate.** A
+prescription being replaced does not resume once the replacement ends —
+"supersedes" means from the new start date onward, which is the same rule
+migration 020 stated, generalised to ranges. Splitting the old row to keep its
+tail would create a protocol row the practitioner never confirmed, which is
+exactly what the planner's confirmation gate exists to prevent. A practitioner
+who wants 9–10 March covered includes those days in the plan.
+
+### What the trigger deliberately does not do
+
+Rows starting **on or after** the new row's start date are left alone. Closing
+a row to before its own start is not expressible, and a re-prescription landing
+on an identical start date is an *update* of that row, not a supersession of
+it — the confirm action does create-or-update keyed on
+`(athlete, supplement key, start_date)` for exactly that case. Anything left
+genuinely overlapping is rejected by the constraint, which is correct: it means
+two different prescriptions claim the same days.
