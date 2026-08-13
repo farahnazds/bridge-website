@@ -449,9 +449,9 @@ export default function Home() {
           <h2 style={{ margin: 0, maxWidth: 760, fontFamily: HEAD, fontSize: 66, lineHeight: 1, letterSpacing: "-.04em", fontWeight: 600, color: "#fff", textWrap: "pretty", animation: "lp-rise 1s both cubic-bezier(.22,.7,.25,1)", animationTimeline: "view()", animationRange: "entry 0% cover 32%" }}>Ready to bridge the gap?</h2>
           <p style={{ margin: 0, maxWidth: 560, fontSize: 18, lineHeight: 1.65, color: "rgba(255,255,255,.6)", textWrap: "pretty" }}>Book a 15-minute call and see how Bridgetx fits your club, your sport, your workflow.</p>
           <div style={{ display: "flex", marginTop: 6 }}>
-            <a data-cta-btn="1" href="mailto:hello@bridgetx.co?subject=Bridgetx%20demo" className="lp-btn" style={{ position: "relative", flex: "none", whiteSpace: "nowrap", padding: "15px 28px", borderRadius: 11, fontSize: 15, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
+            <a data-cta-btn="1" href="mailto:admin@bridgetx.co?subject=Bridgetx%20demo" className="lp-btn" style={{ position: "relative", flex: "none", whiteSpace: "nowrap", padding: "15px 28px", borderRadius: 11, fontSize: 15, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
           </div>
-          <span style={{ fontSize: 14, color: "rgba(255,255,255,.42)" }}>Or email us directly — <a href="mailto:hello@bridgetx.co" style={{ color: "rgba(255,255,255,.62)" }}>hello@bridgetx.co</a></span>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,.42)" }}>Or email us directly — <a href="mailto:admin@bridgetx.co" style={{ color: "rgba(255,255,255,.62)" }}>admin@bridgetx.co</a></span>
         </div>
       </section>
 
@@ -486,7 +486,7 @@ export default function Home() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(255,255,255,.34)" }}>Connect</span>
-                <a href="mailto:hello@bridgetx.co" style={{ fontSize: 14 }}>hello@bridgetx.co</a>
+                <a href="mailto:admin@bridgetx.co" style={{ fontSize: 14 }}>admin@bridgetx.co</a>
                 <Link href="/login" style={{ fontSize: 14 }}>Sign In</Link>
                 <a href="#demo" style={{ fontSize: 14 }}>Book a Meeting</a>
               </div>
@@ -495,7 +495,7 @@ export default function Home() {
           <div style={{ paddingTop: 28, borderTop: "1px solid rgba(255,255,255,.07)", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
             <span style={{ fontSize: 13, color: "rgba(255,255,255,.36)" }}>© 2026 Bridgetx. All rights reserved.</span>
             <span style={{ display: "flex", alignItems: "center", gap: 16, fontFamily: MONO, fontSize: 11, letterSpacing: ".1em", color: "rgba(255,255,255,.3)" }}>
-              <a href="mailto:hello@bridgetx.co" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".1em", color: "rgba(255,255,255,.42)" }}>HELLO@BRIDGETX.CO</a>
+              <a href="mailto:admin@bridgetx.co" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".1em", color: "rgba(255,255,255,.42)" }}>ADMIN@BRIDGETX.CO</a>
               <span style={{ width: 1, height: 11, background: "rgba(255,255,255,.14)" }} />
               <span>@BRIDGETX.CO</span>
             </span>
