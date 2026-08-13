@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { BADGE, BTN_PRIMARY_FULL, BTN_SECONDARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
+import { BTN_PRIMARY_FULL, BTN_SECONDARY, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
+import ClinicalFlagChips from "@/components/ClinicalFlagChips";
 import type { PlanSuggestion } from "@/lib/supplementPlan";
 import type { AthletePlanRow, GeneratedPlan } from "./actions";
 
@@ -72,41 +73,6 @@ function SubmitButton({ count }: { count: number }) {
           ? "Nothing selected"
           : `Confirm & Generate — ${count} item${count === 1 ? "" : "s"}`}
     </button>
-  );
-}
-
-/** Allergies / intolerances / conditions / RED-S / iron, always visible. */
-function ClinicalFlags({ row, compact }: { row: AthletePlanRow; compact?: boolean }) {
-  const chips: { label: string; tone: "danger" | "warning" }[] = [
-    ...row.allergies.map((a) => ({ label: `Allergy: ${a}`, tone: "danger" as const })),
-    ...row.intolerances.map((a) => ({ label: `Intolerance: ${a}`, tone: "warning" as const })),
-    ...row.conditions.map((a) => ({ label: a, tone: "warning" as const })),
-  ];
-  if (row.redSFlag) chips.push({ label: "RED-S screening", tone: "danger" });
-  if (row.ironFlag) chips.push({ label: "Iron repletion", tone: "danger" });
-
-  if (chips.length === 0) {
-    return (
-      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        No allergies, intolerances or conditions declared.
-      </p>
-    );
-  }
-  return (
-    <div className={`flex flex-wrap gap-1 ${compact ? "" : "mt-1"}`}>
-      {chips.map((c) => (
-        <span
-          key={c.label}
-          className={BADGE}
-          style={{
-            backgroundColor: `color-mix(in srgb, var(--${c.tone}) 12%, transparent)`,
-            color: `var(--${c.tone})`,
-          }}
-        >
-          {c.label}
-        </span>
-      ))}
-    </div>
   );
 }
 
@@ -437,7 +403,7 @@ export default function ReviewStep({
                     style={{ backgroundColor: "var(--surface)", minWidth: "260px" }}
                   >
                     <p className="text-sm font-medium" style={{ color: "var(--text)" }}>{a.athleteName}</p>
-                    <ClinicalFlags row={a} />
+                    <ClinicalFlagChips flags={a} />
                     {a.error && (
                       <p className="mt-1 text-xs" style={{ color: "var(--danger)" }}>{a.error}</p>
                     )}
@@ -486,7 +452,7 @@ export default function ReviewStep({
                 <p className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
                   {a.athleteName}
                 </p>
-                <ClinicalFlags row={a} />
+                <ClinicalFlagChips flags={a} />
                 {a.error && <p className="mt-2 text-sm" style={{ color: "var(--danger)" }}>{a.error}</p>}
                 {a.periodSummary && (
                   <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>

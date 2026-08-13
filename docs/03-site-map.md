@@ -108,6 +108,19 @@ Admin only).
     nutrition report per athlete. The Nutrition tab on the Reports page links
     here; `?athlete=<id>` preselects one athlete. Nothing is written before
     confirmation, so athletes never see a suggestion.
+- `/staff/[team-id]/supplements` — **Supplement Protocols**. Standing oversight
+  of the whole roster: every athlete's active and scheduled supplements, with
+  name, dose, timing, date range and phase. Inline editing of dose, timing,
+  date range and the athlete-facing reason; "End today" on an active protocol
+  (history kept); "Cancel" on a scheduled one that never took effect. Filter to
+  one athlete or scan the team; `?athlete=<id>` preselects, same contract as
+  Reports and the planner. A minimal "Add a supplement" form covers manual
+  prescribing outside the planner. Every write runs the same structured safety
+  check the Nutrition Planner uses at confirm — with one deliberate exemption:
+  an edit that only *reduces* coverage (ending, shortening, dose and timing
+  unchanged) is always allowed, so a contraindicated protocol can always be
+  removed. Protocols are normally *created* through the Nutrition Planner; this
+  page is for oversight and adjustment afterwards.
 - Messenger, Official/Private Comments
 - Practitioner profile (auto-generated work history timeline)
 

@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { after } from "next/server";
 import { cookies } from "next/headers";
 import { recordLastUsedContext } from "@/lib/lastUsedContext";
-import { Activity, CircleUser, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Users, Zap, CircleCheckBig } from "lucide-react";
+import { Activity, CircleUser, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Pill, Users, Zap, CircleCheckBig } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import Link from "next/link";
@@ -91,6 +91,7 @@ export default async function TeamLayout({
     { label: "GPS/Performance", href: `/staff/${teamId}/gps-performance`, icon: Activity },
     { label: "VALD", href: `/staff/${teamId}/vald`, icon: Zap },
     { label: "Injury Log", href: `/staff/${teamId}/injuries`, icon: HeartPulse },
+    { label: "Supplements", href: `/staff/${teamId}/supplements`, icon: Pill },
     { label: "Comments", href: `/staff/${teamId}/comments`, icon: MessageCircle },
     { label: "Compliance", href: `/staff/${teamId}/compliance`, icon: CircleCheckBig },
   ] },
