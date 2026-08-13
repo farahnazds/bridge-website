@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { CARD, NOTICE } from "@/lib/ui";
+import { METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
 
 export const metadata: Metadata = { title: "Assessments — Bridgetx" };
 
@@ -20,6 +21,7 @@ type AssessmentRow = {
   id: string;
   athlete_id: string;
   date: string;
+  method: AssessmentMethod | null;
   weight_kg: number | null;
   height_cm: number | null;
   body_fat_pct: number | null;
@@ -60,7 +62,7 @@ export default async function ClubAssessmentsPage({
     const { data, error } = await supabase
       .from("assessments")
       .select(
-        "id, athlete_id, date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier, provider_id"
+        "id, athlete_id, date, method, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier, provider_id"
       )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
@@ -125,6 +127,7 @@ export default async function ClubAssessmentsPage({
                 {[
                   "Athlete",
                   "Date",
+                  "Method",
                   "Weight",
                   "Height",
                   "Body Fat %",
@@ -152,6 +155,9 @@ export default async function ClubAssessmentsPage({
                     </td>
                     <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
                       {a.date}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {METHOD_LABELS[(a.method ?? "manual") as AssessmentMethod] ?? a.method}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
                       {fmt(a.weight_kg, " kg")}

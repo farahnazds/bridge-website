@@ -233,7 +233,7 @@ ${bundle.types.map(typeLabel).join(", ")}`);
 ### Latest assessment (anchor for energy and protein targets)
 ${
   bundle.latestAssessment
-    ? `${bundle.latestAssessment.date} | weight ${num(bundle.latestAssessment.weight_kg)} kg | body fat ${num(bundle.latestAssessment.body_fat_pct)}% | lean ${num(bundle.latestAssessment.lean_mass_kg)} kg | BMR ${num(bundle.latestAssessment.bmr)} | TDEE ${num(bundle.latestAssessment.tdee)}`
+    ? `${bundle.latestAssessment.date} | method ${bundle.latestAssessment.method ?? "not recorded"} | weight ${num(bundle.latestAssessment.weight_kg)} kg | body fat ${num(bundle.latestAssessment.body_fat_pct)}% | lean ${num(bundle.latestAssessment.lean_mass_kg)} kg | BMR ${num(bundle.latestAssessment.bmr)} | TDEE ${num(bundle.latestAssessment.tdee)}`
     : "No assessment on file — say so, and do not invent energy targets from nothing."
 }
 

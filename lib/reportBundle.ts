@@ -143,7 +143,7 @@ export async function getReportBundle(
   let benchmark: EliteBenchmark | null = null;
   if (want("body_composition")) {
     const cols =
-      "date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier";
+      "date, method, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier";
     const { data: inPeriod } = await supabase
       .from("assessments")
       .select(cols)
@@ -240,7 +240,7 @@ export async function getReportBundle(
   if (want("nutrition")) {
     const { data: latest } = await supabase
       .from("assessments")
-      .select("date, weight_kg, body_fat_pct, lean_mass_kg, bmr, tdee")
+      .select("date, method, weight_kg, body_fat_pct, lean_mass_kg, bmr, tdee")
       .eq("athlete_id", athleteId)
       .lte("date", periodEnd)
       .order("date", { ascending: false })

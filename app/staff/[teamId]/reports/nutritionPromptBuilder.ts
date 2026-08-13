@@ -93,8 +93,22 @@ export interface ActiveInjuryContext {
   targetReturnDate: string | null;
 }
 
+/** Spelled out so the model reasons about the instrument, not about a slug. */
+export const ASSESSMENT_METHOD_NAMES: Record<string, string> = {
+  manual: "manually entered (instrument not recorded)",
+  tanita: "Tanita bioelectrical impedance (BIA)",
+  inbody: "InBody bioelectrical impedance (BIA)",
+  skinfold: "skinfold calipers — body fat ESTIMATED by a published equation, not measured",
+  dexa: "DEXA scan",
+};
+
 export interface AssessmentContext {
   date: string;
+  /** The instrument behind these numbers. Stated in the prompt because a
+   *  skinfold body fat is an ESTIMATE from an equation while a DEXA figure is
+   *  a measurement, and a plan built on one should not describe it as the
+   *  other. */
+  method: string | null;
   weight_kg: number | null;
   body_fat_pct: number | null;
   lean_mass_kg: number | null;
@@ -303,7 +317,7 @@ export function buildNutritionPrompt(input: NutritionPromptInput): string {
   const age = ageInYears(athlete.dob);
 
   const assessmentBlock = latestAssessment
-    ? `Date: ${latestAssessment.date}
+    ? `Date: ${latestAssessment.date} | Method: ${ASSESSMENT_METHOD_NAMES[latestAssessment.method ?? "manual"] ?? latestAssessment.method ?? "not recorded"}
 Weight: ${latestAssessment.weight_kg ?? "—"} kg | Body fat: ${latestAssessment.body_fat_pct ?? "—"}% | Lean mass: ${latestAssessment.lean_mass_kg ?? "—"} kg
 BMR: ${latestAssessment.bmr ?? "—"} | TDEE: ${latestAssessment.tdee ?? "—"}
 ${

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
 import TrendSparkline from "@/components/TrendSparkline";
 import { CARD, NOTICE } from "@/lib/ui";
+import { METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
 
 export const metadata: Metadata = { title: "My Body Composition — Bridgetx" };
 
@@ -26,6 +27,7 @@ export const metadata: Metadata = { title: "My Body Composition — Bridgetx" };
 
 type AssessmentRow = {
   date: string;
+  method: AssessmentMethod | null;
   weight_kg: number | null;
   height_cm: number | null;
   body_fat_pct: number | null;
@@ -102,7 +104,7 @@ export default async function MyBodyCompositionPage({
   const { data, error } = await supabase
     .from("assessments")
     .select(
-      "date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier"
+      "date, method, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier"
     )
     .eq("athlete_id", athleteId)
     .order("date", { ascending: false });
@@ -196,7 +198,7 @@ export default async function MyBodyCompositionPage({
               <table className="w-full min-w-[980px] text-left text-sm">
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Date", "Weight", "Height", "Body Fat %", "Lean Mass", "Muscle Mass", "Visceral Fat", "BMR", "TDEE", "Validity", "Notes"].map((h) => (
+                    {["Date", "Method", "Weight", "Height", "Body Fat %", "Lean Mass", "Muscle Mass", "Visceral Fat", "BMR", "TDEE", "Validity", "Notes"].map((h) => (
                       <th key={h} className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>
                         {h}
                       </th>
@@ -209,6 +211,7 @@ export default async function MyBodyCompositionPage({
                     return (
                       <tr key={r.date} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
                         <td className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--text)" }}>{r.date}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-xs" style={{ color: "var(--text-muted)" }}>{METHOD_LABELS[(r.method ?? "manual") as AssessmentMethod] ?? r.method}</td>
                         <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{fmt(r.weight_kg, " kg")}</td>
                         <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{fmt(r.height_cm, " cm")}</td>
                         <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{fmt(r.body_fat_pct, "%")}</td>

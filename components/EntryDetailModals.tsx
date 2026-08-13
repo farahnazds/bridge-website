@@ -21,7 +21,13 @@ import type { AssessmentRecord } from "@/app/staff/[teamId]/assessments/Assessme
 import type { GpsEntry } from "@/app/staff/[teamId]/gps-performance/GpsClient";
 import type { ValdEntry } from "@/app/staff/[teamId]/vald/ValdClient";
 import { EditInjuryForm } from "@/app/staff/[teamId]/injuries/InjuriesClient";
-import { EditAssessmentForm } from "@/app/staff/[teamId]/assessments/AssessmentsClient";
+import {
+  EditAssessmentForm,
+  MethodChip,
+  type Athlete as AssessmentAthlete,
+} from "@/app/staff/[teamId]/assessments/AssessmentsClient";
+import { METHOD_FIELDS, METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
+import type { SkinfoldEquationRow } from "@/lib/skinfoldEquations";
 import { EditGpsForm } from "@/app/staff/[teamId]/gps-performance/GpsClient";
 import { EditValdForm } from "@/app/staff/[teamId]/vald/ValdClient";
 
@@ -41,6 +47,38 @@ import { EditValdForm } from "@/app/staff/[teamId]/vald/ValdClient";
 // action, or the RLS window is reimplemented at either call site.
 
 export type EntryEditContext = { teamId: string } | null;
+
+/** Assessments need more than the team to render their edit form: the skinfold
+ *  section re-checks eligibility against the athlete and the equation rows, so
+ *  both travel with the context. Kept separate from EntryEditContext, which
+ *  every other entry type shares and none of them needs this for. */
+export type AssessmentEditContext =
+  | { teamId: string; athlete?: AssessmentAthlete | null; equations?: SkinfoldEquationRow[] }
+  | null;
+
+/** Renders method_data through the method's own field definitions, so a
+ *  reading shows its real label and unit rather than a raw jsonb key.
+ *  Anything the definition does not name — derivation provenance such as
+ *  equation_version — is listed after it rather than hidden, since that is
+ *  what explains how a derived figure was produced. */
+function methodDataRows(
+  method: AssessmentMethod,
+  data: Record<string, unknown>
+): [string, string][] {
+  const defs = method === "manual" ? [] : METHOD_FIELDS[method];
+  const named = new Set(defs.map((f) => f.key));
+  const rows: [string, string][] = [];
+  for (const f of defs) {
+    const v = data[f.key];
+    if (v === undefined || v === null || v === "") continue;
+    rows.push([f.label, `${v}${f.unit ? ` ${f.unit}` : ""}`]);
+  }
+  for (const [k, v] of Object.entries(data)) {
+    if (named.has(k) || v === undefined || v === null || v === "") continue;
+    rows.push([k.replace(/_/g, " "), String(v)]);
+  }
+  return rows;
+}
 
 const STATUS_LABEL: Record<string, string> = Object.fromEntries(INJURY_STATUSES.map((s) => [s.value, s.label]));
 const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
@@ -390,7 +428,7 @@ export function AssessmentDetailModal({
   onClose,
 }: {
   record: AssessmentRecord;
-  edit: EntryEditContext;
+  edit: AssessmentEditContext;
   onClose: () => void;
 }) {
   return (
@@ -399,22 +437,52 @@ export function AssessmentDetailModal({
       subtitle={`logged by ${record.providerName}`}
       noun="assessment"
       isEditable={record.isEditable}
-      edit={edit}
+      edit={edit ? { teamId: edit.teamId } : null}
       onClose={onClose}
       detail={
         <div className="flex flex-col gap-4">
+          {/* The method leads, because the numbers under it are not comparable
+              across methods without it — a DEXA lean mass and a BIA lean mass
+              are different measurements of different things. */}
+          <div className="flex items-center gap-2">
+            <MethodChip method={record.method} />
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {record.method === "skinfold"
+                ? "body fat calculated from the folds below"
+                : record.method === "manual"
+                  ? "entered by hand"
+                  : "device output"}
+            </span>
+          </div>
           <Fields
             rows={[
               ["Weight", num(record.weightKg, 1, " kg")],
               ["Height", num(record.heightCm, 1, " cm")],
               ["Body fat", num(record.bodyFatPct, 1, "%")],
               ["Lean mass", num(record.leanMassKg, 1, " kg")],
-              ["Muscle mass", num(record.muscleMassKg, 1, " kg")],
-              ["Visceral fat", num(record.visceralFat)],
+              // Both deprecated for new writes (migrations 038/039); shown only
+              // where a historical row still carries one, rather than as an
+              // empty field implying it should have been filled.
+              ...(record.muscleMassKg !== null
+                ? ([["Muscle mass", num(record.muscleMassKg, 1, " kg")]] as [string, string][])
+                : []),
+              ...(record.visceralFat !== null
+                ? ([["Visceral fat", num(record.visceralFat)]] as [string, string][])
+                : []),
               ["BMR", record.bmr ?? "—"],
               ["TDEE", record.tdee ?? "—"],
             ]}
           />
+          {Object.keys(record.methodData).length > 0 && (
+            <div>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {METHOD_LABELS[record.method]} readings
+              </p>
+              <Fields
+                rows={methodDataRows(record.method, record.methodData)}
+              />
+            </div>
+          )}
           <div>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Notes
@@ -426,7 +494,16 @@ export function AssessmentDetailModal({
         </div>
       }
       form={({ onDone, onSaved }) =>
-        edit && <EditAssessmentForm teamId={edit.teamId} record={record} onDone={onDone} onSaved={onSaved} />
+        edit && (
+          <EditAssessmentForm
+            teamId={edit.teamId}
+            record={record}
+            athlete={edit.athlete ?? null}
+            equations={edit.equations}
+            onDone={onDone}
+            onSaved={onSaved}
+          />
+        )
       }
     />
   );

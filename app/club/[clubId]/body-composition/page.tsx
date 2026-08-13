@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import EmptyState from "@/components/EmptyState";
 import TrendSparkline from "@/components/TrendSparkline";
 import { CARD, NOTICE } from "@/lib/ui";
+import { METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
 
 export const metadata: Metadata = { title: "Body Composition — Bridgetx" };
 
@@ -24,6 +25,7 @@ type AthleteRow = { id: string; first_name: string; last_name: string; code: str
 type AssessmentRow = {
   athlete_id: string;
   date: string;
+  method: AssessmentMethod | null;
   weight_kg: number | null;
   body_fat_pct: number | null;
   lean_mass_kg: number | null;
@@ -77,7 +79,7 @@ export default async function ClubBodyCompositionPage({
   if (athleteIds.length > 0) {
     const { data, error } = await supabase
       .from("assessments")
-      .select("athlete_id, date, weight_kg, body_fat_pct, lean_mass_kg, validity_tier")
+      .select("athlete_id, date, method, weight_kg, body_fat_pct, lean_mass_kg, validity_tier")
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
     rows = (data ?? []) as AssessmentRow[];
@@ -102,7 +104,12 @@ export default async function ClubBodyCompositionPage({
         ? latest.body_fat_pct - previous.body_fat_pct
         : null;
     const daysSince = latest ? Math.floor((today.getTime() - new Date(latest.date).getTime()) / 86_400_000) : null;
-    return { athlete: a, list, latest, bfDelta, daysSince };
+    // A change measured across two DIFFERENT instruments is not a change in
+    // the athlete. DEXA and BIA disagree by more than most real movement over
+    // a reporting period, so the delta is flagged rather than presented flat.
+    const methodChanged =
+      latest !== null && previous !== null && (latest.method ?? "manual") !== (previous.method ?? "manual");
+    return { athlete: a, list, latest, previous, bfDelta, daysSince, methodChanged };
   });
 
   const assessed = summaries.filter((s) => s.latest !== null);
@@ -166,7 +173,7 @@ export default async function ClubBodyCompositionPage({
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  {["Athlete", "Last assessed", "Weight", "Body Fat %", "Change", "Lean Mass", "Validity", "Trend"].map((h) => (
+                  {["Athlete", "Last assessed", "Method", "Weight", "Body Fat %", "Change", "Lean Mass", "Validity", "Trend"].map((h) => (
                     <th key={h} className="whitespace-nowrap px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>
                       {h}
                     </th>
@@ -195,10 +202,22 @@ export default async function ClubBodyCompositionPage({
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: isStale ? "var(--warning)" : "var(--text)" }}>
                         {l ? `${l.date}${s.daysSince !== null ? ` (${s.daysSince}d)` : ""}` : "Never"}
                       </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                        {l ? (METHOD_LABELS[(l.method ?? "manual") as AssessmentMethod] ?? l.method) : "—"}
+                      </td>
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{fmt(l?.weight_kg ?? null, " kg")}</td>
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{fmt(l?.body_fat_pct ?? null, "%")}</td>
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: deltaColor }}>
                         {s.bfDelta === null ? "—" : `${s.bfDelta > 0 ? "+" : ""}${Number(s.bfDelta.toFixed(1))}`}
+                        {s.methodChanged && (
+                          <span
+                            className="ml-1 text-xs"
+                            style={{ color: "var(--warning)" }}
+                            title="The last two assessments used different measurement methods, so this change may be an instrument difference rather than a real one."
+                          >
+                            ≠ method
+                          </span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{fmt(l?.lean_mass_kg ?? null, " kg")}</td>
                       <td className="whitespace-nowrap px-5 py-3 text-xs" style={{ color: "var(--text-muted)" }}>

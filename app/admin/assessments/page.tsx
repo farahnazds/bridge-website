@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
 import { CARD, NOTICE } from "@/lib/ui";
+import { METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
 
 export const metadata: Metadata = { title: "Assessments — Admin — Bridgetx" };
 
@@ -21,6 +22,7 @@ type AssessmentRow = {
   id: string;
   athlete_id: string;
   date: string;
+  method: AssessmentMethod | null;
   weight_kg: number | null;
   body_fat_pct: number | null;
   lean_mass_kg: number | null;
@@ -59,7 +61,7 @@ export default async function AdminAssessmentsPage() {
     const { data, error } = await supabase
       .from("assessments")
       .select(
-        "id, athlete_id, date, weight_kg, body_fat_pct, lean_mass_kg, muscle_mass_kg, bmr, tdee, validity_tier, provider_id, provider:profiles!provider_id(first_name, last_name)"
+        "id, athlete_id, date, method, weight_kg, body_fat_pct, lean_mass_kg, muscle_mass_kg, bmr, tdee, validity_tier, provider_id, provider:profiles!provider_id(first_name, last_name)"
       )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
@@ -114,6 +116,7 @@ export default async function AdminAssessmentsPage() {
                   "Athlete",
                   "Club",
                   "Date",
+                  "Method",
                   "Weight",
                   "Body Fat %",
                   "Lean Mass",
@@ -147,6 +150,9 @@ export default async function AdminAssessmentsPage() {
                     </td>
                     <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
                       {r.date}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {METHOD_LABELS[(r.method ?? "manual") as AssessmentMethod] ?? r.method}
                     </td>
                     <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
                       {fmt(r.weight_kg, " kg")}

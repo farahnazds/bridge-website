@@ -275,7 +275,7 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     supabase
       .from("assessments")
       .select(
-        "id, athlete_id, date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
+        "id, athlete_id, date, method, method_data, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
       )
       .eq("athlete_id", athleteId)
       .order("date", { ascending: false })
@@ -387,6 +387,8 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     athleteId: a.athlete_id as string,
     athleteName,
     date: a.date as string,
+    method: (a.method as AssessmentRecord["method"] | null) ?? "manual",
+    methodData: (a.method_data as Record<string, unknown> | null) ?? {},
     weightKg: a.weight_kg as number | null,
     heightCm: a.height_cm as number | null,
     bodyFatPct: a.body_fat_pct as number | null,

@@ -127,7 +127,7 @@ export async function loadAthletePlanningExtras(
       .in("id", athleteIds),
     supabase
       .from("assessments")
-      .select("athlete_id, date, weight_kg, body_fat_pct, lean_mass_kg, bmr, tdee")
+      .select("athlete_id, date, method, weight_kg, body_fat_pct, lean_mass_kg, bmr, tdee")
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false }),
     supabase
@@ -160,6 +160,7 @@ export async function loadAthletePlanningExtras(
     if (latestAssessment.has(id)) continue;
     latestAssessment.set(id, {
       date: a.date as string,
+      method: (a.method as string | null) ?? null,
       weight_kg: a.weight_kg as number | null,
       body_fat_pct: a.body_fat_pct as number | null,
       lean_mass_kg: a.lean_mass_kg as number | null,

@@ -6,6 +6,7 @@ import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import { getAthleteProfileData } from "@/lib/athleteProfile";
 import AthleteProfile from "@/components/AthleteProfile";
 import { clubDefaultLanguage, clubIdForTeam } from "@/lib/reportLanguage";
+import { loadSkinfoldEquations } from "@/lib/skinfoldEquationsData";
 
 export const metadata: Metadata = { title: "Athlete — Bridgetx" };
 
@@ -66,9 +67,12 @@ export default async function TeamAthleteProfilePage({
   // rendered for anyone the layout admits, and each action performs its own
   // role check with RLS behind it. Gating the DATA on a role guess here would
   // add a second, weaker permission rule — see components/QuickAddModals.tsx.
-  const [practitionerRows, defaultLanguage] = await Promise.all([
+  const [practitionerRows, defaultLanguage, skinfoldEquations] = await Promise.all([
     supabase.from("staff_team_assignments").select("staff_profile_id, profiles(id, first_name, last_name)").eq("team_id", teamId),
     clubDefaultLanguage(await clubIdForTeam(teamId)),
+    // The assessment quick-add's skinfold tab needs the same equation rows the
+    // Assessments page uses, so the two agree on what is selectable.
+    loadSkinfoldEquations(),
   ]);
   type PractitionerRow = { profiles: { id: string; first_name: string | null; last_name: string | null } | null };
   const practitioners = ((practitionerRows.data ?? []) as unknown as PractitionerRow[])
@@ -92,6 +96,13 @@ export default async function TeamAthleteProfilePage({
         // in that case — a message needs a recipient profile, and there isn't
         // one to address yet.
         athleteProfileId: data.athlete.profile_id,
+        // The assessment quick-add's skinfold tab gates on these. Passed from
+        // the record already loaded above rather than re-fetched, so the
+        // pre-flight here gives the same answer as the Assessments page.
+        athleteDob: data.athlete.dob,
+        athleteGender: data.athlete.gender,
+        athleteClubId: data.athlete.club_id,
+        skinfoldEquations,
         teamName: context.team.name,
         practitioners,
         defaultLanguage,

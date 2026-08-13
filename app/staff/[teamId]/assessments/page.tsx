@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import AssessmentsClient, { type AssessmentRecord } from "./AssessmentsClient";
+import { loadSkinfoldEquations } from "@/lib/skinfoldEquationsData";
+import type { AssessmentMethod } from "@/lib/assessmentMethods";
 import { CARD, NOTICE } from "@/lib/ui";
 import { EDIT_WINDOW_MS } from "@/lib/constants";
 
@@ -14,11 +16,24 @@ function personName(p: { first_name: string | null; last_name: string | null } |
 
 export const metadata: Metadata = { title: "Assessments — Bridgetx" };
 
-type AthleteEmbed = { id: string; first_name: string; last_name: string; code: string };
+type AthleteEmbed = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  code: string;
+  // dob/gender drive the skinfold readiness pre-flight; club_id is where a
+  // missing one gets fixed. All three travel with the roster so the check
+  // happens before a form is filled in rather than at save.
+  dob: string | null;
+  gender: string | null;
+  club_id: string | null;
+};
 type AssessmentRow = {
   id: string;
   athlete_id: string;
   date: string;
+  method: AssessmentMethod;
+  method_data: Record<string, unknown> | null;
   weight_kg: number | null;
   height_cm: number | null;
   body_fat_pct: number | null;
@@ -45,7 +60,7 @@ export default async function TeamAssessmentsPage({
 
   const { data: rosterData } = await supabase
     .from("athlete_teams")
-    .select("athlete_id, athletes(id, first_name, last_name, code)")
+    .select("athlete_id, athletes(id, first_name, last_name, code, dob, gender, club_id)")
     .eq("team_id", teamId);
 
   // Many-to-one FK embed, same verified pattern as app/staff/[teamId]/page.tsx.
@@ -62,7 +77,7 @@ export default async function TeamAssessmentsPage({
     const { data, error } = await supabase
       .from("assessments")
       .select(
-        "id, athlete_id, date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
+        "id, athlete_id, date, method, method_data, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
       )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
@@ -79,6 +94,8 @@ export default async function TeamAssessmentsPage({
       athleteId: a.athlete_id,
       athleteName: athlete ? `${athlete.first_name} ${athlete.last_name}` : "Unknown athlete",
       date: a.date,
+      method: a.method,
+      methodData: a.method_data ?? {},
       weightKg: a.weight_kg,
       heightCm: a.height_cm,
       bodyFatPct: a.body_fat_pct,
@@ -98,7 +115,14 @@ export default async function TeamAssessmentsPage({
     firstName: a.first_name,
     lastName: a.last_name,
     code: a.code,
+    dob: a.dob,
+    gender: a.gender,
+    clubId: a.club_id,
   }));
+
+  // Read from the database rather than hardcoded, so the options the picker
+  // offers and the bounds the trigger enforces are the same rows.
+  const equations = await loadSkinfoldEquations();
 
   return (
     <div className="flex flex-col gap-8">
@@ -110,7 +134,9 @@ export default async function TeamAssessmentsPage({
           Assessments
         </h1>
         <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-          Log a BIA body composition assessment. Any club staff member can edit an entry within 7 days
+          Log a body composition assessment — Tanita, InBody, skinfold or DEXA. Each method captures
+          its own fields, and every value carries the method that produced it, because the four are
+          not measuring quite the same things. Any club staff member can edit an entry within 7 days
           of it being logged.
         </p>
       </div>
@@ -133,7 +159,12 @@ export default async function TeamAssessmentsPage({
           <p style={{ color: "var(--text-muted)" }}>No athletes on this team yet.</p>
         </div>
       ) : (
-        <AssessmentsClient teamId={teamId} athletes={athletesForClient} assessments={records} />
+        <AssessmentsClient
+          teamId={teamId}
+          athletes={athletesForClient}
+          assessments={records}
+          equations={equations}
+        />
       )}
     </div>
   );

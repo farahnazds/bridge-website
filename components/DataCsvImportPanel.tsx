@@ -68,6 +68,7 @@ export default function DataCsvImportPanel<T>({
   confirmAction,
   summarise,
   requiredNote,
+  extraFields,
 }: {
   teamId: string;
   templateFilename: string;
@@ -77,6 +78,11 @@ export default function DataCsvImportPanel<T>({
   confirmAction: (prev: ConfirmShape, fd: FormData) => Promise<ConfirmShape>;
   summarise: (row: MatchedRow<T>) => string;
   requiredNote: string;
+  /** Extra hidden inputs carried on BOTH the preview and confirm submits.
+   *  Assessments needs it: one action pair serves four measurement methods and
+   *  dispatches on a `method` field, so the confirm has to know which method
+   *  the preview was produced for. */
+  extraFields?: Record<string, string>;
 }) {
   const [preview, previewFormAction] = useActionState(previewAction, { error: null, rows: [] } as PreviewShape<T>);
   const [confirm, confirmFormAction] = useActionState(confirmAction, {
@@ -188,6 +194,9 @@ export default function DataCsvImportPanel<T>({
 
         <form action={confirmFormAction} className="flex flex-col gap-3">
           <input type="hidden" name="team_id" value={teamId} />
+          {Object.entries(extraFields ?? {}).map(([k, v]) => (
+            <input key={k} type="hidden" name={k} value={v} />
+          ))}
           <input type="hidden" name="rows_json" value={JSON.stringify(matched)} />
           <Banner error={confirm.error} />
           <div className="flex gap-2">
@@ -221,6 +230,9 @@ export default function DataCsvImportPanel<T>({
 
       <form action={previewFormAction} className="flex flex-col gap-3" noValidate>
         <input type="hidden" name="team_id" value={teamId} />
+        {Object.entries(extraFields ?? {}).map(([k, v]) => (
+            <input key={k} type="hidden" name={k} value={v} />
+          ))}
         <Banner error={preview.error} />
         <input name="csv_file" type="file" accept=".csv" required className={INPUT} style={INPUT_STYLE} />
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>

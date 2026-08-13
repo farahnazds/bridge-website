@@ -9,6 +9,9 @@ import { goalSummaryLine } from "@/lib/bodyComposition";
 
 export interface AssessmentRow {
   date: string;
+  /** Which instrument produced this row. Carried into the prompt on every data
+   *  point — see the measurement-method rules in the system prompt. */
+  method: string | null;
   weight_kg: number | null;
   height_cm: number | null;
   body_fat_pct: number | null;
@@ -85,6 +88,16 @@ function listOrNone(items: string[]): string {
   return items.length > 0 ? items.join(", ") : "none declared";
 }
 
+/** Spelled out for the model rather than passed as a slug, so it reasons about
+ *  "DEXA scan" and "bioelectrical impedance" rather than about "dexa". */
+const METHOD_NAMES: Record<string, string> = {
+  manual: "manually entered (instrument not recorded)",
+  tanita: "Tanita bioelectrical impedance (BIA)",
+  inbody: "InBody bioelectrical impedance (BIA)",
+  skinfold: "skinfold calipers, body fat estimated by a published equation",
+  dexa: "DEXA scan",
+};
+
 // Register block shared with the other four report types — see
 // lib/reportAudience.ts and the note in promptBuilder.ts.
 export function bodyCompositionSystemPrompt(audience: ReportAudience): string {
@@ -106,6 +119,14 @@ Elite benchmark handling — hard rules:
 - The athlete's OWN goal is separate from the elite benchmark and matters more. Where a goal is set, the "Body-composition goal and gap to it" section gives the target body fat, target lean mass, derived goal body weight, and the gap from the latest assessment — all already computed. Use those figures rather than recalculating, and make the trend analysis and the "Goals for next period" section follow from that gap: how far off the athlete is, in which direction, and whether the trend across the assessments provided is moving toward or away from it.
 - Distinguish the two comparisons explicitly. An athlete can sit below the elite benchmark yet above their own goal, or the reverse; do not merge them into a single verdict.
 - Where no goal is set, say so plainly and recommend the practitioner set one. Never invent a target, and never present current values as though they were on target.
+
+Measurement method — hard rules. Every assessment below is labelled with the METHOD that produced it, and the methods are not interchangeable:
+- NEVER present values from different methods as a continuous trend without saying so explicitly. A DEXA scan and a bioelectrical impedance reading measure different things by different means; a change between two assessments taken on different instruments may be an instrument difference rather than a change in the athlete. Where consecutive assessments use different methods, say that plainly and treat the comparison as indicative, not as a measured change.
+- Where two or more assessments share a method, that is the strongest trend available — prefer it, and say that is why.
+- A skinfold body fat percentage is ESTIMATED from caliper measurements by a published equation, not measured directly. Describe it as an estimate. Different equations give different answers from the same folds.
+- DEXA is the most direct measurement here; BIA readings are affected by hydration, recent food and recent training. Do not present a small BIA change as definitive.
+- Never state or imply a method that is not labelled in the data. Where the method is "manually entered (instrument not recorded)", say the instrument is unknown rather than assuming one.
+- "muscle mass" and "visceral fat" appear on some older rows only and are marked as legacy method-specific fields. Do not trend them across assessments, and do not compare them between methods — they held different quantities on different instruments.
 
 Citations — hard rule: only cite entries from the "Clinical + Research library entries" section in the data below, if any are provided. Never cite anything from general training knowledge, even if a relevant paper is "known" to you. If no library entries are provided, do not include any citation for that point — write it without one rather than reaching for an unverified source.
 
@@ -139,10 +160,14 @@ export function buildBodyCompositionPrompt(input: BodyCompositionPromptInput): s
       ? assessments
           .map(
             (a) =>
-              `- ${a.date} | weight: ${a.weight_kg ?? "—"} kg | height: ${a.height_cm ?? "—"} cm | body fat: ${
+              `- ${a.date} | METHOD: ${METHOD_NAMES[a.method ?? "manual"] ?? a.method ?? "not recorded"} | weight: ${
+                a.weight_kg ?? "—"
+              } kg | height: ${a.height_cm ?? "—"} cm | body fat: ${
                 a.body_fat_pct ?? "—"
-              }% | lean mass: ${a.lean_mass_kg ?? "—"} kg | muscle mass: ${a.muscle_mass_kg ?? "—"} kg | visceral fat: ${
-                a.visceral_fat ?? "—"
+              }% | lean mass: ${a.lean_mass_kg ?? "—"} kg${
+                a.muscle_mass_kg !== null ? ` | muscle mass: ${a.muscle_mass_kg} kg (legacy field, method-specific)` : ""
+              }${
+                a.visceral_fat !== null ? ` | visceral fat: ${a.visceral_fat} (legacy field, method-specific)` : ""
               } | BMR: ${a.bmr ?? "—"} | TDEE: ${a.tdee ?? "—"} | validity: ${a.validity_tier} | notes: ${
                 a.notes ?? "—"
               }`

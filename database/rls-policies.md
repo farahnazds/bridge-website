@@ -1359,3 +1359,107 @@ it — the confirm action does create-or-update keyed on
 `(athlete, supplement key, start_date)` for exactly that case. Anything left
 genuinely overlapping is rejected by the constraint, which is correct: it means
 two different prescriptions claim the same days.
+
+---
+
+## Added: `skinfold_equations` + the assessment equation guard (2026-08-13)
+
+Migration `038_assessment_methods.sql`.
+
+### The table
+
+`skinfold_equations` is a reference vocabulary, exactly like
+`medical_conditions` and `allergies`, and gets the identical policy pair:
+
+| Policy | Command | Rule |
+|---|---|---|
+| `authenticated read` | `select` | `auth.uid() is not null` |
+| `super admin writes` | `all` | `is_super_admin()` |
+
+It holds no athlete data — an equation's name, citation, validated age range,
+required fold sites, and which sexes' coefficients have been transcribed from a
+primary source. Every authenticated role needs to read it to render or validate
+a skinfold assessment; nobody but a super admin should be able to widen an
+equation's validated range, because doing so is a clinical decision.
+
+### `assessments` policies are unchanged
+
+Deliberately. All four measurement methods write to the same `assessments` row,
+so the nine existing policies — including `club staff edit within 7 days` and
+its `within_edit_window(created_at, 7)` boundary — apply to Tanita, InBody,
+skinfold and DEXA rows without amendment. That inheritance is the main reason
+the methods share one table rather than getting four of their own; four tables
+would have meant re-proving every provenance guarantee four times.
+
+### Why the age gate is a trigger and not a policy
+
+`assessment_skinfold_guard()` refuses a skinfold row whose equation is unknown,
+is applied outside its validated age range, is applied to an athlete with no
+`dob` or no `gender`, or whose coefficients for that athlete's sex are not yet
+confirmed.
+
+RLS was the wrong tool for it. A policy answers "may this user touch this row",
+and this is not about the user — a super admin applying Slaughter to a
+25-year-old produces exactly as wrong a number as anyone else. It is a
+statement about the row's internal consistency, so it belongs in a constraint,
+and it needs a lookup into `athletes` for `dob`/`gender`, which a `check`
+constraint cannot do. That leaves a trigger.
+
+It is `security definer` because the guard must be able to read the athlete's
+date of birth even where the writing role's own RLS would not return that row.
+It reads two columns, compares them to reference bounds, and writes nothing.
+
+Age is computed **at the assessment date**, not at insert time — a measurement
+back-entered inside the 7-day window is judged against how old the athlete was
+when the folds were taken.
+
+### The verification block is intentional and temporary
+
+`verified_sexes` is empty for Durnin-Womersley and Slaughter, and is `{female}`
+for Jackson-Pollock. The trigger refuses any equation/sex pair not listed, so an
+unconfirmed formula cannot produce a stored clinical number even if application
+code tried. This makes "we have not checked this against the primary source
+yet" a state the database enforces rather than a comment someone later steps
+over. Clearing it is an `update` on the reference row plus the matching formula
+in `lib/skinfoldEquations.ts`; the two must be widened together.
+
+---
+
+## Changed: the assessment guard gains a site-mapping gate (2026-08-13)
+
+Migration `039_skinfold_site_map_and_muscle_mass.sql`. No policy changes —
+`skinfold_equations` keeps its `authenticated read` / `super admin writes` pair
+and `assessments` keeps its nine. Only `assessment_skinfold_guard()` changed.
+
+### Two gates, because there are two unknowns
+
+`verified_sexes` says whether an equation's COEFFICIENTS are confirmed.
+`site_map` says which FOLD each of its inputs refers to. Knowing one tells you
+nothing about the other, so they are checked separately and an equation needs
+both before it can be written.
+
+The form captures ISAK site names; the equations were published against a
+different vocabulary. Durnin-Womersley's "suprailiac" is described as just above
+the iliac crest in the mid-axillary line — ISAK's **iliac crest**.
+Jackson-Pollock-Ward's is conventionally the diagonal fold toward the anterior
+axillary border — closer to ISAK's **supraspinale**, a different fold several
+centimetres away.
+
+Measured, on one athlete's folds through the confirmed Jackson-Pollock women's
+coefficients, the two choices give **21.77%** and **23.42%** body fat. Which
+site an equation meant is not a naming detail.
+
+### The guard now also checks the folds exist
+
+After the mapping gate, every `method_data` key the map names must be present
+and a positive number. Without it a row could be stored claiming an equation it
+carries no inputs for — an assessment that looks complete in the record and can
+produce nothing.
+
+### Everything is blocked, deliberately
+
+Every `site_map` ships empty, so no skinfold equation is currently writable for
+anyone — including the Jackson-Pollock women's path migration 038 allowed, whose
+coefficients are confirmed but whose site mapping is not. Clearing a block is an
+`update` on the reference row; clearing both for one sex is what makes that
+equation live.

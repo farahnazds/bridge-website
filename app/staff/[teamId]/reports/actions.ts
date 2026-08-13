@@ -351,7 +351,7 @@ export async function generateBodyCompositionReport(
   const { data: assessmentsInPeriod } = await supabase
     .from("assessments")
     .select(
-      "date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier"
+      "date, method, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier"
     )
     .eq("athlete_id", athleteId)
     .gte("date", periodStart)
@@ -367,7 +367,7 @@ export async function generateBodyCompositionReport(
     const { data: fallback } = await supabase
       .from("assessments")
       .select(
-        "date, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier"
+        "date, method, weight_kg, height_cm, body_fat_pct, lean_mass_kg, muscle_mass_kg, visceral_fat, bmr, tdee, notes, validity_tier"
       )
       .eq("athlete_id", athleteId)
       .lt("date", periodStart)

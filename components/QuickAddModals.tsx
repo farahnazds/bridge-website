@@ -1,5 +1,7 @@
 "use client";
 
+import type { SkinfoldEquationRow } from "@/lib/skinfoldEquations";
+
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -46,6 +48,16 @@ import AthleteMessageComposer from "@/components/AthleteMessageComposer";
 export interface QuickAddContext {
   teamId: string;
   athlete: FieldAthlete;
+  /** The athlete's dob, sex and club, plus the skinfold equation rows. Needed
+   *  only by the assessment form, whose skinfold tab refuses to open without
+   *  them — every equation is age- and sex-specific, and the club is where a
+   *  missing one gets fixed. Optional so the other quick-adds are unaffected;
+   *  absent simply means the skinfold tab shows its "add a date of birth"
+   *  blocker, which is the correct answer when we genuinely do not know. */
+  athleteDob?: string | null;
+  athleteGender?: string | null;
+  athleteClubId?: string | null;
+  skinfoldEquations?: SkinfoldEquationRow[];
   /** The athlete's login profile id, or null if they haven't activated. A
    *  message needs a recipient PROFILE, not an athlete row, so the Messenger
    *  quick-add is not offered when this is null — there is nobody to address. */
@@ -133,13 +145,32 @@ export function QuickAdd({ kind, ctx, onClose }: { kind: QuickAddKind; ctx: Quic
   // whole roster would be dead weight and would put other athletes' names into
   // the payload of a page that is about one of them.
   const one = [{ id: ctx.athlete.id, firstName: ctx.athlete.label, lastName: "", code: "" }];
+  // The assessment form's Athlete type carries the three clinical fields its
+  // skinfold tab gates on; the other forms take the plain shape above.
+  const oneAssessment = [
+    {
+      ...one[0],
+      dob: ctx.athleteDob ?? null,
+      gender: ctx.athleteGender ?? null,
+      clubId: ctx.athleteClubId ?? null,
+    },
+  ];
 
   return (
     <QuickAddModal title={TITLES[kind]} subtitle={ctx.athlete.label} onClose={onClose}>
       {({ onDone, onSaved }) => {
         switch (kind) {
           case "assessment":
-            return <LogAssessmentForm teamId={ctx.teamId} athletes={one} lockedAthlete={ctx.athlete} onDone={onDone} onSaved={onSaved} />;
+            return (
+              <LogAssessmentForm
+                teamId={ctx.teamId}
+                athletes={oneAssessment}
+                equations={ctx.skinfoldEquations ?? []}
+                lockedAthlete={ctx.athlete}
+                onDone={onDone}
+                onSaved={onSaved}
+              />
+            );
           case "gps":
             return <LogGpsForm teamId={ctx.teamId} athletes={one} lockedAthlete={ctx.athlete} onDone={onDone} onSaved={onSaved} />;
           case "vald":
