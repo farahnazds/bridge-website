@@ -83,6 +83,35 @@ export function createPageMachine(
   let headerH = 0;
   let footerH = 0;
 
+  // Opened ONCE and reused for every page.
+  //
+  // Passing raw bytes to doc.image() re-embeds the logo as a NEW XObject on
+  // every page. lib/reportPdf.ts:100-104 documents measuring exactly that on
+  // the original renderer — a 2 MB logo across 9 pages produced an 18 MB
+  // content stream and a 7.3 MB file — and this layout reintroduced it:
+  // a live 3-page report came back with 10 image XObjects, six of which were
+  // three copies of the same logo and its alpha mask.
+  //
+  // openImage() is absent from @types/pdfkit but exists at runtime, hence the
+  // narrow cast rather than a broad any. A logo pdfkit cannot decode fails
+  // here, once, and falls back to the club wordmark rather than throwing on
+  // every page.
+  let logoHandle: unknown | null = null;
+  let logoOpened = false;
+  const openLogo = (): unknown | null => {
+    if (logoOpened) return logoHandle;
+    logoOpened = true;
+    if (!chrome.clubLogo) return null;
+    try {
+      logoHandle = (doc as unknown as { openImage(src: Buffer): unknown }).openImage(
+        Buffer.from(chrome.clubLogo)
+      );
+    } catch {
+      logoHandle = null;
+    }
+    return logoHandle;
+  };
+
   const drawHeader = (): number => {
     const w = PAGE.width;
 
@@ -108,9 +137,10 @@ export function createPageMachine(
     const logoX = right - LOGO;
     doc.roundedRect(logoX, brandTop, LOGO, LOGO, px(6)).fillOpacity(0.14).fill(HEADER_TEXT);
     doc.fillOpacity(1);
-    if (chrome.clubLogo) {
+    const logo = openLogo();
+    if (logo) {
       try {
-        doc.image(Buffer.from(chrome.clubLogo), logoX + px(2), brandTop + px(2), {
+        doc.image(logo as Parameters<typeof doc.image>[0], logoX + px(2), brandTop + px(2), {
           fit: [LOGO - px(4), LOGO - px(4)],
         });
       } catch {
