@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAnthropicClient, REPORT_MODEL, REPORT_EFFORT } from "@/lib/anthropic";
+import {
+  createAnthropicClient,
+  REPORT_MODEL,
+  REPORT_EFFORT,
+  REPORT_MAX_TOKENS,
+  reportResponseError,
+} from "@/lib/anthropic";
 import { getCurrentProfile } from "@/lib/auth";
 import { sendReportSharedEmail } from "@/lib/resend";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
@@ -180,7 +186,7 @@ export async function generateComplianceReport(
     response = await anthropic.messages
       .stream({
         model: REPORT_MODEL,
-        max_tokens: 8000,
+        max_tokens: REPORT_MAX_TOKENS,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
         system: complianceSystemPrompt(audience),
@@ -196,19 +202,11 @@ export async function generateComplianceReport(
     };
   }
 
-  if (response.stop_reason === "refusal") {
-    return {
-      error: "The AI declined to generate this report. Try adjusting the additional instructions, or contact support if this persists.",
-      reportText: null,
-      dataCheckNote,
-      reportId: null,
-    };
-  }
-
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
-  if (!reportText) {
-    return { error: "The AI returned an empty response. Try again.", reportText: null, dataCheckNote, reportId: null };
+  const responseError = reportResponseError(response.stop_reason, reportText);
+  if (responseError || !reportText) {
+    return { error: responseError, reportText: null, dataCheckNote, reportId: null };
   }
 
 
@@ -447,7 +445,7 @@ export async function generateBodyCompositionReport(
     response = await anthropic.messages
       .stream({
         model: REPORT_MODEL,
-        max_tokens: 8000,
+        max_tokens: REPORT_MAX_TOKENS,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
         system: bodyCompositionSystemPrompt(audience),
@@ -463,19 +461,11 @@ export async function generateBodyCompositionReport(
     };
   }
 
-  if (response.stop_reason === "refusal") {
-    return {
-      error: "The AI declined to generate this report. Try adjusting the additional instructions, or contact support if this persists.",
-      reportText: null,
-      dataCheckNote,
-      reportId: null,
-    };
-  }
-
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
-  if (!reportText) {
-    return { error: "The AI returned an empty response. Try again.", reportText: null, dataCheckNote, reportId: null };
+  const responseError = reportResponseError(response.stop_reason, reportText);
+  if (responseError || !reportText) {
+    return { error: responseError, reportText: null, dataCheckNote, reportId: null };
   }
 
 
@@ -775,7 +765,7 @@ export async function generatePerformanceReport(
     response = await anthropic.messages
       .stream({
         model: REPORT_MODEL,
-        max_tokens: 8000,
+        max_tokens: REPORT_MAX_TOKENS,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
         system: performanceSystemPrompt(audience),
@@ -790,13 +780,10 @@ export async function generatePerformanceReport(
     };
   }
 
-  if (response.stop_reason === "refusal") {
-    return { ...base, error: "The AI declined to generate this report.", dataCheckNote };
-  }
-
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
-  if (!reportText) return { ...base, error: "The AI returned an empty response. Try again.", dataCheckNote };
+  const responseError = reportResponseError(response.stop_reason, reportText);
+  if (responseError || !reportText) return { ...base, error: responseError, dataCheckNote };
 
   // ---- Automatic pre-save safety assertion ----
   const safety = await assertReportSafe(athleteId, reportText);
@@ -971,7 +958,7 @@ export async function generateInjuryReport(
     response = await anthropic.messages
       .stream({
         model: REPORT_MODEL,
-        max_tokens: 8000,
+        max_tokens: REPORT_MAX_TOKENS,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
         system: injurySystemPrompt(audience),
@@ -986,13 +973,10 @@ export async function generateInjuryReport(
     };
   }
 
-  if (response.stop_reason === "refusal") {
-    return { ...base, error: "The AI declined to generate this report.", dataCheckNote };
-  }
-
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
-  if (!reportText) return { ...base, error: "The AI returned an empty response. Try again.", dataCheckNote };
+  const responseError = reportResponseError(response.stop_reason, reportText);
+  if (responseError || !reportText) return { ...base, error: responseError, dataCheckNote };
 
   // ---- Automatic pre-save safety assertion ----
   const safety = await assertReportSafe(athleteId, reportText);
@@ -1112,7 +1096,7 @@ export async function generateCombinedReport(
         // Higher than the 8000 an individual report uses: this document
         // carries N domain sections plus a synthesis, and truncating it
         // mid-section would silently drop the recommendations at the end.
-        max_tokens: 16000,
+        max_tokens: REPORT_MAX_TOKENS,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
         system: combinedSystemPrompt(audience, types),
@@ -1127,17 +1111,10 @@ export async function generateCombinedReport(
     };
   }
 
-  if (response.stop_reason === "refusal") {
-    return {
-      ...base,
-      error: "The AI declined to generate this report. Try adjusting the additional instructions, or contact support if this persists.",
-      dataCheckNote,
-    };
-  }
-
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
-  if (!reportText) return { ...base, error: "The AI returned an empty response. Try again.", dataCheckNote };
+  const responseError = reportResponseError(response.stop_reason, reportText);
+  if (responseError || !reportText) return { ...base, error: responseError, dataCheckNote };
 
   // Same unconditional pre-save gate as every individual report — combining
   // types does not change what counts as unsafe.
