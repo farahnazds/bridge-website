@@ -183,13 +183,22 @@ export async function assembleMeasured(
   }
 
   // nutrition
+  //
+  // The periodisation strip must show the days the REPORT COVERS, not simply
+  // the earliest rows on file. A nutrition report is forward-looking — its
+  // period starts in the future — so an unfiltered query ordered ascending
+  // returns the oldest planned days in the table, which are typically months
+  // before the block being prescribed. Caught while seeding demo data: the
+  // strip was showing 22 Jul against a report covering late August.
+  let planQuery = supabase
+    .from("training_load_plans")
+    .select("date, intensity, session_type, rpe")
+    .or(`athlete_id.eq.${athleteId},athlete_id.is.null`);
+  if (periodStart) planQuery = planQuery.gte("date", periodStart);
+  if (periodEnd) planQuery = planQuery.lte("date", periodEnd);
+
   const [{ data: plans }, { data: prot }, assessments, compliance] = await Promise.all([
-    supabase
-      .from("training_load_plans")
-      .select("date, intensity, session_type, rpe")
-      .or(`athlete_id.eq.${athleteId},athlete_id.is.null`)
-      .order("date", { ascending: true })
-      .limit(30),
+    planQuery.order("date", { ascending: true }).limit(30),
     supabase
       .from("supplement_protocols")
       .select("supplement_name, dose, timing, rationale, start_date, end_date")
