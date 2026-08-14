@@ -143,6 +143,23 @@ currently is — and only when planning several athletes at once.
 feature, not a follow-up to that build — which is why it is written up here
 rather than left as a TODO in the renderer.**
 
+> **CONFIRMED by the spec, 2026-08-15.** `docs/12-report-pdf-templates.md` §1
+> states it directly: practitioner copies cover *"Whole squad, ranked by
+> attention required"* and are *"ordered by who needs attention first, never
+> alphabetically — the point of a squad view is triage."* This was inferred from
+> the templates before that document existed; it is now the written spec.
+>
+> **What ships today is a deliberate stopgap, not the target.** Practitioner-
+> audience reports render through the ATHLETE layouts at clinical register
+> (`lib/reportPdf/render.ts`). That is scope-preserving — `lib/reportAudience.ts`
+> records that audience currently means register, not scope — but it is not what
+> §1 describes. A practitioner report today is one athlete in depth where the
+> spec calls for a ranked squad roster. Anyone reviewing those PDFs should judge
+> them as "the athlete layout at clinical register", not as practitioner reports.
+>
+> §3 also names a **`"Squad summary"`** section that exists in no layout, because
+> it has no meaning until a document covers a squad. It arrives with this work.
+
 The five practitioner report templates in `lib/reportPdf/templates/practitioner/`
 are **team documents, not athlete documents**. Their own section titles say so:
 
@@ -211,6 +228,61 @@ version of that is just the athlete report with different wording.
 The five **athlete** layouts bind to the pipeline that already exists and are
 being built now. Deferring the practitioner five costs nothing that is
 currently reachable: no squad report can be produced today by any path.
+
+## Deferred: daily target panels have no source, and the spec says where it is
+
+**Raised 2026-08-15, reviewing the built report layouts against
+`docs/12-report-pdf-templates.md`. A gap between spec and build, deliberately
+not fixed in place — it needs a decision about where prescribed figures live.**
+
+Three report types carry a **dark target panel** — daily energy, protein,
+carbohydrate, energy availability, and a donut. `docs/12` §3 lists it against
+**Nutrition, Body Comp and Injury**.
+
+**Today only Nutrition can populate it.** Body-composition and injury render
+`prescribedTargetsMissing()` — an explicit "no confirmed targets are stored for
+this athlete" note — because nothing in `assessments`, `gps_logs`, `vald_data`
+or any other table holds a macro target. That was the correct call at the time:
+the alternative was estimating clinical figures, which
+`docs/07-ai-engine.md` forbids and which the missing-means-missing rule in
+`docs/12` §4 forbids again.
+
+### The spec resolves it, and the answer is not "add a table"
+
+`docs/12` §4 binds these explicitly:
+
+> | Macro targets, periodisation, meals | **Nutrition report generation output** |
+
+So the source is the nutrition engine's output, not a stored table. A
+body-composition or injury report should surface the athlete's **current
+confirmed nutrition prescription** rather than derive targets of its own. That
+is consistent with how the nutrition layout already works — it reads its
+prescribed half back out of generated content via `extractPrescribedTables()`
+(`lib/reportPdf/narrative.ts`) precisely because no table stores it.
+
+### Why this is not a small fix
+
+1. **"Current prescription" is not a defined concept.** Nutrition reports are
+   per-period and forward-looking. A body-composition report generated today
+   must decide *which* nutrition report's targets apply — the most recent, the
+   one whose period covers today, or none if the latest has expired. Picking the
+   wrong one prints stale macros as current, which is worse than printing none.
+2. **Nothing links a report to its own targets.** `reports` stores generated
+   text and a PDF path. Reading targets back out means re-parsing a sibling
+   report's markdown at render time — workable, but it makes one report's
+   rendering depend on another report's prose surviving unchanged.
+3. **The honest fallback must stay.** Whatever is built, an athlete with no
+   confirmed nutrition plan must still get the current explicit note. The panel
+   must never guess.
+
+**Likely shape:** persist the confirmed targets as structured data at nutrition
+confirm time — the one moment a practitioner has actually approved them — and
+have the other layouts read that, with a validity window. That is a schema
+change plus a write in `confirmNutritionPlan`, which is why it is scheduled
+rather than patched.
+
+**Not urgent:** the panel currently states its own absence clearly, so no report
+is wrong today — only thinner than the spec intends.
 
 ## Target market rollout
 
