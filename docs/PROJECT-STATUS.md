@@ -91,10 +91,20 @@ CSS are being used as the spec, by agreement.
   and deferred footer numbering (`bufferPages` + `finalise()`), because
   "Page 2 of 2" cannot be known until the last block is placed.
 
+> **The two dev harness routes under `app/api/dev/` were DELETED on 2026-08-15**,
+> once the real end-to-end pass under RLS had proved the structured path.
+> Every reference to `/api/dev/pdf-smoke` or `/api/dev/report-preview` below is
+> a record of how something was verified at the time, not a route that still
+> exists. Nothing in `lib/` or `app/` imports them.
+>
+> They were worth keeping until the end: the placement traces and self-tests
+> they exposed caught four defects the type checker could not see. If this work
+> is picked up again, recreating an equivalent harness is cheaper than
+> debugging a layout by opening PDFs.
+
 **Live-verified 2026-08-14** via a temporary dev-only route,
-`app/api/dev/pdf-smoke/route.ts` (404s in production; **delete when the new
-generator is wired in**). `?trace=1` returns the placement of every block and
-asserts the invariants:
+`app/api/dev/pdf-smoke/route.ts` (since deleted — see the note above).
+`?trace=1` returned the placement of every block and asserted the invariants:
 
 ```
 pages 2 · blocks 22 · overflows 0 · overlaps 0
