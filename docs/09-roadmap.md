@@ -137,6 +137,81 @@ race stops being theoretical.
 **Not urgent today:** it only fires when an athlete is on two teams — no athlete
 currently is — and only when planning several athletes at once.
 
+## Deferred feature, scheduled separately: squad-level practitioner reports
+
+**Raised 2026-08-14 while building the report PDF generator. This is a new
+feature, not a follow-up to that build — which is why it is written up here
+rather than left as a TODO in the renderer.**
+
+The five practitioner report templates in `lib/reportPdf/templates/practitioner/`
+are **team documents, not athlete documents**. Their own section titles say so:
+
+- `Squad Compliance — Ranked by Attention Required`
+- `Squad Roster — Current Standing`, `Squad Distribution & Trend`
+- `Squad Screening — Ranked by Asymmetry`
+- every one of them ends `Squad Interpretation` + `Recommended Actions`
+
+The body-composition table carries several athletes at once, each with position
+and assessment method — `Yusuf Haddad C InBody 15.4%`, `Marcus Bello F DEXA
+14.1%`, `Adam Reyes G Skinfold 13.6%`.
+
+The athlete templates in the sibling folder are the opposite shape: one person,
+in depth, ending `Monitoring Plan` and `Sources`.
+
+### Why this is a feature and not a layout
+
+Report generation is **one athlete at a time**. `generateAndStoreReportPdf`
+(`lib/reportPdfDelivery.ts`) takes a single `athleteId`, and every report action
+resolves a single athlete before it builds a prompt.
+
+`audience` today changes the **register**, not the **scope** — and
+`lib/reportAudience.ts` already says so in its own scope note:
+
+> `docs/07-ai-engine.md` also defines audience as governing how COMBINED
+> multi-athlete/multi-type documents merge (athlete = one doc per athlete,
+> practitioner = one doc per team). That half is still unbuilt — generation is
+> one athlete at a time — so today this column means register only.
+
+So the practitioner templates describe a document the platform cannot currently
+produce. Writing a layout for them would produce a shape with nothing to put in
+it.
+
+### What building it actually requires
+
+1. **Team-scoped roster queries.** Every squad section is a roster ranked by
+   something — attention required, asymmetry, deviation from target. That is a
+   different query shape from the per-athlete reads the report actions do now,
+   and it has to respect the same RLS scoping as the roster pages
+   (`docs/02-roles-and-permissions.md`), including a practitioner who is
+   team-scoped rather than club-scoped (migration 026).
+2. **Cross-athlete AI reasoning.** The prompt builders reason about one athlete
+   against their own history and benchmarks. A squad report reasons *across*
+   athletes — who is drifting, who needs attention first, what the group pattern
+   is. That is a new prompt shape, not a longer version of the existing one.
+3. **A generation model that fits the wait.** A per-athlete report is generated
+   synchronously while the practitioner waits. A squad report over a full roster
+   is the same problem `MAX_COMBINED_TYPES` in `lib/reportTypes.ts` already
+   documents: past what a form should hold open, and past what a serverless
+   request should sit on. It probably wants the background job runner that the
+   combined-report cap is also waiting on.
+4. **A scope decision.** Team, or club? Whole roster, or a filtered subset? The
+   templates show a squad; `teams` and `clubs` are different scopes and the
+   answer changes both the query and the permission check.
+
+### The trap to avoid
+
+Do **not** approximate it by generating a per-athlete report with practitioner
+register and calling it a squad report. It would satisfy the template visually
+and be wrong: the ranked-roster sections are the entire clinical point of the
+document — they exist so a practitioner can triage a squad — and a one-athlete
+version of that is just the athlete report with different wording.
+
+### Meanwhile
+
+The five **athlete** layouts bind to the pipeline that already exists and are
+being built now. Deferring the practitioner five costs nothing that is
+currently reachable: no squad report can be produced today by any path.
+
 ## Target market rollout
 
 1. UAE clubs and academies (launch)
