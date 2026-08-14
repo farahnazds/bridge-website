@@ -106,7 +106,7 @@ Admin only).
     full-width page rather than a tab. Bulk day-by-day supplement planning:
     pick one athlete, a subset or the whole squad, pick a range of 1–14 days,
     pick day-specific (uses each day's Training Load Plan entry) or
-    general/standing. Generates suggestions — one AI call per athlete for the
+    general/standing. Generates suggestions — one plan per athlete for the
     whole range — then a review grid of athlete rows against day columns where
     every suggestion is approved by default, editable in place, and skippable.
     Confirming writes each athlete's supplement protocol and generates one

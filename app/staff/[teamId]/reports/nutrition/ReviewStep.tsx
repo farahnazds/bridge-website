@@ -443,7 +443,7 @@ export default function ReviewStep({
             {checkedCount} of {totalItems} suggestion{totalItems === 1 ? "" : "s"} selected
           </p>
           <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
-            {plan.modelCalls} AI call{plan.modelCalls === 1 ? "" : "s"} — one per athlete for the whole period.
+            {plan.modelCalls} plan{plan.modelCalls === 1 ? "" : "s"} prepared — one per athlete for the whole period.
             Nothing has been saved yet; unchecked items are discarded.
           </p>
         </div>

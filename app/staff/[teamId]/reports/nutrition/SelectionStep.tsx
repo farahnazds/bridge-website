@@ -22,14 +22,16 @@ function isoOffset(days: number): string {
 
 function SubmitButton({ athleteCount, dayCount, mode }: { athleteCount: number; dayCount: number; mode: PlanMode }) {
   const { pending } = useFormStatus();
-  // The call count is stated up front, not just after the fact: it is the
-  // thing a practitioner planning for a whole roster most needs to know before
-  // pressing the button, and it is one per athlete regardless of range length.
-  const cost =
+  // The scope is stated up front, not just after the fact: it is the thing a
+  // practitioner planning for a whole roster most needs to know before pressing
+  // the button, and one plan is built per athlete regardless of range length.
+  const scope =
     athleteCount === 0
       ? ""
-      : ` · ${athleteCount} AI call${athleteCount === 1 ? "" : "s"}${
-          mode === "day_specific" ? ` covering ${dayCount} day${dayCount === 1 ? "" : "s"} each` : ""
+      : ` · ${athleteCount} athlete${athleteCount === 1 ? "" : "s"}${
+          mode === "day_specific"
+            ? `, ${dayCount} day${dayCount === 1 ? "" : "s"}${athleteCount === 1 ? "" : " each"}`
+            : ""
         }`;
   return (
     <button
@@ -40,7 +42,7 @@ function SubmitButton({ athleteCount, dayCount, mode }: { athleteCount: number; 
     >
       {pending
         ? `Planning for ${athleteCount} athlete${athleteCount === 1 ? "" : "s"}… usually 20–90 seconds`
-        : `Generate plan${cost}`}
+        : `Generate plan${athleteCount === 1 ? "" : "s"}${scope}`}
     </button>
   );
 }
@@ -92,7 +94,7 @@ export default function SelectionStep({
               Athletes
             </p>
             <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
-              {selected.length} of {athletes.length} selected. One AI call is made per selected athlete.
+              {selected.length} of {athletes.length} selected. One plan is built per selected athlete.
             </p>
           </div>
           <div className="flex gap-2">
