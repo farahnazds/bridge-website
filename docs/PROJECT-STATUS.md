@@ -172,10 +172,32 @@ than zeros — the empty-data path is genuinely covered, not assumed.
    prescription. Both layouts render `prescribedTargetsMissing()` saying so
    explicitly rather than estimating.
 
-**Injury is athlete-audience, so `InjuryRow` has no `description` field at
-all.** Migration 018 and `docs/02-roles-and-permissions.md` restrict athlete
-reads to status and phase; expressing that in the type means a future caller
-cannot pass clinical free text in by accident.
+**CORRECTED 2026-08-15 — the injury layout was dropping the injury.** An earlier
+version of this file recorded, as a feature, that `InjuryRow` deliberately had
+no `description` field, reasoning from `injuries_athlete_view` (migrations
+006/018). **That was wrong.**
+`app/staff/[teamId]/reports/injuryPromptBuilder.ts:100-112` states the opposite
+rule explicitly:
+
+> "The free-text clinical description still enters the prompt for BOTH
+> audiences... An athlete-audience injury report is framed more plainly but is
+> not a thinner document — it must not quietly drop the clinical picture."
+>
+> "Do not omit or generalise away a diagnosis, mechanism, or complication
+> because the athlete may read it — an injury report that leaves out the injury
+> is not safer, it is wrong."
+
+Two different surfaces were conflated. The **athlete's dashboard** is restricted
+to status/rtp_phase through `injuries_athlete_view` — unchanged, and this layout
+does not touch it. The **injury report** is a clinical document carrying type and
+clinical description at either register; whether an athlete receives it stays the
+practitioner's decision at sharing time (`reports.shared_with`).
+
+`InjuryRow` now carries `type`, `description` and `carriedIn`, and an "Injury
+log" section renders each injury as its own atomic panel — matching the required
+structure at `injuryPromptBuilder.ts:116`. Re-verified: TES-0001 17 blocks
+(4 interp panels, one per injury) / TES-0002 5 blocks / CLB-9001 14 blocks, all
+0 overflows and 0 overlaps.
 
 **markdown→Narrative parse — DONE and proven (2026-08-14).**
 `lib/reportPdf/narrative.ts` maps generated markdown onto the Narrative slots,
@@ -207,8 +229,45 @@ leftover punctuation (`|||`, `**`) into the athlete-facing "What this means"
 panel. Now guarded by `looksLikeProse()`, which counts LETTERS rather than
 characters, so markdown debris scores zero however long it is.
 
-**Still to build:** the nutrition layout (4 pages, 7 meal-blocks — the largest
-remaining piece), and wiring into `lib/reportPdfDelivery.ts`.
+**Nutrition layout — DONE and proven (2026-08-15).** All five athlete layouts
+now exist. `lib/reportPdf/layouts/athleteNutrition.ts`.
+
+**Nutrition splits differently from the other four, deliberately.** Everywhere
+else the rule is that every figure comes from the database. Here roughly two
+thirds of the document is a PRESCRIPTION, not a measurement — daily energy and
+macro targets, meal timing by day type, food portion examples. No table stores
+any of it and none should: it is produced by the nutrition engine and confirmed
+by a practitioner. So this layout draws from three labelled sources:
+
+- **MEASURED** — `training_load_plans` (periodisation strip),
+  `supplement_protocols` (confirmed stack), `assessments` + `checkins` (summary
+  bar). Same rule as the other four.
+- **PRESCRIBED** — meal-blocks and daily targets, read back out of the generated
+  markdown via `extractPrescribedTables()`. `proseOf()` still drops tables
+  everywhere else, for the opposite reason: a table in a compliance narrative
+  would restate measured data at figures the model chose.
+- **STANDING** — the anti-doping precision box, which is fixed text and renders
+  unconditionally.
+
+**Verified across three athletes × three narrative modes, 9 renders, plus a
+full five-type regression of 15 renders — 0 overflows, 0 overlaps throughout:**
+
+```
+none     TES-0001  days=11 prot=2 tables=0  20283B 1p 15 blk
+sample   TES-0001  days=11 prot=2 tables=3  35078B 2p 26 blk
+garbage  TES-0001  days=11 prot=2 tables=0  20283B 1p 15 blk
+```
+
+`garbage` is byte-identical to `none` here too. Invariants asserted
+mechanically rather than eyeballed: the anti-doping box is present in **all 9**
+renders including those where every data section is empty; meal-blocks appear
+only when a plan exists; the targets `darkpanel` appears only when targets
+exist. `training_load_plans.intensity` is `medium` where the template's tone
+class is `mod`, mapped in `dayTag()` so neither has to move for the other; a
+`session_type` of `match` outranks intensity.
+
+**Still to build:** wiring into `lib/reportPdfDelivery.ts`, deleting the two dev
+harness routes, and a real pass under RLS.
 
 ### Unresolved before any wiring: which layout serves a practitioner report
 
@@ -220,11 +279,10 @@ layout in the new system. That question must be answered before
 practitioner-audience reports to the athlete layouts at clinical register, or
 keep them on the existing generator until the squad work lands.
 
-**Narrative is still unfilled.** `Narrative` (means-box, interps,
-recommendations, monitoring) is typed but nothing populates it yet — the report
-actions produce one markdown string. The compliance report above renders with
-an empty narrative, which proves the measured half stands alone, but the
-markdown→`Narrative` parse is outstanding.
+**Narrative parsing is built** — see the markdown→Narrative section above. What
+remains is not the parser but the *plumbing*: the report actions still produce a
+single markdown string and nothing calls `parseNarrative()` on the real path
+yet. That happens as part of wiring into `lib/reportPdfDelivery.ts`.
 
 **Deferred:** the five practitioner squad layouts — written up as its own
 roadmap item in `docs/09-roadmap.md` ("Deferred feature, scheduled separately:

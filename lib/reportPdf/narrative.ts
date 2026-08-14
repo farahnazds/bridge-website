@@ -273,6 +273,73 @@ export function parseNarrative(markdown: string | null | undefined): Narrative {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Nutrition prescription tables
+// ---------------------------------------------------------------------------
+// The other four report types follow one rule: figures come from the database,
+// never from the model. Nutrition is the deliberate exception, and the reason is
+// what the figures ARE.
+//
+// A body-fat percentage is a MEASUREMENT — it exists in `assessments` and the
+// model must not invent it. A daily carbohydrate target is a PRESCRIPTION: no
+// table holds it, nothing measures it, and it is produced by the practitioner's
+// nutrition engine and confirmed by them before the report is shared. The seven
+// meal-blocks in templates/athlete/nutrition.html are all of that kind.
+//
+// So for nutrition, and only for nutrition, prescribed tables are read back out
+// of the generated markdown — which is where they genuinely live. `proseOf()`
+// above deliberately drops tables for exactly the opposite reason (a table in a
+// compliance narrative would restate measured data at figures the model chose);
+// that rule still holds everywhere else.
+//
+// Like everything in this module, extraction never throws and degrades to an
+// empty list, in which case the layout renders its prescribed sections as an
+// explicit "not available" rather than as blank panels.
+
+export interface PrescribedTable {
+  /** The section heading, e.g. "High intensity". */
+  title: string;
+  /** Any prose between the heading and the table, e.g. a macro summary line. */
+  meta: string | null;
+  head: string[];
+  rows: string[][];
+  /** Any prose after the table — the template renders this as `.note`. */
+  note: string | null;
+}
+
+export function extractPrescribedTables(markdown: string | null | undefined): PrescribedTable[] {
+  try {
+    if (!markdown || markdown.trim() === "") return [];
+    const { sections } = sectionise(parseReportBlocks(markdown));
+    const out: PrescribedTable[] = [];
+
+    for (const section of sections) {
+      const tableIndex = section.blocks.findIndex((b) => b.kind === "table");
+      if (tableIndex < 0) continue;
+      const t = section.blocks[tableIndex];
+      if (t.kind !== "table") continue;
+
+      const head = t.header.map((cells) => inlineText(cells).trim());
+      const rows = t.rows.map((r) => r.map((cells) => inlineText(cells).trim()));
+      if (head.length === 0 || rows.length === 0) continue;
+
+      const before = proseOf(section.blocks.slice(0, tableIndex));
+      const after = proseOf(section.blocks.slice(tableIndex + 1));
+
+      out.push({
+        title: section.title || "Plan",
+        meta: before || null,
+        head,
+        rows,
+        note: after || null,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export function isEmpty(n: Narrative): boolean {
   return (
     n.meansBox === null &&

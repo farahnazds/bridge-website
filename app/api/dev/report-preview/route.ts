@@ -42,7 +42,18 @@ import { athleteInjuryBlocks, type InjuryRow, type RtpPhase } from "@/lib/report
 import type { AssessmentMethod } from "@/lib/assessmentMethods";
 import type { ReportType } from "@/lib/reportTypes";
 
-import { narrativeCoverage, parseNarrative, isEmpty } from "@/lib/reportPdf/narrative";
+import {
+  extractPrescribedTables,
+  narrativeCoverage,
+  parseNarrative,
+  isEmpty,
+} from "@/lib/reportPdf/narrative";
+import {
+  athleteNutritionBlocks,
+  type NutritionData,
+  type ProtocolRow,
+  type TrainingDay,
+} from "@/lib/reportPdf/layouts/athleteNutrition";
 import { EMPTY_NARRATIVE } from "@/lib/reportPdf/model";
 
 // A realistic generated report, in the shape prompts/report-generation.md asks
@@ -89,7 +100,64 @@ const LABELS: Record<string, string> = {
   body_composition: "Body Composition",
   performance: "Performance",
   injury: "Injury & Return to Play",
+  nutrition: "Nutrition",
 };
+
+// A generated nutrition report, in the shape the template implies: prescribed
+// targets and meal plans as markdown tables, which is where they genuinely live
+// (no table stores a macro target).
+const SAMPLE_NUTRITION_MARKDOWN = `# Nutrition Report
+
+## Executive summary
+
+Carbohydrate is periodised to session load across this block while protein holds
+constant. The single biggest change is post-training protein timing.
+
+## Daily targets
+
+| Target | Value | Detail |
+| --- | --- | --- |
+| Daily energy | 2,914 kcal | maintenance 2,640 kcal |
+| Protein | 139 g | 1.9 g/kg across 4-6 meals |
+| Carbohydrate | 450 g | periodised to session load |
+| Energy availability | 44 kcal/kg | floor 45 kcal/kg FFM |
+
+## High intensity
+
+2,914 kcal · 139 g protein · 450 g carb · 62 g fat
+
+| Meal | Timing | Protein | Carb |
+| --- | --- | --- | --- |
+| Breakfast | 07:00 | 28 g | 90 g |
+| Pre-training AM | 2 h pre | 11 g | 72 g |
+| Post-training AM | 0-45 min | 25-30 g whey | 63 g |
+| Lunch | 13:00 | 33 g | 90 g |
+| Dinner | 19:30 | 56 g | 90 g |
+
+Two-session day - fuel and refuel around both sessions.
+
+## Rest day
+
+2,156 kcal · 125 g protein · 243 g carb · 76 g fat
+
+| Meal | Timing | Protein | Carb |
+| --- | --- | --- | --- |
+| Breakfast | 08:00 | 38 g | 73 g |
+| Lunch | 13:00 | 48 g | 92 g |
+| Dinner | 19:00 | 40 g | 78 g |
+
+No session - carbohydrate comes down, protein holds.
+
+## Practitioner recommendations
+
+- Land post-training protein within 45 minutes of finishing.
+- Keep rest-day carbohydrate down without dropping protein.
+
+## Goals for next period
+
+Body composition re-scan at the next block boundary, on the same device with the
+same operator.
+`;
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -452,17 +520,68 @@ export async function GET(request: Request) {
       citations,
       CONTENT_WIDTH
     );
+  } else if (type === "nutrition") {
+    const [{ data: plans }, { data: prot }, assessments] = await Promise.all([
+      db
+        .from("training_load_plans")
+        .select("date, intensity, session_type, rpe, athlete_id")
+        .or(`athlete_id.eq.${athlete.id},athlete_id.is.null`)
+        .order("date", { ascending: true })
+        .limit(30),
+      db
+        .from("supplement_protocols")
+        .select("supplement_name, dose, timing, rationale, start_date, end_date")
+        .eq("athlete_id", athlete.id)
+        .order("start_date", { ascending: false }),
+      loadAssessments(),
+    ]);
+    const days: TrainingDay[] = (plans ?? []).map((p) => ({
+      date: p.date as string,
+      intensity: p.intensity as string | null,
+      sessionType: p.session_type as string | null,
+      rpe: p.rpe as number | null,
+    }));
+    const protocols: ProtocolRow[] = (prot ?? []).map((p) => ({
+      supplementName: p.supplement_name as string,
+      dose: p.dose as string,
+      timing: p.timing as string,
+      rationale: p.rationale as string | null,
+      startDate: p.start_date as string,
+      endDate: p.end_date as string | null,
+    }));
+    const prescribed =
+      narrativeMode === "sample" ? extractPrescribedTables(SAMPLE_NUTRITION_MARKDOWN) : [];
+    measured.trainingDays = days.length;
+    measured.protocols = protocols.length;
+    measured.assessments = assessments.length;
+    measured.prescribedTables = prescribed.length;
+    blocks = athleteNutritionBlocks(
+      {
+        days,
+        protocols,
+        latestAssessment: assessments[0] ?? null,
+        checkinRate: rows.length === 0 ? null : data.rateOfCalendar,
+        bodyMassKg: assessments[0]?.weightKg ?? null,
+        heightCm: null,
+      },
+      identity,
+      narrative,
+      prescribed,
+      citations
+    );
   } else {
     const [{ data: inj }, assessments] = await Promise.all([
       db
         .from("injuries")
-        .select("date, status, rtp_phase, target_return_date, cleared_date, validity_tier")
+        .select("date, type, description, status, rtp_phase, target_return_date, cleared_date, validity_tier")
         .eq("athlete_id", athlete.id)
         .order("date", { ascending: false }),
       loadAssessments(),
     ]);
     const injuries: InjuryRow[] = (inj ?? []).map((r) => ({
       date: r.date as string,
+      type: (r.type as string | null) ?? "Unspecified injury",
+      description: r.description as string | null,
       status: r.status as InjuryRow["status"],
       rtpPhase: (r.rtp_phase ?? null) as RtpPhase | null,
       targetReturnDate: r.target_return_date as string | null,
