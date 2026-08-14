@@ -227,6 +227,8 @@ export async function generateAndSaveNutritionReport(
     athleteId: req.athleteId,
     markdown: reportText,
     reportTypeLabel: REPORT_TYPE_LABELS["nutrition"] ?? "Report",
+    reportType: "nutrition",
+    audience: req.audience,
     athleteName,
     periodStart: req.periodStart,
     periodEnd: req.periodEnd,

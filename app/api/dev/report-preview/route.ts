@@ -396,6 +396,9 @@ export async function GET(request: Request) {
     tier: athlete.tier as string | null,
     reportType: type,
     reportLabel: LABELS[type],
+    audience: (url.searchParams.get("audience") === "practitioner"
+      ? "practitioner"
+      : "athlete") as "athlete" | "practitioner",
     audienceLabel: "Athlete Report",
     periodStart: start,
     periodEnd: end,

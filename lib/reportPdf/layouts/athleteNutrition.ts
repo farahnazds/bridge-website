@@ -27,6 +27,7 @@ import {
   prescriberBlocks,
   shortDate,
   sourcesBlocks,
+  summaryHeading,
 } from "./common";
 
 // Layout for lib/reportPdf/templates/athlete/nutrition.html — the largest of the
@@ -85,8 +86,14 @@ export interface NutritionData {
   heightCm: number | null;
 }
 
-const STANDING_CALLOUT =
-  "Your plan for this block, built from your training schedule, your latest body composition scan and your confirmed supplement protocol. Carbohydrate moves with your session load; protein stays roughly constant across the week.";
+// Second person for the athlete, third for the practitioner. The content is the
+// same statement either way — only the address changes.
+const STANDING_CALLOUT: Record<"athlete" | "practitioner", string> = {
+  athlete:
+    "Your plan for this block, built from your training schedule, your latest body composition scan and your confirmed supplement protocol. Carbohydrate moves with your session load; protein stays roughly constant across the week.",
+  practitioner:
+    "This block's plan, built from the athlete's training schedule, latest body composition scan and confirmed supplement protocol. Carbohydrate is periodised to session load; protein holds roughly constant across the week.",
+};
 
 // The templates carry this verbatim in a `.precision-box`, and it is the one
 // block that renders whether or not anything else on the page does. An athlete
@@ -142,7 +149,7 @@ export function athleteNutritionBlocks(
   const blocks: Block[] = [];
 
   blocks.push(...prescriberBlocks(identity));
-  blocks.push(callout(STANDING_CALLOUT));
+  blocks.push(callout(STANDING_CALLOUT[identity.audience]));
 
   // ---- Daily targets (PRESCRIBED) ----
   blocks.push(sectionTitle("Daily targets — standard training day"));
@@ -167,7 +174,7 @@ export function athleteNutritionBlocks(
     );
   }
 
-  if (narrative.meansBox) blocks.push(meansBox("What this means for you", narrative.meansBox));
+  if (narrative.meansBox) blocks.push(meansBox(summaryHeading(identity), narrative.meansBox));
 
   // ---- Weekly periodisation (MEASURED) ----
   blocks.push(sectionTitle("Weekly periodisation"));

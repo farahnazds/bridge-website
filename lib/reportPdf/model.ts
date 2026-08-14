@@ -1,5 +1,6 @@
 import "server-only";
 import type { ReportType } from "@/lib/reportTypes";
+import type { ReportAudience } from "@/lib/reportAudience";
 
 // The typed model an athlete report layout is built from.
 //
@@ -49,6 +50,15 @@ export interface ReportIdentity {
   tier: string | null;
   reportType: ReportType;
   reportLabel: string;
+  /**
+   * Selects register, never structure.
+   *
+   * Both audiences render through the same layouts — see the note in
+   * ./render.ts. This field exists so the header can be labelled correctly and
+   * so the handful of second-person phrases ("what this means for you") can be
+   * neutral in a clinical document. It must never gate a section.
+   */
+  audience: ReportAudience;
   audienceLabel: string;
   periodStart: string | null;
   periodEnd: string | null;

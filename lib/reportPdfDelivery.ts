@@ -7,6 +7,27 @@ import {
   type ReportPdfBranding,
   type ReportPdfMeta,
 } from "@/lib/reportPdf";
+import { FALLBACK_AUDIENCE, type ReportAudience } from "@/lib/reportAudience";
+import type { ReportType } from "@/lib/reportTypes";
+import { assembleMeasured } from "@/lib/reportPdf/assemble";
+import { renderReportDocument } from "@/lib/reportPdf/render";
+import { downscaleLogo as downscaleHeaderLogo } from "@/lib/reportPdf/logo";
+import type { ReportIdentity } from "@/lib/reportPdf/model";
+
+/** Re-validated here, exactly as lib/reportPdf.ts does: content never supplies a colour. */
+const ACCENT_HEX = /^#[0-9a-f]{6}$/i;
+const DEFAULT_ACCENT = "#0057FF";
+
+function safeAccent(hex: string | null): string {
+  return hex && ACCENT_HEX.test(hex) ? hex : DEFAULT_ACCENT;
+}
+
+function ageFromDob(dob: string | null): number | null {
+  if (!dob) return null;
+  const ms = Date.now() - new Date(`${dob}T00:00:00Z`).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  return Math.floor(ms / (365.25 * 86_400_000));
+}
 
 // Takes a freshly generated report, renders the branded PDF, stores it, and
 // records the object path on reports.file_url.
@@ -69,6 +90,17 @@ export interface StoreReportPdfInput {
   periodStart: string | null;
   periodEnd: string | null;
   generatedByName: string;
+  /**
+   * Selects the layout in the structured renderer.
+   *
+   * Optional on purpose: a caller that omits it (or a combined report, which is
+   * several types in one document and has no single layout) falls straight
+   * through to the original renderer. Adding the field could not break an
+   * existing call site even if one were missed.
+   */
+  reportType?: ReportType;
+  /** Register only — see lib/reportPdf/render.ts. Defaults to practitioner. */
+  audience?: ReportAudience;
 }
 
 /**
@@ -122,9 +154,11 @@ export async function generateAndStoreReportPdf(
   const supabase = await createClient();
 
   // Club comes from the athlete, not from anything the caller passed in.
+  // The extra identity columns feed the structured renderer's header; the
+  // original renderer ignores them.
   const { data: athlete } = await supabase
     .from("athletes")
-    .select("club_id, clubs(name)")
+    .select("club_id, sport, position, tier, dob, clubs(name)")
     .eq("id", input.athleteId)
     .maybeSingle();
 
@@ -137,17 +171,25 @@ export async function generateAndStoreReportPdf(
 
   const { data: brandingRow } = await supabase
     .from("club_branding")
-    .select("logo_url, report_color_hex")
+    .select("logo_url, report_color_hex, advertising_banner_url")
     .eq("club_id", clubId)
     .maybeSingle();
 
   // A club with no branding row is a supported state, not an error — the PDF
   // renders with the wordmark and the default brand colour.
+  //
+  // The raw bytes are kept because the two renderers draw the logo at different
+  // sizes (a 104x34pt strip vs a 24pt square) and each downscales to its own
+  // budget. Sharing one resize would mis-size whichever changed second.
+  let rawLogo: Uint8Array | null = null;
   let logo: Uint8Array | null = null;
   const logoPath = (brandingRow?.logo_url as string | null) ?? null;
   if (logoPath && EMBEDDABLE_LOGO.test(logoPath)) {
     const { data: blob } = await supabase.storage.from("club-branding").download(logoPath);
-    if (blob) logo = await downscaleLogo(new Uint8Array(await blob.arrayBuffer()));
+    if (blob) {
+      rawLogo = new Uint8Array(await blob.arrayBuffer());
+      logo = await downscaleLogo(rawLogo);
+    }
   }
 
   const branding: ReportPdfBranding = {
@@ -164,11 +206,83 @@ export async function generateAndStoreReportPdf(
     generatedAt: new Date(),
   };
 
-  let bytes: Uint8Array;
-  try {
-    bytes = await renderReportPdf(input.markdown, branding, meta);
-  } catch (err) {
-    return { path: null, error: `PDF rendering failed: ${err instanceof Error ? err.message : "unknown"}` };
+  // ---------------------------------------------------------------------------
+  // STRUCTURED RENDERER FIRST, ORIGINAL RENDERER AS THE FALLBACK
+  // ---------------------------------------------------------------------------
+  // The structured path (lib/reportPdf/*) lays the report out against the
+  // templates and reads its figures from the database. The original renderer
+  // (lib/reportPdf.ts) formats the generated markdown and is kept — not
+  // deprecated, not deleted — as the fallback beneath it.
+  //
+  // Why a fallback rather than a straight replacement: a report is generated
+  // once, synchronously, after the practitioner has already waited 20-90 seconds
+  // for the model. If anything in the new path throws — an unexpected null in a
+  // measured row, a chart that will not rasterise, a layout bug that only one
+  // athlete's data can reach — the honest outcome is the document they used to
+  // get, not a failed generation and a lost report. The report row is already
+  // saved by this point either way.
+  //
+  // A missing `reportType` (or a combined report, which has several types and no
+  // single layout) skips the structured path entirely rather than guessing.
+  let bytes: Uint8Array | null = null;
+  let fellBack: string | null = null;
+
+  if (input.reportType) {
+    try {
+      const measured = await assembleMeasured(
+        input.reportType,
+        input.athleteId,
+        input.periodStart,
+        input.periodEnd
+      );
+      const audience: ReportAudience = input.audience ?? FALLBACK_AUDIENCE;
+      const identity: ReportIdentity = {
+        clubName,
+        clubLogo: rawLogo ? await downscaleHeaderLogo(rawLogo) : null,
+        teamName: null,
+        athleteName: input.athleteName,
+        sport: (athlete?.sport as string | null) ?? "",
+        position: (athlete?.position as string | null) ?? null,
+        ageYears: ageFromDob(athlete?.dob as string | null),
+        tier: (athlete?.tier as string | null) ?? null,
+        reportType: input.reportType,
+        reportLabel: input.reportTypeLabel,
+        audience,
+        audienceLabel: audience === "athlete" ? "Athlete Report" : "Practitioner Report",
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        accentHex: safeAccent(brandingRow?.report_color_hex as string | null),
+        // Gated on a banner actually being uploaded. The upload half of that
+        // feature exists; nothing has ever rendered it, so the slot stays dark.
+        bannerLabel: (brandingRow?.advertising_banner_url as string | null) ? "Club Partner" : null,
+        prescriber: null,
+      };
+      bytes = await renderReportDocument({
+        reportType: input.reportType,
+        identity,
+        measured,
+        markdown: input.markdown,
+        footerNote: `Confidential — clinical record. Generated by ${input.generatedByName} on ${new Date()
+          .toISOString()
+          .slice(0, 10)}.`,
+      });
+    } catch (err) {
+      // Swallowed deliberately, and surfaced as a warning on the report rather
+      // than an error, because the fallback below still produces a document.
+      fellBack = err instanceof Error ? err.message : "unknown error";
+      bytes = null;
+    }
+  }
+
+  if (bytes === null) {
+    try {
+      bytes = await renderReportPdf(input.markdown, branding, meta);
+    } catch (err) {
+      return {
+        path: null,
+        error: `PDF rendering failed: ${err instanceof Error ? err.message : "unknown"}`,
+      };
+    }
   }
 
   const path = `${clubId}/${input.reportId}.pdf`;
@@ -185,6 +299,17 @@ export async function generateAndStoreReportPdf(
     .eq("id", input.reportId);
   if (updateError) {
     return { path, error: `PDF stored, but linking it to the report failed: ${updateError.message}` };
+  }
+
+  // A fallback is reported, not hidden. The practitioner has a usable document
+  // either way, but "which renderer produced this" is exactly the kind of thing
+  // that is invisible until someone asks why a PDF looks different from the
+  // last one — so it is said plainly rather than logged and forgotten.
+  if (fellBack) {
+    return {
+      path,
+      error: `Report saved and a PDF was produced, but the structured layout failed and the standard layout was used instead: ${fellBack}`,
+    };
   }
 
   return { path, error: null };

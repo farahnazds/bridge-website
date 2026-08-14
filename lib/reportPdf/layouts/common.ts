@@ -18,6 +18,17 @@ import { formatCitation, type Citation, type Narrative, type ReportIdentity } fr
 // banner — is the same in every athlete template, so it lives here rather than
 // being retyped five times.
 
+/**
+ * The heading over the summary panel.
+ *
+ * The templates address the athlete directly ("What this means for you"). In a
+ * practitioner document that reads wrong, so the phrasing — and only the
+ * phrasing — follows the audience. No section appears or disappears with it.
+ */
+export function summaryHeading(identity: ReportIdentity): string {
+  return identity.audience === "athlete" ? "What this means for you" : "Interpretation summary";
+}
+
 export function shortDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {

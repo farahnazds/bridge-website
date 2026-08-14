@@ -27,6 +27,7 @@ import {
   type Narrative,
   type ReportIdentity,
 } from "../model";
+import { summaryHeading } from "./common";
 
 // Layout for lib/reportPdf/templates/athlete/compliance.html.
 //
@@ -155,7 +156,7 @@ export async function athleteComplianceBlocks(
   );
 
   if (narrative.meansBox) {
-    blocks.push(meansBox("What this means for you", narrative.meansBox));
+    blocks.push(meansBox(summaryHeading(identity), narrative.meansBox));
   }
 
   // ---- Category Trends ----
