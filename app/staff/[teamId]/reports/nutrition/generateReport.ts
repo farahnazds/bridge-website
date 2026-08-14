@@ -1,6 +1,12 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { createAnthropicClient, REPORT_MODEL, REPORT_EFFORT } from "@/lib/anthropic";
+import {
+  createAnthropicClient,
+  REPORT_MODEL,
+  REPORT_EFFORT,
+  REPORT_MAX_TOKENS,
+  reportResponseError,
+} from "@/lib/anthropic";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
 import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
@@ -172,10 +178,10 @@ export async function generateAndSaveNutritionReport(
     response = await anthropic.messages
       .stream({
         model: REPORT_MODEL,
-        // Higher than the 8000 the single-day report used: a day-specific
-        // report now carries a subsection per day across up to a fortnight,
-        // and truncating mid-range would silently drop the later days.
-        max_tokens: 16000,
+        // A day-specific report carries a subsection per day across up to a
+        // fortnight, so it was already raised once above the old default;
+        // REPORT_MAX_TOKENS now holds that budget for every report type.
+        max_tokens: REPORT_MAX_TOKENS,
         thinking: { type: "adaptive" },
         output_config: { effort: REPORT_EFFORT },
         system: nutritionSystemPrompt(req.audience),
@@ -186,12 +192,10 @@ export async function generateAndSaveNutritionReport(
     return { ...base, error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}` };
   }
 
-  if (response.stop_reason === "refusal") {
-    return { ...base, error: "The AI declined to generate this report." };
-  }
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
-  if (!reportText) return { ...base, error: "The AI returned an empty response." };
+  const responseError = reportResponseError(response.stop_reason, reportText);
+  if (responseError || !reportText) return { ...base, error: responseError };
 
   // Unchanged from the single-athlete generator: runs on the generated TEXT,
   // before the insert, so an unsafe report can never be stored, listed or

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { createAnthropicClient, REPORT_MODEL, REPORT_EFFORT } from "@/lib/anthropic";
+import { createAnthropicClient, REPORT_MODEL, REPORT_EFFORT, REPORT_MAX_TOKENS } from "@/lib/anthropic";
 import { resolveReportLanguage } from "@/lib/reportLanguage";
 import { resolveReportAudience, type ReportAudience } from "@/lib/reportAudience";
 import {
@@ -355,7 +355,7 @@ async function runGeneratePlan(
       response = await anthropic.messages
         .stream({
           model: REPORT_MODEL,
-          max_tokens: 16000,
+          max_tokens: REPORT_MAX_TOKENS,
           thinking: { type: "adaptive" },
           output_config: {
             effort: REPORT_EFFORT,
@@ -374,6 +374,16 @@ async function runGeneratePlan(
     }
     const textBlock = response.content.find((b) => b.type === "text");
     const raw = textBlock && "text" in textBlock ? textBlock.text : null;
+    // Planning, not report generation, so this keeps its own wording — but it
+    // shares the failure mode: thinking can consume the whole budget and leave
+    // no text, which must not be reported as an empty response inviting a retry.
+    if (response.stop_reason === "max_tokens" && !raw) {
+      return {
+        ...shell,
+        error:
+          "The plan needed more space than it was given and stopped before any of it was written. This has been flagged for review — please report it rather than retrying, because the same request will fail the same way.",
+      };
+    }
     if (!raw) return { ...shell, error: "The AI returned an empty response." };
 
     let parsed: { period_summary?: unknown; suggestions?: unknown };

@@ -21,3 +21,63 @@ export const REPORT_MODEL = "claude-sonnet-5";
 // latency; the effort setting is the lever to revisit if generation time
 // becomes a problem, separately from the model choice.
 export const REPORT_EFFORT = "high" as const;
+
+/**
+ * Output budget for every report generation.
+ *
+ * ===========================================================================
+ * WHY THIS IS 24000 AND WHY IT USED TO BREAK REPORTS
+ * ===========================================================================
+ * `max_tokens` bounds thinking AND text together. With `thinking: adaptive` at
+ * "high" effort, a data-dense clinical prompt can spend the entire budget
+ * reasoning and finish with `stop_reason: "max_tokens"` having emitted a
+ * thinking block and NO text block at all.
+ *
+ * That is not hypothetical. Four report types sat at 8000, and on 2026-08-15
+ * a real compliance report for a pilot athlete failed twice in a row.
+ * Reproduced directly against the same call shape:
+ *
+ *   max_tokens= 8000   81s  stop_reason=max_tokens  blocks=[thinking]       text=0 chars
+ *   max_tokens=16000  128s  stop_reason=end_turn    blocks=[thinking,text]  text=14416 chars
+ *   max_tokens=24000  122s  stop_reason=end_turn    blocks=[thinking,text]  text=12946 chars
+ *
+ * The failure is DATA-DEPENDENT, which is what made it so quiet: the same code
+ * generated 32 reports successfully while athletes had little history, then
+ * began failing as one accumulated 14 check-ins, 6 assessments, 12 GPS
+ * sessions, VALD tests and an injury with a clinical description. It arrives
+ * with success, not at deploy time.
+ *
+ * 16000 clears it today. 24000 is chosen instead because the input grows for
+ * the life of every athlete, and the margin is what stops this recurring
+ * silently. One constant, so no report type can drift back — the same reason
+ * REPORT_MODEL exists above.
+ */
+export const REPORT_MAX_TOKENS = 24000;
+
+/**
+ * Interprets a finished report response, returning a user-facing error or null
+ * if the response is usable.
+ *
+ * Shared by all seven generation call sites so the three failure modes cannot
+ * drift apart or be conflated — which is exactly what happened before: a
+ * `max_tokens` stop is not a refusal, so it fell through to "empty response.
+ * Try again", telling a practitioner to retry something that would
+ * deterministically fail the same way.
+ */
+export function reportResponseError(
+  stopReason: string | null | undefined,
+  reportText: string | null
+): string | null {
+  if (stopReason === "refusal") {
+    return "The AI declined to generate this report. Try adjusting the additional instructions, or contact support if this persists.";
+  }
+  if (stopReason === "max_tokens" && !reportText) {
+    // Deliberately does NOT say "try again". The same input will hit the same
+    // ceiling, so a retry wastes 90 seconds and produces the same failure.
+    return "The report needed more space than it was given and stopped before any of it was written. This has been flagged for review — please report it rather than retrying, because the same request will fail the same way.";
+  }
+  if (!reportText) {
+    return "The AI returned an empty response. Try again.";
+  }
+  return null;
+}
