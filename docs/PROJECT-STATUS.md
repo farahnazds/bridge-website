@@ -20,37 +20,232 @@ been started. Do not assume any of them are done.
 
 ---
 
-## 2. Blocking issue — Supabase credentials are dead locally
+## 2. RESOLVED — the "Supabase 401" was a tooling artifact, not a real fault
 
-**This blocks most verification work and should be fixed first.**
+**There was never anything wrong with the credentials, the database, or
+production.** An earlier version of this file recorded a blocking 401. That was
+wrong and is corrected here.
 
-- `NEXT_PUBLIC_SUPABASE_URL` in `.env.local` is `pdzxkpahydbtajdjcwwg`.
-- Both keys in `.env.local` return **401** against that project — the
-  `sb_secret_…` service key *and* the `sb_publishable_…` key. Tried with both
-  headers, and each header alone.
-- Unauthenticated requests also return **401 with an empty body**, where a
-  healthy project returns `{"message":"No API key found in request"}`.
-- DNS resolves fine.
+**Root cause: PowerShell 5.1's `Invoke-WebRequest` silently drops the custom
+`apikey` header.** Proven by sending the byte-identical request two ways:
 
-**Ruled out:** production being down. `www.bridgetx.co` returns **HTTP 200**
-served by Vercel (~138KB). `thebridgehp.com` resolves to `216.198.79.1`, the
-same Vercel apex IP; `www` CNAMEs to `cname.vercel-dns.com`.
+| Headers sent | `curl.exe` | PS `Invoke-WebRequest` |
+|---|---|---|
+| `apikey` only | **200** | 401 |
+| `Authorization: Bearer` only | 401 | 401 |
+| both | **200** | 401 |
 
-**Most likely:** the keys in `.env.local` were rotated. **Not confirmed** — it
-was never diagnosed at the dashboard.
+The `Authorization`-only 401 is genuine Supabase behaviour — new-format
+(`sb_secret_…` / `sb_publishable_…`) keys must travel in `apikey`. Because
+PowerShell drops that header, every request degraded to the one combination
+that legitimately fails, and returned a plausible-looking 401.
 
-Note: Vercel and Supabase **CLI** logins were completed today. That does not
-fix this — the app reads `.env.local` at runtime, not the CLI session.
+**Verified working as of 2026-08-14:** project `pdzxkpahydbtajdjcwwg` is
+healthy. The service key returns 200/206 on table reads, the publishable key
+returns 200 on `/rest/v1/clubs` and `/auth/v1/settings`, and the Storage API
+lists all three buckets.
 
-**Consequence:** anything needing real data cannot be verified. A 200 on the
-homepage does not prove the database is healthy; that needs an authenticated
-page load.
+> **Tooling rule for this project: use `curl.exe` for any Supabase or HTTP API
+> check. Do not trust `Invoke-WebRequest` for authenticated requests.** It fails
+> in a way that looks exactly like a credential problem.
+
+**Production is unaffected and always was.** `www.bridgetx.co` serves HTTP 200
+via Vercel; `thebridgehp.com` resolves to the same Vercel apex IP
+(`216.198.79.1`), `www` CNAMEd to `cname.vercel-dns.com`.
 
 ---
 
 ## 3. In progress
 
-### 3a. Report PDF generator — BLOCKED, not started
+### 3a. Report PDF generator — IN PROGRESS (foundation built 2026-08-14)
+
+**Unblocked.** The ten templates were found in `%TEMP%` (never copied into the
+repo) and installed at `lib/reportPdf/templates/{athlete,practitioner}/`. The
+directory was also renamed `reportPDF` → `reportPdf` to match `reportPdf.ts`
+and avoid a case-sensitivity break on Vercel's Linux build.
+`docs/12-report-pdf-templates.md` **is still empty** — the templates and their
+CSS are being used as the spec, by agreement.
+
+**Built and typechecking clean:**
+- `lib/reportPdf/theme.ts` — every design token transcribed from the template
+  CSS, with px→pt conversion (`*0.75`) applied once at the boundary. Copying
+  the CSS px values directly would render the document ~33% oversized.
+- `lib/reportPdf/layout.ts` — the measure-then-place engine. Blocks report true
+  height via `heightOfString` before anything is drawn; atomic blocks never
+  split; `split()` lets tables break between rows; `keepWithNext` stops a
+  section title being stranded. Replaces the guessed constants (40/28/16pt) in
+  `lib/reportPdf.ts:184-186`.
+- `lib/reportPdf/charts.ts` — SVG→PNG via sharp at 3x for ~288dpi.
+  **Live-verified: 15/15 chart SVGs across all ten templates rasterised, 0
+  failures, ~8KB each.**
+
+- `lib/reportPdf/primitives.ts` — drawing helpers. Note the split between
+  `applyFont` (measurement) and `applyStyle` (drawing): `fillColor` writes into
+  the current page's content stream, which is null before the first `addPage()`,
+  so measuring with a colour set throws.
+- `lib/reportPdf/blocks.ts` — the block vocabulary: `section-title`,
+  `status-row`, `interp`, `callout`, `precision-box`, `means-box`, `rx`,
+  `rec-item`, `citation-list`, `summarybar`, `weekstrip`, `missing-note`,
+  `adbanner`, `charts-row`, and a splittable `table` that repeats its header.
+- `lib/reportPdf/chrome.ts` — gradient header band, brandbar with club logo,
+  and deferred footer numbering (`bufferPages` + `finalise()`), because
+  "Page 2 of 2" cannot be known until the last block is placed.
+
+**Live-verified 2026-08-14** via a temporary dev-only route,
+`app/api/dev/pdf-smoke/route.ts` (404s in production; **delete when the new
+generator is wired in**). `?trace=1` returns the placement of every block and
+asserts the invariants:
+
+```
+pages 2 · blocks 22 · overflows 0 · overlaps 0
+table:split   p1  top 725.7  h  87.9  bottom 813.6  limit 817
+table         p2  top 129.4  h 260.9  bottom 390.3  limit 817
+```
+
+No block extends past the content bottom, none overlaps its predecessor, the
+22-row table split between rows across the page boundary, and the preceding
+`section-title` was not stranded. That is `page-break-inside: avoid` working
+without Chromium.
+
+**Athlete compliance layout — DONE and proven against live data (2026-08-14).**
+`lib/reportPdf/layouts/athleteCompliance.ts`, plus `model.ts` (the typed
+measured/narrative split), `svgChart.ts` (charts generated from live points —
+the template SVGs hold specimen values and cannot be reused), and `logo.ts`.
+
+Rendered through `app/api/dev/report-preview?code=…&trace=1` against all three
+real athletes in the database:
+
+```
+TES-0001  rows=14  rendered=57%      adherence=60%            36 KB  1p  ovf=0 olp=0
+TES-0002  rows=0   rendered=No data  adherence=Not recorded   14 KB  1p  ovf=0 olp=0
+CLB-9001  rows=1   rendered=100%     adherence=Not recorded   11 KB  1p  ovf=0 olp=0
+```
+
+Real club branding (accent `#00B3A6` from `club_branding`), the real uploaded
+logo embedded, real citations from `clinical_research_library`, and the ad
+banner correctly not rendered.
+
+**Two defects the live check caught:**
+1. **2.5 MB PDFs.** The club logo was over 99% of the file (2,535,563 bytes vs
+   10,831 for a club with no logo) — the hazard `lib/reportPdfDelivery.ts:74-91`
+   documents. Fixed by `lib/reportPdf/logo.ts`, sized to this layout's 24pt box
+   rather than sharing the old renderer's constant. Now 36 KB.
+2. **"0%" for an athlete with no check-ins.** `rateOfCalendar` computes an
+   arithmetically correct 0% from zero rows, which states a finding the record
+   does not support — precisely the fallback-to-default the spec forbids. Now
+   `headlineRate()` returns null and the card reads "No data". Exported so the
+   rendered value and the asserted value are the same expression.
+
+**Body-composition, performance and injury layouts — DONE and proven
+(2026-08-14).** `athleteBodyComposition.ts`, `athletePerformance.ts`,
+`athleteInjury.ts`, plus `layouts/common.ts` for the shared tail
+(Interpretation → Recommendations → Monitoring → Sources → banner), so the five
+documents cannot drift in the parts meant to be identical.
+
+**All four types × all three real athletes = 12 renders, every one clean:**
+
+```
+TES-0001  compliance        checkins=14              36 KB  10 blocks  ovf=0 olp=0
+TES-0001  body_composition  assessments=4 methods=1  30 KB  12 blocks  ovf=0 olp=0
+TES-0001  performance       gps=4 vald=4             33 KB  12 blocks  ovf=0 olp=0
+TES-0001  injury            injuries=4               15 KB  12 blocks  ovf=0 olp=0
+TES-0002  (all four, zero rows in every table)        9–14 KB          ovf=0 olp=0
+CLB-9001  (all four, one row each)                   11–12 KB          ovf=0 olp=0
+```
+
+TES-0002 has no rows in any table and renders correctly as missing-notes rather
+than zeros — the empty-data path is genuinely covered, not assumed.
+
+**Two things worth knowing:**
+
+1. **The ≠ cross-method branch is NOT exercised by live data.** Every athlete
+   in the database has `methods=1`, so no real report can reach it. It is
+   instead asserted directly via
+   `/api/dev/report-preview?selftest=1` — 7/7 checks on `latestDelta()`,
+   covering same-method, cross-method, single-scan and no-scan. Claiming it
+   "works" off the 12 renders would have been unsupported.
+2. **The prescribed-targets `darkpanel` cannot be populated.** Both
+   body-composition and injury carry a panel of daily energy / protein /
+   carbohydrate / energy-availability targets. Those are *prescribed* values
+   from the nutrition planner, not measurements — nothing in `assessments`,
+   `gps_logs` or `vald_data` holds them and no table stores a current macro
+   prescription. Both layouts render `prescribedTargetsMissing()` saying so
+   explicitly rather than estimating.
+
+**Injury is athlete-audience, so `InjuryRow` has no `description` field at
+all.** Migration 018 and `docs/02-roles-and-permissions.md` restrict athlete
+reads to status and phase; expressing that in the type means a future caller
+cannot pass clinical free text in by accident.
+
+**markdown→Narrative parse — DONE and proven (2026-08-14).**
+`lib/reportPdf/narrative.ts` maps generated markdown onto the Narrative slots,
+matching the section names `prompts/report-generation.md` asks for (Executive
+summary → means-box, Compliance-linked analysis and unrecognised sections →
+interps, Goals for next period / Monitoring → monitoring, Practitioner
+recommendations → rec-items).
+
+**The failure-mode contract holds: 12/12, nothing threw.**
+`/api/dev/report-preview?selftest=narrative` covers null, undefined, empty,
+whitespace-only, headings-with-no-content, unmatched headings, no headings at
+all, malformed tables, unterminated emphasis, deep headings, and the full
+sample. Every failure returns `EMPTY_NARRATIVE`; nothing raises.
+
+End-to-end across compliance and body-composition × two athletes × three
+narrative modes — 12 renders, 0 overflows, 0 overlaps:
+
+```
+none     compliance  TES-0001  means=F interps=0 recs=0  36152B  1p  10 blk
+sample   compliance  TES-0001  means=T interps=2 recs=3  48325B  2p  20 blk
+garbage  compliance  TES-0001  means=F interps=0 recs=0  36152B  1p  10 blk
+```
+
+`garbage` is byte-identical to `none` — a broken parse degrades to exactly the
+structural-only render, which is the requirement.
+
+**One defect the garbage case caught.** The no-headings fallback promoted
+leftover punctuation (`|||`, `**`) into the athlete-facing "What this means"
+panel. Now guarded by `looksLikeProse()`, which counts LETTERS rather than
+characters, so markdown debris scores zero however long it is.
+
+**Still to build:** the nutrition layout (4 pages, 7 meal-blocks — the largest
+remaining piece), and wiring into `lib/reportPdfDelivery.ts`.
+
+### Unresolved before any wiring: which layout serves a practitioner report
+
+The five layouts built are ATHLETE-audience. `reportAudience.ts` defaults to
+`practitioner` (`FALLBACK_AUDIENCE`), and the practitioner squad templates are
+deferred (see `docs/09-roadmap.md`). So a practitioner-audience report has no
+layout in the new system. That question must be answered before
+`generateAndStoreReportPdf` is switched over — options are to route
+practitioner-audience reports to the athlete layouts at clinical register, or
+keep them on the existing generator until the squad work lands.
+
+**Narrative is still unfilled.** `Narrative` (means-box, interps,
+recommendations, monitoring) is typed but nothing populates it yet — the report
+actions produce one markdown string. The compliance report above renders with
+an empty narrative, which proves the measured half stands alone, but the
+markdown→`Narrative` parse is outstanding.
+
+**Deferred:** the five practitioner squad layouts — written up as its own
+roadmap item in `docs/09-roadmap.md` ("Deferred feature, scheduled separately:
+squad-level practitioner reports").
+
+**The existing generator is untouched and remains the live path.**
+`git diff` against `lib/reportPdf.ts`, `lib/reportPdfDelivery.ts`,
+`lib/reportContent.ts` and `app/staff` is empty. `lib/reportPdf.ts` (file) and
+`lib/reportPdf/` (directory) coexist safely because Node resolves the file
+first, so every existing `@/lib/reportPdf` import still reaches the old
+renderer. Nothing is wired up until the new path is proven end to end.
+
+**Known architectural gap to close next.** `generateAndStoreReportPdf`
+(`lib/reportPdfDelivery.ts:63-72`) takes only `markdown`. The templates carry
+structured figures — `InBody 15.4% 11.0% +4.4`, training-day strips, compliance
+percentages — which must come from the database, not from generated prose
+(there is already a hard gate against cross-method fabrication). So the report
+actions need to assemble a typed report model alongside the narrative. That
+touches all five report actions plus `nutrition/generateReport.ts`.
+
+#### Original blocking analysis (retained for context)
 
 Requested: build the real PDF generator rendering five report types across two
 audiences (Compliance, Body Composition, Nutrition, Performance, Injury ×
@@ -137,18 +332,66 @@ environment, and cleaning in place is messy (`docs/08-integrations.md:13-28`
 records that deleting `reports` rows orphans PDFs in the bucket; migration
 `019` grants storage DELETE to super admins only).
 
-**Recommendation was to keep the original direction anyway**, because Supabase
-has no supported path for migrating `auth.users` with password hashes between
-projects — a fresh production database means re-inviting every account.
-Counterweight: `scripts/` already has `bootstrap-super-admin.mjs`,
-`import-clinical-library.mjs`, `import-supplement-library.mjs`, so reference
-data on a fresh project is largely scripted.
+An earlier recommendation was to keep the original direction, on the grounds
+that Supabase cannot migrate `auth.users` password hashes between projects, so
+a fresh production database would mean re-inviting every account.
 
-**The number that settles it was never obtained** (blocked by §2): how many
-real accounts and how much hand-entered config exist today. A ready-to-paste
-audit query was drafted covering `auth.users`, per-table counts, a
-`profiles`-by-role breakdown, named `clubs` rows, and `storage.objects` by
-bucket. It was never run.
+**That reasoning no longer holds — the audit has now been run (2026-08-14) and
+it flips the recommendation.**
+
+### Audit results — production contains only test data
+
+| Table | Count | | Table | Count |
+|---|---|---|---|---|
+| profiles | 10 | | reports | 56 (48 with PDFs) |
+| clubs | 2 | | checkins | 15 |
+| teams | 3 | | training_load_plans | 15 |
+| athletes | **3** | | injuries | 5 |
+| club_staff | 4 | | notifications | 7 |
+| club_branding | 1 | | audit_log | **0** |
+| subscriptions | **0** | | comments | 0 |
+
+**Nothing in there is a real client:**
+
+- **Clubs are `test1` and `Rival Academy (Club B)`** — both scaffolding. No
+  pilot club exists yet.
+- **Athletes are `TES-0001`, `TES-0002`, `CLB-9001`** — all test codes.
+- **Profiles are a one-or-two-per-role test matrix**: 1 super_admin, 1 admin,
+  2 club_manager, 2 club_practitioner, 2 athlete, 1 brand_partner,
+  1 partnerships_consultant.
+- **All 56 reports** were generated against those test athletes.
+
+**So there are zero real accounts to re-invite**, and the only argument for
+keeping the current database as production disappears.
+
+**Revised recommendation: production should be the clean project** (either the
+new one, or the current one wiped and reseeded). Item 4 of the pre-launch
+checklist then costs nothing instead of being a risky in-place delete against
+a live client database.
+
+**Real reference data that would need recreating** — the only thing of value
+in there: `clinical_research_library` 43, `supplement_library` 10,
+`elite_benchmarks` 6, `products` 2, `club_brand_products` 1, and one
+`club_branding` row carrying a genuine uploaded logo
+(`…/logo-1786090262617.png`). The first two have import scripts
+(`import-clinical-library.mjs`, `import-supplement-library.mjs`); branding and
+benchmarks are hand-entered and would need redoing.
+
+**Storage buckets confirmed present** on the current project: `report-pdfs`
+(private, 10MB, `application/pdf`), `profile-photos` (private, 5MB), and
+`club-branding` (private, 5MB, incl. SVG). They are still **not created by any
+migration** — trap 1 above stands for any fresh project.
+
+### Two observations worth confirming
+
+- **`audit_log` is empty (0 rows)** despite `database/tables-overview.md`
+  describing it as powering the per-athlete/per-practitioner Activity/History
+  feed. After this much development, zero rows suggests nothing writes to it.
+  Not investigated.
+- **`subscriptions` is empty** while both clubs show
+  `subscription_status: active`. Possibly by design — the `clubs` table carries
+  its own subscription dates and `docs/09-roadmap.md` treats the separate
+  `plans`/subscription tables as foundation-only. Worth a glance.
 
 ---
 
@@ -159,7 +402,7 @@ bucket. It was never run.
 | 1 | Database separation | Investigated, plan drafted, **paused**. Nothing created or changed. |
 | 2 | Production env vars in Vercel | **Not started.** Needs CLI/dashboard access. |
 | 3 | Compliance-alert cron genuinely firing | **Code reviewed only.** Never confirmed against real execution logs. |
-| 4 | Test-data cleanup in production | **Not started.** Depends on item 1 and on §2. |
+| 4 | Test-data cleanup in production | **Not started**, but the audit is done — see §3b. Production currently holds *only* test data: 2 test clubs, 3 test athletes, 56 test reports. |
 | 5 | Full production smoke test | **Not started.** |
 
 **On item 3, what is known:** the cron is declared in `vercel.json:2-7` —
@@ -195,7 +438,10 @@ served (`/` and `/login` both 200); all label permutations confirmed by
 running the exact expression from the file.
 
 **Verification NOT done:** the planner was never rendered in a browser.
-`/staff/[teamId]/reports/nutrition` 307s to login and §2 blocks signing in.
+`/staff/[teamId]/reports/nutrition` 307s to login when unauthenticated. This
+was originally attributed to the §2 "blocker"; that blocker was not real, so
+**nothing now prevents signing in and confirming the button visually** — it
+simply has not been done yet.
 
 ### Remaining "AI" in user-facing text — audited, NOT yet changed
 
@@ -301,8 +547,10 @@ beyond "Default".
 
 ## 8. Suggested order for the next session
 
-1. Fix the Supabase keys (§2). Nearly everything else is downstream.
-2. Decide the database-split direction using the audit query (§3b).
-3. Get the PDF templates, or agree to draft the spec as its own task (§3a).
-4. Resume pre-launch items 2–5 (§4).
-5. Decide on the remaining "AI" text groups 1 and 2 (§5).
+1. Decide the database-split direction — the audit is done and points to
+   making production the clean project (§3b).
+2. Get the PDF templates, or agree to draft the spec as its own task (§3a).
+3. Resume pre-launch items 2–5 (§4) — none of them are blocked.
+4. Visually confirm the Nutrition Planner button, then decide on the remaining
+   "AI" text groups 1 and 2 (§5).
+5. Check the two anomalies in §3b: empty `audit_log`, empty `subscriptions`.
