@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import DataModal from "@/components/DataModal";
 import { BADGE, BTN_PRIMARY, BTN_SECONDARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import ClinicalFlagChips, { type ClinicalFlagsInput } from "@/components/ClinicalFlagChips";
 import { protocolPhase, protocolWindowLabel, type ProtocolPhase } from "@/lib/supplementProtocols";
@@ -200,18 +201,19 @@ const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * answering "what protocols exist". Days with nothing due don't appear,
  * exactly as in the reference.
  *
- * Edit/Alternatives here don't host their own forms — they signal the row's
- * range card (the single home of those flows) open and scroll to it, so the
- * agenda can never fork the edit surface.
+ * Each line is CLICKABLE and opens the occurrence in DataModal — the same
+ * detail-popup pattern the athlete profile's data rows use — where the full
+ * product/dose/timing/rationale detail and the Edit/Alternatives actions
+ * live, instead of crowding every line with inline buttons. The columns are
+ * a fixed grid shared by every line, so doses and timings align down the
+ * whole panel regardless of digit count.
  */
 function WeekAgenda({
   days,
-  canEdit,
-  onOpen,
+  onSelect,
 }: {
   days: AgendaDay[];
-  canEdit: boolean;
-  onOpen: (rowId: string, panel: "edit" | "alternatives") => void;
+  onSelect: (item: AgendaItem, date: string) => void;
 }) {
   if (days.length === 0) {
     return (
@@ -248,48 +250,37 @@ function WeekAgenda({
           </div>
           <div className="flex min-w-0 flex-col">
             {d.items.map((it, j) => (
-              <div
+              <button
                 key={it.row.id}
-                className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-3.5 py-2.5"
+                type="button"
+                onClick={() => onSelect(it, d.date)}
+                className="grid w-full items-center gap-x-3 px-3.5 py-2.5 text-left transition-colors duration-150 ease-out hover:bg-white/[0.03]"
                 style={{
+                  // One fixed template for EVERY line in the panel — this is
+                  // what makes doses and timings start at the same x down the
+                  // whole list, whatever their digit count.
+                  gridTemplateColumns: "12px minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1.1fr) 12px",
                   borderBottom:
                     j < d.items.length - 1 ? "1px solid color-mix(in srgb, var(--border) 55%, transparent)" : undefined,
                 }}
               >
-                <span className="h-[5px] w-[5px] shrink-0 rounded-full" style={{ backgroundColor: it.tone }} />
-                <span className="min-w-0 text-[13px] font-semibold" style={{ color: "var(--text)", flex: "1 1 150px" }}>
+                <span className="h-[5px] w-[5px] rounded-full" style={{ backgroundColor: it.tone }} />
+                <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text)" }}>
                   {it.row.supplementName}
                 </span>
-                <span className="min-w-0 text-xs" style={{ color: "var(--text-muted)", flex: "1 1 auto" }}>{it.row.dose}</span>
+                <span className="text-xs" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                  {it.row.dose}
+                </span>
                 <span
-                  className="min-w-0 text-[9.5px]"
+                  className="text-[9.5px]"
                   style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}
                 >
                   {it.row.timing}
                 </span>
-                {canEdit && (
-                  <span className="ml-auto flex shrink-0 items-center gap-3">
-                    {it.altCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onOpen(it.row.id, "alternatives")}
-                        className="text-[11.5px] font-medium underline-offset-2 hover:underline"
-                        style={{ color: "var(--brand-blue)" }}
-                      >
-                        Alternatives ({it.altCount})
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => onOpen(it.row.id, "edit")}
-                      className={`${PANEL} px-2.5 py-1 text-[11.5px] font-medium transition-colors duration-150 ease-out hover:border-white/25`}
-                      style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                    >
-                      Edit
-                    </button>
-                  </span>
-                )}
-              </div>
+                <span aria-hidden className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  ›
+                </span>
+              </button>
             ))}
           </div>
         </div>
@@ -1509,13 +1500,23 @@ export default function SupplementsClient({
     panel: "edit" | "alternatives";
     nonce: number;
   } | null>(null);
+  const agendaNonceRef = useRef(0);
   const openFromAgenda = (rowId: string, panel: "edit" | "alternatives") => {
     setPhaseFilter("all");
-    setAgendaTarget({ rowId, panel, nonce: Date.now() });
+    setAgendaTarget({ rowId, panel, nonce: ++agendaNonceRef.current });
     setTimeout(() => {
       document.getElementById(`protocol-${rowId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 80);
   };
+
+  /** The occurrence a clicked agenda line opens in DataModal. */
+  const [agendaDetail, setAgendaDetail] = useState<{
+    item: AgendaItem;
+    date: string;
+    athleteId: string;
+  } | null>(null);
+
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
   const stats: { label: string; value: number; tone: string; sub: string }[] = [
     {
@@ -1791,7 +1792,10 @@ export default function SupplementsClient({
             {phaseFilter !== "ended" && (
               <div className="flex flex-col gap-2.5">
                 <SectionHead tone="var(--brand-blue)" label="DUE — NEXT 7 DAYS" />
-                <WeekAgenda days={agendaDays} canEdit={canEdit} onOpen={openFromAgenda} />
+                <WeekAgenda
+                  days={agendaDays}
+                  onSelect={(item, date) => setAgendaDetail({ item, date, athleteId: a.athleteId })}
+                />
               </div>
             )}
 
@@ -1846,6 +1850,122 @@ export default function SupplementsClient({
           </div>
         );
       })}
+
+      {/* An agenda occurrence, opened in the app's standard detail modal
+          (DataModal — the athlete profile's data-row pattern). Read-only
+          detail for any viewer; the Edit/Alternatives actions hand off to
+          the row's range card, the single home of those flows. */}
+      {agendaDetail &&
+        (() => {
+          const { item, date, athleteId } = agendaDetail;
+          const row = item.row;
+          const product = row.productId ? productById.get(row.productId) ?? null : null;
+          const athlete = data.find((x) => x.athleteId === athleteId) ?? null;
+          const codeLabels = { ...allergenLabels, ...(athlete?.clinical?.codeLabels ?? {}) };
+          const phase = protocolPhase(asCoverage(row), today);
+          const when = new Date(Date.parse(date));
+          const rowConflicts = conflictsByRow.get(row.id) ?? [];
+          const label = (text: string) => (
+            <span
+              className="text-[9px] font-medium"
+              style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.16em", color: "var(--text-muted)" }}
+            >
+              {text}
+            </span>
+          );
+          return (
+            <DataModal
+              title={row.supplementName}
+              subtitle={`${athlete?.name ?? ""} · due ${AGENDA_WEEKDAY.format(when)} ${AGENDA_DATE.format(when)} · ${protocolWindowLabel(asCoverage(row), today)}`}
+              onClose={() => setAgendaDetail(null)}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={BADGE}
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${PHASE_TONE[phase]} 12%, transparent)`,
+                      color: PHASE_TONE[phase],
+                    }}
+                  >
+                    {PHASE_LABEL[phase]}
+                  </span>
+                  {row.supplementLibraryId === null && (
+                    <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--warning) 10%, transparent)", color: "var(--warning)" }}>
+                      Not in library
+                    </span>
+                  )}
+                  {rowConflicts.length > 0 && (
+                    <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}>
+                      Conflicts with declared {rowConflicts.join(", ")}
+                    </span>
+                  )}
+                </div>
+
+                {product ? (
+                  <div className="flex flex-col gap-1.5">
+                    {label("PRODUCT")}
+                    <p className="m-0 text-sm font-medium" style={{ color: "var(--text)" }}>
+                      {product.name} <span style={{ color: "var(--text-muted)" }}>— {product.brand}</span>
+                    </p>
+                    <ProductBadges p={product} codeLabels={codeLabels} />
+                  </div>
+                ) : (
+                  <p className="m-0 text-xs" style={{ color: "var(--text-muted)" }}>
+                    No specific certified product attached — clinical entity only. Use Alternatives to attach one.
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    {label("DOSE")}
+                    <p className="m-0 text-sm" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{row.dose}</p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {label("TIMING")}
+                    <p className="m-0 text-sm" style={{ color: "var(--text)" }}>{row.timing}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  {label("WHY")}
+                  <p className="m-0 text-sm leading-relaxed" style={{ color: row.rationale ? "var(--text)" : "var(--text-muted)" }}>
+                    {row.rationale || "No reason recorded."}
+                  </p>
+                </div>
+
+                {canEdit && (
+                  <div className="flex flex-wrap items-center gap-3 border-t pt-4" style={{ borderColor: "var(--border)" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAgendaDetail(null);
+                        openFromAgenda(row.id, "edit");
+                      }}
+                      className={BTN_PRIMARY}
+                      style={{ backgroundImage: "var(--brand-gradient-action)" }}
+                    >
+                      Edit protocol
+                    </button>
+                    {item.altCount > 0 && phase !== "ended" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAgendaDetail(null);
+                          openFromAgenda(row.id, "alternatives");
+                        }}
+                        className={BTN_SECONDARY}
+                        style={{ borderColor: "var(--border)", color: "var(--text)" }}
+                      >
+                        Alternatives ({item.altCount})
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </DataModal>
+          );
+        })()}
     </div>
   );
 }
