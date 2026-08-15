@@ -13,10 +13,10 @@ type RosterAthlete = { id: string; first_name: string; last_name: string; code: 
 
 // Standing oversight of every supplement protocol on the team.
 //
-// The Nutrition Planner (/staff/[team-id]/reports/nutrition) is where protocols
-// come FROM — AI suggestion, review, confirm. This page is what you use
-// afterwards: scan the roster, correct a dose, shorten or extend a range, end
-// something early, or add one by hand.
+// The Nutrition Planner (./planner — a sub-route of this page since the
+// planner/report split) is where protocols come FROM — AI suggestion, review,
+// confirm. This page is what you use afterwards: scan the roster, correct a
+// dose, shorten or extend a range, end something early, or add one by hand.
 //
 // Same table, same helpers, same safety check. An edit made here reaches Daily
 // Check-In and My Protocol exactly as a planner confirmation does, because
@@ -123,7 +123,7 @@ export default async function SupplementsPage({
           What every athlete on this team is currently on, and what is scheduled to start. Edit a
           dose, timing or date range here; protocols are normally created through the{" "}
           <Link
-            href={`/staff/${teamId}/reports/nutrition`}
+            href={`/staff/${teamId}/supplements/planner`}
             className="font-medium underline-offset-2 hover:underline"
             style={{ color: "var(--brand-blue)" }}
           >

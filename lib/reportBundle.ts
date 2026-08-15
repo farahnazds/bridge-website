@@ -75,6 +75,15 @@ export interface ReportBundle {
   activeInjuries: ActiveInjuryContext[] | null;
   prescription: PrescriptionContext | null;
   supplementLibrary: SupplementLibraryEntry[] | null;
+  /** The athlete's CONFIRMED supplement protocol rows overlapping the period —
+   *  the same read the standalone Nutrition generator makes, so a combined
+   *  report's nutrition section describes the same plan a standalone report
+   *  would. Empty means no confirmed plan covers the period; unlike the
+   *  standalone generator this does NOT gate generation, because refusing a
+   *  five-domain document over one domain's missing data would be the wrong
+   *  trade — the prompt states the absence instead. Null when nutrition was
+   *  not requested. */
+  confirmedProtocol: { supplementName: string; dose: string; timing: string; rationale: string; window: string }[] | null;
 
   /** Deduped across every requested type. */
   clinicalLibraryEntries: ClinicalLibraryEntry[];
@@ -237,7 +246,28 @@ export async function getReportBundle(
   let activeInjuries: ActiveInjuryContext[] | null = null;
   let prescription: PrescriptionContext | null = null;
   let supplementLibrary: SupplementLibraryEntry[] | null = null;
+  let confirmedProtocol: ReportBundle["confirmedProtocol"] = null;
   if (want("nutrition")) {
+    // Same overlap rule as the standalone generator and the schema's own
+    // definition of "active": a standing row (end_date null) counts from its
+    // start date onward.
+    const { data: protocolRows } = await supabase
+      .from("supplement_protocols")
+      .select("supplement_name, dose, timing, rationale, start_date, end_date")
+      .eq("athlete_id", athleteId)
+      .lte("start_date", periodEnd)
+      .or(`end_date.is.null,end_date.gte.${periodStart}`)
+      .order("start_date", { ascending: true });
+    confirmedProtocol = (protocolRows ?? []).map((r) => ({
+      supplementName: r.supplement_name as string,
+      dose: r.dose as string,
+      timing: r.timing as string,
+      rationale: (r.rationale as string | null) ?? "",
+      window: (r.end_date as string | null)
+        ? `${r.start_date} to ${r.end_date}`
+        : `from ${r.start_date}, standing`,
+    }));
+
     const { data: latest } = await supabase
       .from("assessments")
       .select("date, method, weight_kg, body_fat_pct, lean_mass_kg, bmr, tdee")
@@ -317,6 +347,11 @@ export async function getReportBundle(
         ? `Nutrition: prescription brand ${prescription.brandName} (${prescription.products.length} product(s)).`
         : "Nutrition: no prescription brand assigned — clinical recommendations will carry no product names."
     );
+    notes.push(
+      confirmedProtocol.length > 0
+        ? `Nutrition: ${confirmedProtocol.length} confirmed protocol row${confirmedProtocol.length === 1 ? "" : "s"} overlap the period.`
+        : "Nutrition: no confirmed supplement plan overlaps this period — the report will say so rather than invent one."
+    );
   }
 
   // ---- clinical library, one topic per requested type, deduped by title ----
@@ -363,6 +398,7 @@ export async function getReportBundle(
       activeInjuries,
       prescription,
       supplementLibrary,
+      confirmedProtocol,
       clinicalLibraryEntries,
       previousReportSummary: previousReport?.ai_summary ?? null,
       dataCheckNotes: notes,

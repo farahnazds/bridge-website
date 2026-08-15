@@ -18,22 +18,28 @@ import {
   nutritionSystemPrompt,
   type ConfirmedProtocolLine,
   type PerformanceSignalsContext,
-} from "../nutritionPromptBuilder";
-import type { AthletePlanningExtras } from "./data";
-import type { PlanDay } from "./planPromptBuilder";
-import type { PrescriptionContext, ClinicalLibraryEntry } from "../nutritionPromptBuilder";
+} from "./nutritionPromptBuilder";
+import type { AthletePlanningExtras, PlanDay } from "@/lib/nutritionPlanData";
+import type { PrescriptionContext, ClinicalLibraryEntry } from "./nutritionPromptBuilder";
 
-// The SECOND model call: the real, saved Nutrition report, written after the
-// practitioner has confirmed. Deliberately not a server action — this is a
-// plain module, so it cannot be invoked as an endpoint on its own; only the
-// confirm action calls it, after doing its own authorisation and safety work.
+// The saved Nutrition report. Deliberately not a server action — this is a
+// plain module, so it cannot be invoked as an endpoint on its own; only
+// generateNutritionReport in ./actions.ts calls it, after doing its own
+// authorisation, roster and plan-coverage work.
 //
-// It goes through the SAME pipeline the old single-athlete generator used, in
-// the same order and with the same guarantees: audience resolved server-side,
+// HISTORY: this used to be the second half of the planner's confirm flow — a
+// report generated automatically for each athlete whose protocols had just
+// been written. Confirming a plan and reporting on it are now two independent
+// acts (the planner lives at supplements/planner/ and only writes protocol
+// rows), so this module moved to the reports side, where its one caller lives.
+//
+// It goes through the SAME pipeline the other four generators use, in the same
+// order and with the same guarantees: audience resolved server-side,
 // citation-only discipline via the tagged library, assertReportSafe BEFORE the
 // insert so an unsafe report never reaches the database, then the branded PDF.
-// The only structural change is that the supplement section now reports a
-// decision that has already been made rather than making one.
+// The supplement section reports the CONFIRMED protocol read back from
+// supplement_protocols — a decision that has already been made — never one the
+// model invents.
 
 const SIGNAL_LOOKBACK_DAYS = 7;
 
@@ -54,6 +60,9 @@ export interface NutritionReportRequest {
   citations: ClinicalLibraryEntry[];
   includePerformanceSignals: boolean;
   additionalInstructions: string | null;
+  /** Day spans of the period no confirmed protocol row covers, precomputed by
+   *  the caller. See the coverage note in nutritionPromptBuilder.ts. */
+  coverageGaps: string[];
   language: string;
   audience: ReportAudience;
 }
@@ -62,6 +71,9 @@ export interface NutritionReportResult {
   athleteId: string;
   athleteName: string;
   reportId: string | null;
+  /** The generated markdown, for the same inline preview the other four
+   *  generators show. Null on any failure. */
+  reportText: string | null;
   error: string | null;
   note: string | null;
 }
@@ -122,7 +134,7 @@ export async function generateAndSaveNutritionReport(
   req: NutritionReportRequest
 ): Promise<NutritionReportResult> {
   const athleteName = `${req.clinical.firstName} ${req.clinical.lastName}`;
-  const base = { athleteId: req.athleteId, athleteName, reportId: null, note: null };
+  const base = { athleteId: req.athleteId, athleteName, reportId: null, reportText: null, note: null };
 
   const performanceSignals = req.includePerformanceSignals
     ? await loadPerformanceSignals(req.athleteId, req.mode, req.periodStart)
@@ -168,6 +180,7 @@ export async function generateAndSaveNutritionReport(
     previousReportSummary: req.extras.previousReportSummary,
     periodStart: req.periodStart,
     periodEnd: req.periodEnd,
+    coverageGaps: req.coverageGaps,
     additionalInstructions: req.additionalInstructions,
     language: req.language,
   });
@@ -243,6 +256,7 @@ export async function generateAndSaveNutritionReport(
     athleteId: req.athleteId,
     athleteName,
     reportId: inserted.id,
+    reportText,
     error: null,
     note: pdf.error ? `PDF: ${pdf.error}` : null,
   };

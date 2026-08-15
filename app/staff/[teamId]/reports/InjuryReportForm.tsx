@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { BTN_PRIMARY_FULL, CARD, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import AthleteSelectField from "@/components/AthleteSelectField";
 import { useFormStatus } from "react-dom";
-import AudienceField from "./AudienceField";
+import AudienceField from "@/components/AudienceField";
 import { generateInjuryReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import ReportMarkdown from "@/components/ReportMarkdown";

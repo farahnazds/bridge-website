@@ -67,6 +67,16 @@ import {
   injurySystemPrompt,
   type InjuryRow,
 } from "./injuryPromptBuilder";
+import { MAX_PLAN_DAYS, dateRange, daysBetween, type PlanMode } from "@/lib/supplementPlan";
+import { loadAthleteClinicalContext, loadSupplementLibrary } from "@/lib/supplementPlanSafety";
+import {
+  loadAthletePlanningExtras,
+  loadNutritionCitations,
+  loadPrescriptions,
+  loadTrainingLoadDays,
+} from "@/lib/nutritionPlanData";
+import { generateAndSaveNutritionReport } from "./nutritionReport";
+import type { ConfirmedProtocolLine } from "./nutritionPromptBuilder";
 
 export interface GenerateReportState {
   error: string | null;
@@ -648,18 +658,205 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
   return { error: null, warning: emailWarning, success: true };
 }
 
-// ---- Nutrition ----
-// Nutrition generation no longer lives here. It moved to the bulk day-by-day
-// planner at app/staff/[teamId]/reports/nutrition/, which replaced the
-// single-athlete/single-day form entirely: suggestions are generated per
-// athlete across a range, reviewed and confirmed by the practitioner, written
-// to supplement_protocols, and only then turned into saved reports. The prompt
-// builder (./nutritionPromptBuilder.ts) is still shared — the planner's confirm
-// step calls it for the report half of the flow.
+// ---- Nutrition — standalone again, but gated on a confirmed plan ----
 //
-// The RPE gate that used to block generation here is gone with it. A day with
-// no Training Load Plan entry now degrades to a baseline suggestion that names
-// the gap, rather than refusing the whole request; see docs/07-ai-engine.md.
+// This action's history matters for reading it. Nutrition generation lived
+// here originally, moved into the bulk planner when confirming a plan also
+// produced the reports, and returned here when those became two independent
+// acts. What it did NOT take back from the old form is the right to decide
+// supplements: the planner (Supplements → Nutrition Planner) writes
+// supplement_protocols, and this action READS those rows for the requested
+// period. If none cover it, it refuses to run — a nutrition report's
+// prescription section reports a decision, and no confirmed rows means no
+// decision has been made to report.
+//
+// Partial coverage generates, with the uncovered day spans computed HERE and
+// stated plainly in the report — the same explicit-degradation stance
+// docs/07-ai-engine.md takes on missing training-load days. Standing rows
+// (end_date null) count toward coverage from their start date onward, because
+// that is literally what "active" means for supplement_protocols.
+
+/** Collapse the dates NOT covered by any protocol row into human-readable
+ *  spans ("2026-08-24 to 2026-08-25"). Runs on at most a period's worth of
+ *  dates, already capped below. */
+function uncoveredSpans(
+  dates: string[],
+  rows: { start_date: string; end_date: string | null }[]
+): string[] {
+  const uncovered = dates.filter(
+    (d) => !rows.some((r) => r.start_date <= d && (r.end_date === null || r.end_date >= d))
+  );
+  const spans: string[] = [];
+  let spanStart: string | null = null;
+  let prev: string | null = null;
+  for (const d of uncovered) {
+    if (spanStart === null) {
+      spanStart = d;
+    } else if (prev !== null && daysBetween(prev, d) !== 2) {
+      // Not the day after prev — close the open span and start a new one.
+      spans.push(spanStart === prev ? spanStart : `${spanStart} to ${prev}`);
+      spanStart = d;
+    }
+    prev = d;
+  }
+  if (spanStart !== null && prev !== null) {
+    spans.push(spanStart === prev ? spanStart : `${spanStart} to ${prev}`);
+  }
+  return spans;
+}
+
+export async function generateNutritionReport(
+  _prevState: GenerateReportState,
+  formData: FormData
+): Promise<GenerateReportState> {
+  const base = { reportText: null, dataCheckNote: null, reportId: null };
+  const profile = await getCurrentProfile();
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+    return { ...base, error: "You don't have permission to do this." };
+  }
+
+  const teamId = String(formData.get("team_id") ?? "").trim();
+  const athleteId = String(formData.get("athlete_id") ?? "").trim();
+  const periodStart = String(formData.get("period_start") ?? "").trim();
+  const periodEnd = String(formData.get("period_end") ?? "").trim();
+  const mode: PlanMode = String(formData.get("mode") ?? "") === "general" ? "general" : "day_specific";
+  const includePerformanceSignals = formData.get("include_performance_signals") === "on";
+  const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
+
+  if (!teamId || !athleteId) return { ...base, error: "Choose an athlete." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(periodStart) || !/^\d{4}-\d{2}-\d{2}$/.test(periodEnd) || periodEnd < periodStart) {
+    return { ...base, error: "Choose a valid report period." };
+  }
+
+  // Period caps. Day-specific writes a subsection per day, so it keeps the
+  // planner's own ceiling — the report describes the same kind of plan. General
+  // mode has no per-day sections, but the coverage computation and the prompt
+  // both walk the period, so it is bounded too rather than accepting a year.
+  const dayCount = daysBetween(periodStart, periodEnd);
+  if (mode === "day_specific" && dayCount > MAX_PLAN_DAYS) {
+    return {
+      ...base,
+      error: `A day-by-day report covers at most ${MAX_PLAN_DAYS} days — the same limit the planner has. Use General mode for a longer standing period, or shorten the period.`,
+    };
+  }
+  if (dayCount > 92) {
+    return { ...base, error: "A nutrition report covers at most ~3 months. Shorten the period." };
+  }
+
+  const supabase = await createClient();
+
+  // Roster membership re-derived server-side, exactly as the other four do.
+  const { data: onTeam } = await supabase
+    .from("athlete_teams")
+    .select("athlete_id")
+    .eq("team_id", teamId)
+    .eq("athlete_id", athleteId)
+    .maybeSingle();
+  if (!onTeam) return { ...base, error: "That athlete isn't on this team." };
+
+  // ---- THE COVERAGE GATE ----
+  // The rows as they actually stand, overlapping the report period — the same
+  // overlap rule the schema's exclusion constraint uses, so a standing row
+  // (end_date null) counts from its start date onward.
+  const { data: protocolRows } = await supabase
+    .from("supplement_protocols")
+    .select("supplement_name, dose, timing, rationale, start_date, end_date")
+    .eq("athlete_id", athleteId)
+    .lte("start_date", periodEnd)
+    .or(`end_date.is.null,end_date.gte.${periodStart}`)
+    .order("start_date", { ascending: true });
+
+  const rows = protocolRows ?? [];
+  if (rows.length === 0) {
+    return {
+      ...base,
+      error:
+        "No confirmed supplement plan covers this period, so there is no prescription for this report to describe. Plan and confirm supplements first — Supplements → Nutrition Planner — then generate the report.",
+    };
+  }
+
+  const dates = dateRange(periodStart, periodEnd);
+  const coverageGaps = uncoveredSpans(
+    dates,
+    rows.map((r) => ({ start_date: r.start_date as string, end_date: (r.end_date as string | null) ?? null }))
+  );
+  const coveredDays = dates.length - coverageGaps.reduce((n, span) => {
+    const [a, , b] = span.split(" ");
+    return n + (b ? daysBetween(a, b) : 1);
+  }, 0);
+
+  const confirmedProtocol: ConfirmedProtocolLine[] = rows.map((r) => ({
+    supplementName: r.supplement_name as string,
+    dose: r.dose as string,
+    timing: r.timing as string,
+    rationale: (r.rationale as string | null) ?? "",
+    window: (r.end_date as string | null)
+      ? `${r.start_date} to ${r.end_date}`
+      : `from ${r.start_date}, standing`,
+  }));
+
+  const [contexts, library, extrasById, loadDaysById, citations] = await Promise.all([
+    loadAthleteClinicalContext([athleteId]),
+    loadSupplementLibrary(),
+    loadAthletePlanningExtras([athleteId], periodStart, periodEnd),
+    mode === "day_specific"
+      ? loadTrainingLoadDays(teamId, [athleteId], periodStart, periodEnd)
+      : Promise.resolve(new Map<string, never[]>()),
+    loadNutritionCitations(),
+  ]);
+
+  const clinical = contexts.get(athleteId);
+  const extras = extrasById.get(athleteId);
+  if (!clinical || !extras) {
+    return { ...base, error: "This athlete's profile couldn't be loaded." };
+  }
+
+  const prescriptions = await loadPrescriptions([
+    { athleteId, clubId: extras.clubId, segmentId: extras.segmentId },
+  ]);
+
+  const report = await generateAndSaveNutritionReport({
+    profileId: profile.id,
+    generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+    teamId,
+    athleteId,
+    mode,
+    periodStart,
+    periodEnd,
+    days: loadDaysById.get(athleteId) ?? [],
+    confirmedProtocol,
+    clinical,
+    extras,
+    prescription: prescriptions.get(athleteId) ?? null,
+    supplementLibrary: library,
+    citations,
+    includePerformanceSignals,
+    additionalInstructions,
+    coverageGaps,
+    language: await resolveReportLanguage(formData.get("language") as string | null, teamId),
+    audience: resolveReportAudience(formData.get("audience") as string | null),
+  });
+
+  if (report.error || !report.reportId) {
+    return { ...base, error: report.error ?? "Report generation failed." };
+  }
+
+  revalidatePath(`/staff/${teamId}/reports`, "layout");
+
+  return {
+    error: null,
+    reportText: report.reportText,
+    dataCheckNote: [
+      coverageGaps.length === 0
+        ? `Confirmed plan: ${rows.length} protocol row${rows.length === 1 ? "" : "s"} cover the full period.`
+        : `Confirmed plan covers ${coveredDays} of ${dates.length} days — the uncovered spans are stated in the report.`,
+      report.note,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    reportId: report.reportId,
+  };
+}
 
 // ---- Performance report — GPS and/or VALD, past dates only ----
 // docs/07-ai-engine.md: "Performance | Athlete / Practitioner | Past |

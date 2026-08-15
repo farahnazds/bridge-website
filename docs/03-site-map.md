@@ -102,17 +102,29 @@ Admin only).
   for intensity/RPE/session detail, team-wide or per athlete. Named "Training
   Load Plan" until 2026-08-14; the route is unchanged.
 - Reports — generate (individual or team-combined), share
-  - `/staff/[team-id]/reports/nutrition` — **Nutrition Planner**, its own
-    full-width page rather than a tab. Bulk day-by-day supplement planning:
-    pick one athlete, a subset or the whole squad, pick a range of 1–14 days,
-    pick day-specific (uses each day's Training Load Plan entry) or
-    general/standing. Generates suggestions — one plan per athlete for the
-    whole range — then a review grid of athlete rows against day columns where
-    every suggestion is approved by default, editable in place, and skippable.
-    Confirming writes each athlete's supplement protocol and generates one
-    nutrition report per athlete. The Nutrition tab on the Reports page links
-    here; `?athlete=<id>` preselects one athlete. Nothing is written before
-    confirmation, so athletes never see a suggestion.
+  - `/staff/[team-id]/reports/generate` and `…/reports/history` — the two
+    halves of the Reports section, under one shared heading and segmented
+    switcher. Nutrition is a generator tab like the other four types: pick an
+    athlete, a period, day-by-day or general mode. It READS the athlete's
+    confirmed supplement protocol for that period and refuses to generate when
+    no confirmed plan covers it (partial coverage generates, with the gaps
+    stated plainly in the report) — planning supplements is the Nutrition
+    Planner's job, under Supplements.
+  - `/staff/[team-id]/reports/nutrition` — redirect to
+    `…/supplements/planner`, kept because months of links point here;
+    `?athlete=` is carried across.
+- `/staff/[team-id]/supplements/planner` — **Nutrition Planner**, its own
+  full-width page under Supplements (moved from Reports when confirming
+  stopped generating reports). Bulk day-by-day supplement planning: pick one
+  athlete, a subset or the whole squad, pick a range of 1–14 days, pick
+  day-specific (uses each day's Training Load Plan entry) or general/standing.
+  Generates suggestions — one plan per athlete for the whole range — then a
+  review grid of athlete rows against day columns where every suggestion is
+  approved by default, editable in place, and skippable. **Confirming writes
+  each athlete's supplement protocol and nothing else** — reports are
+  generated separately, per athlete and period, under Reports → Generate.
+  `?athlete=<id>` preselects one athlete. Nothing is written before
+  confirmation, so athletes never see a suggestion.
 - `/staff/[team-id]/supplements` — **Supplement Protocols**. Standing oversight
   of the whole roster: every athlete's active and scheduled supplements, with
   name, dose, timing, date range and phase. Inline editing of dose, timing,

@@ -230,6 +230,21 @@ ${bundle.types.map(typeLabel).join(", ")}`);
       .join("\n");
 
     blocks.push(`## Nutrition context
+### Confirmed supplement protocol (ALREADY DECIDED — report it, never remake it)
+${
+  (bundle.confirmedProtocol?.length ?? 0) > 0
+    ? bundle
+        .confirmedProtocol!.map(
+          (c) =>
+            `- ${c.supplementName} | dose: ${c.dose} | timing: ${c.timing} | window: ${c.window}${
+              c.rationale ? ` | rationale: ${c.rationale}` : ""
+            }`
+        )
+        .join("\n") +
+      "\nThese rows ARE the prescription for this period, already written to the athlete's record by the practitioner. The supplement part of your Nutrition section reports them exactly — no additions, no removals, no changed doses or timings. Where something is absent from this list, that is the practitioner's decision; a genuine clinical point about it belongs under practitioner recommendations for a future review."
+    : "No confirmed supplement plan covers this period. Say so plainly in the Nutrition section and prescribe nothing — any supplement suggestion belongs under practitioner recommendations as a point for the next planning session, never as a prescription."
+}
+
 ### Latest assessment (anchor for energy and protein targets)
 ${
   bundle.latestAssessment

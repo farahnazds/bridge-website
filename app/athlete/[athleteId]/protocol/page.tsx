@@ -42,8 +42,8 @@ export const metadata: Metadata = { title: "My Protocol — Bridgetx" };
 // NOTHING UNCONFIRMED APPEARS HERE, and that is structural rather than a filter
 // on this page: an AI suggestion from the bulk planner is never written to
 // supplement_protocols until the practitioner confirms it, so there is no
-// unconfirmed row for this query to exclude. See app/staff/[teamId]/reports/
-// nutrition/actions.ts.
+// unconfirmed row for this query to exclude. See
+// app/staff/[teamId]/supplements/planner/actions.ts.
 
 type ProtocolRow = {
   id: string;

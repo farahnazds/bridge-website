@@ -135,7 +135,7 @@ function SubmitButton({ count }: { count: number }) {
         ? "Saving protocols…"
         : count === 0
           ? "Nothing selected"
-          : `Confirm & Generate — ${count} item${count === 1 ? "" : "s"}`}
+          : `Confirm ${count} item${count === 1 ? "" : "s"}`}
     </button>
   );
 }
@@ -244,7 +244,6 @@ export default function ReviewStep({
       language: plan.language,
       audience: plan.audience,
       additionalInstructions: plan.additionalInstructions,
-      includePerformanceSignals: plan.includePerformanceSignals,
       items,
     });
   }, [cells, plan]);
@@ -664,10 +663,10 @@ export default function ReviewStep({
           Start over
         </button>
         <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
-          Confirming writes the checked items to each athlete&apos;s protocol. That happens first and on its
-          own; the reports are then generated one athlete at a time on the next screen, so a slow report
-          never holds up a protocol. Unchecked items are discarded and any existing protocol for those
-          supplements is left untouched.
+          Confirming writes the checked items to each athlete&apos;s protocol — that is all it does.
+          No report is generated: when you want one, Reports → Generate → Nutrition reads these saved
+          rows back for one athlete and period at a time. Unchecked items are discarded and any
+          existing protocol for those supplements is left untouched.
         </p>
       </div>
     </form>

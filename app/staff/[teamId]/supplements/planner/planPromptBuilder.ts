@@ -1,14 +1,13 @@
 import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
 import { SESSION_TYPES, SESSION_DURATION_BANDS, RTP_PHASES, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
-import { ageInYears, weekdayOf } from "../nutritionPromptBuilder";
+import { ageInYears, weekdayOf } from "@/app/staff/[teamId]/reports/nutritionPromptBuilder";
 import type {
   ActiveInjuryContext,
   AssessmentContext,
   ClinicalLibraryEntry,
   PrescriptionContext,
-  TrainingLoadContext,
-} from "../nutritionPromptBuilder";
+} from "@/app/staff/[teamId]/reports/nutritionPromptBuilder";
 import type { PlanMode } from "@/lib/supplementPlan";
 import type { AthleteClinicalContext, SupplementLibraryRow } from "@/lib/supplementPlanSafety";
 
@@ -29,12 +28,11 @@ import type { AthleteClinicalContext, SupplementLibraryRow } from "@/lib/supplem
 // decisions about the shape of the week, and a model shown one day at a time
 // cannot make them.
 
-/** One day of the requested range, with whatever the Training Load Plan holds. */
-export interface PlanDay {
-  date: string;
-  /** null when no Training Load Plan entry exists for this date. */
-  load: TrainingLoadContext | null;
-}
+// PlanDay moved to lib/nutritionPlanData.ts — the standalone Nutrition report
+// generator needs it too, and both sides importing one definition is what
+// keeps their idea of "a day in the period" identical.
+import type { PlanDay } from "@/lib/nutritionPlanData";
+export type { PlanDay };
 
 export interface PlanPromptInput {
   mode: PlanMode;

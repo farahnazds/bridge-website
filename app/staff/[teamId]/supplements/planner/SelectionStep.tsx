@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
-import AudienceField from "../AudienceField";
+import AudienceField from "@/components/AudienceField";
 import { MAX_PLAN_DAYS, daysBetween } from "@/lib/supplementPlan";
 import type { PlanMode } from "@/lib/supplementPlan";
 
@@ -239,21 +239,10 @@ export default function SelectionStep({
         <AudienceField idPrefix="NutritionPlanner" />
       </div>
 
-      <label className="flex items-start gap-2 text-sm" style={{ color: "var(--text)" }}>
-        <input
-          type="checkbox"
-          name="include_performance_signals"
-          className="mt-0.5 h-4 w-4 rounded"
-          style={{ accentColor: "var(--brand-blue)" }}
-        />
-        <span>
-          Include performance signals
-          <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
-            Pulls the 7 days of GPS and VALD data leading into the period so recovery nutrition can reflect
-            recent accumulated load. Affects the written reports, not the supplement suggestions.
-          </span>
-        </span>
-      </label>
+      {/* The "Include performance signals" checkbox that sat here is gone with
+          the planner/report split: it never influenced the supplement
+          suggestions (its own hint said so), only the reports confirm used to
+          generate. It lives on the Nutrition report form now. */}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="planner_instructions" className={labelClass} style={{ color: "var(--text)" }}>

@@ -8,12 +8,30 @@ import type {
   ClinicalLibraryEntry,
   PrescriptionContext,
   TrainingLoadContext,
-} from "../nutritionPromptBuilder";
-import type { PlanDay } from "./planPromptBuilder";
+} from "@/app/staff/[teamId]/reports/nutritionPromptBuilder";
 
-// Batch loaders for the planner. Everything here runs on the CALLER's client so
-// RLS decides visibility — an athlete the practitioner cannot see contributes
-// no rows and therefore cannot be planned for.
+// Batch loaders shared by the two halves of the nutrition feature since they
+// were split into independent actions: the Supplement Planner
+// (app/staff/[teamId]/supplements/planner/, which writes supplement_protocols)
+// and the standalone Nutrition report generator (app/staff/[teamId]/reports/,
+// which reads them back). Moved here from the planner's folder when the report
+// side stopped being called from the planner — per CLAUDE.md, queries shared
+// across features live in lib/, and a copy in each feature is how the two
+// sides' ideas of "the athlete's context" would drift apart.
+//
+// Everything here runs on the CALLER's client so RLS decides visibility — an
+// athlete the practitioner cannot see contributes no rows and therefore cannot
+// be planned for or reported on.
+
+/** One date in a plan or report period. Lives here rather than in either
+ *  feature's prompt builder because both need it: the planner plans each day,
+ *  and a day-specific report writes a subsection per day. `load` null means no
+ *  Training Load Plan entry exists for that date — an explicit gap, never to
+ *  be described as a rest day. */
+export interface PlanDay {
+  date: string;
+  load: TrainingLoadContext | null;
+}
 //
 // Written to fetch ONCE FOR THE WHOLE BATCH rather than once per athlete. A
 // fortnight's plan for a full roster is otherwise a query per athlete per

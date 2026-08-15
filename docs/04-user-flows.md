@@ -133,12 +133,18 @@ Single signup page. On submit, the system checks for a matching record:
    document per athlete; **for practitioners** = one merged document
    per team, summarizing every athlete), and the athlete/team selection
    (via the reusable "All Athletes" toggle + multi-select)
-2. **Report Period** calendar: future dates only for Nutrition reports
-   (this is the one forward-looking report type); past dates for every
-   other report type
-3. **RPE is required input specifically for Nutrition reports** — if
-   missing for the selected period, generation is blocked with a prompt
-   to enter it first. RPE stays optional everywhere else.
+2. **Report Period** calendar: future dates by default for Nutrition
+   reports (this is the one forward-looking report type — the form
+   defaults tomorrow-onward, though regenerating for a period already
+   underway is allowed); past dates for every other report type
+3. **A confirmed supplement plan is required input specifically for
+   Nutrition reports** — the generator reads the athlete's confirmed
+   protocol rows for the period, and if none cover it, generation is
+   blocked with a prompt to plan supplements first (Supplements →
+   Nutrition Planner). Partial coverage generates, with the uncovered
+   days stated plainly in the report; standing protocols count toward
+   coverage. (The old hard RPE gate is gone — a day without a Training
+   Load Plan entry is named as unlogged, per `07-ai-engine.md`.)
 4. Optional **Additional Instructions** field (available for both
    athlete- and practitioner-facing reports) — guided by Super
    Admin-set rules per club (can't remove branding, no negative

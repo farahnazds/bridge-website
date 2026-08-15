@@ -9,6 +9,19 @@ import { CARD } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Generate a report — Bridgetx" };
 
+// Applies to the server actions posted to this segment — all six generators.
+//
+// NOT a fix for a live timeout: on current Vercel, Fluid Compute is the
+// unified execution model and every plan already DEFAULTS to 300s (verified
+// against Vercel's own docs 2026-08-15 — the "default is 15s" claim that used
+// to circulate in this codebase described the pre-Fluid serverless runtime).
+// This export pins the value explicitly so a report generation (15–130s
+// measured) can never be orphaned by a future change to the platform default,
+// and so the budget is visible in the code that depends on it. 300s is the
+// Hobby-plan MAXIMUM, so this is also the ceiling. It bounds one request; it
+// does not make a slow call fast.
+export const maxDuration = 300;
+
 export default async function GenerateReportPage({
   params,
   searchParams,

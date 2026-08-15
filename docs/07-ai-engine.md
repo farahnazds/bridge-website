@@ -262,9 +262,9 @@ the Training Load Plan entry for the target date was missing or had no RPE.
 That gate is gone, along with the single-athlete/single-day form it belonged
 to.
 
-**Why it changed.** Nutrition generation is now the bulk **Nutrition
-Planner** (`/staff/[teamId]/reports/nutrition`), which plans a range of up to
-14 days for any number of athletes at once. A blocking gate does not
+**Why it changed.** Supplement planning is now the bulk **Nutrition
+Planner** (`/staff/[teamId]/supplements/planner`), which plans a range of up
+to 14 days for any number of athletes at once. A blocking gate does not
 generalise to a range: one unplanned Tuesday in a fortnight would have
 refused the whole batch for every athlete, which is a far worse outcome than
 planning the thirteen days that *are* logged.
@@ -291,13 +291,15 @@ one that applies to that athlete.
 prescription has no single session for an RPE value to attach to. It is now
 reached through the same planner rather than through a separate form.
 
-*(See also `docs/04-user-flows.md` Flow 7 step 3, which still carries the
-older blocking phrasing.)*
+## Nutrition Planner and the Nutrition report — two independent acts
+(restructured 2026-08-15)
 
-## Nutrition Planner — generation shape and the confirmation gate
+Planning supplements and reporting on them used to be one bundled flow:
+confirming a plan wrote the protocol rows and then generated one nutrition
+report per athlete. They are now **fully separate**:
 
-Nutrition is the one forward-looking report type, and the only one whose
-generation is a two-call flow:
+**The Planner** (`/staff/[teamId]/supplements/planner`) suggests, reviews and
+confirms — and confirming **writes protocol rows only**:
 
 1. **Suggest** — one model call **per athlete**, covering the entire selected
    range at once. Structured JSON only, no prose. One call per athlete, never
@@ -307,9 +309,20 @@ generation is a two-call flow:
    practitioner presses it, and again on the review screen.
 2. **Confirm** — the practitioner reviews a grid of athlete rows against day
    columns, edits dose and timing in place, unchecks anything they don't want,
-   and confirms. Only then is anything written: protocol rows first, then one
-   model call per athlete for the real, saved report — built from what was
-   *confirmed*, not from what was suggested.
+   and confirms. Only then is anything written: the protocol rows, full stop.
+   The protocol takes effect immediately on Daily Check-In and My Protocol.
+
+**The Nutrition report** is generated like every other report type, under
+Reports → Generate: one athlete, one period, day-by-day or general mode. It
+**reads the confirmed protocol rows back from `supplement_protocols`** — never
+the plan the client held in memory — and is gated on them: if no confirmed
+row overlaps the period, generation is refused with a pointer to the planner.
+Partial coverage generates, with the uncovered day spans computed in code and
+stated plainly in the report; standing rows (`end_date` null) count toward
+coverage from their start date, which is the schema's own definition of
+"active". A combined report with Nutrition among its types reads the same
+rows (and says plainly when there are none) but is not gated — refusing a
+five-domain document over one domain's missing data would be the wrong trade.
 
 **Athletes never see a suggestion.** This is structural rather than a filter:
 the generate action contains no insert, so an abandoned flow leaves the

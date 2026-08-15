@@ -68,13 +68,11 @@ export default function ReportsNav({
       description: "Your reports, official team reports, and reports shared with you.",
       badge: reportCount,
     },
-    {
-      label: "Planner",
-      segment: "nutrition",
-      // No badge: the planner is a tool, not a collection, so any number next to
-      // it would be inventing a quantity to fill the shape of the design.
-      description: "Plan supplements day by day across a period, then review and confirm.",
-    },
+    // The Nutrition Planner was briefly a third segment here. It moved to
+    // Supplements → Nutrition Planner when confirming a plan stopped generating
+    // reports — a tool whose only output is supplement protocol rows belongs
+    // with the page that oversees those rows. The Nutrition REPORT is a tab on
+    // Generate like every other type.
   ];
 
   const active = segments.find((s) => pathname.startsWith(`${base}/${s.segment}`)) ?? segments[0];

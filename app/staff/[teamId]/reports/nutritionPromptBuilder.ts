@@ -191,6 +191,11 @@ export interface NutritionPromptInput {
   previousReportSummary: string | null;
   periodStart: string;
   periodEnd: string;
+  /** Human-readable day spans of the period NO confirmed protocol row covers,
+   *  e.g. ["2026-08-24 to 2026-08-25"]. Computed by the caller from the same
+   *  overlap rule the schema uses; empty or omitted when coverage is complete
+   *  (a standing row with no end date covers everything from its start). */
+  coverageGaps?: string[];
   additionalInstructions: string | null;
   language: string;
 }
@@ -310,6 +315,7 @@ export function buildNutritionPrompt(input: NutritionPromptInput): string {
     previousReportSummary,
     periodStart,
     periodEnd,
+    coverageGaps,
     additionalInstructions,
     language,
   } = input;
@@ -498,7 +504,16 @@ DATA GAP — state this plainly in the report: this platform does not record the
               }`
           )
           .join("\n") +
-        "\n\nThis list IS the prescription. Report it exactly — no additions, no removals, no changed doses, no changed timings.";
+        "\n\nThis list IS the prescription. Report it exactly — no additions, no removals, no changed doses, no changed timings." +
+        // Computed by the caller in TypeScript rather than left for the model
+        // to derive: gaps come from date arithmetic across overlapping ranges,
+        // which is exactly the work a language model does unreliably. The list
+        // arrives as fact; the model's job is only to say it plainly.
+        (coverageGaps && coverageGaps.length > 0
+          ? `\n\nCOVERAGE GAPS — the confirmed protocol does NOT cover every day of this report's period. No supplement row covers: ${coverageGaps.join(
+              "; "
+            )}. State this plainly in the supplement section. Do not fill a gap with a recommendation, do not extend any window to cover it, and do not present the plan as continuous. If a gap matters clinically, raise it under Practitioner recommendations as a point for the next planning session.`
+          : "");
 
   const prescriptionBlock = prescription
     ? `Assigned prescription brand: ${prescription.brandName} (via the athlete's ${prescription.source})
