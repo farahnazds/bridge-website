@@ -11,11 +11,15 @@
 //     clients cannot load web fonts, so Arial is what recipients see
 //   - a hidden preheader span before the body copy
 //
-// The header logo is a hosted PNG (public/brand/email-logo.png, exported
-// from logo-horizontal-light.svg) referenced absolutely — several clients
-// refuse SVG. The design's club-logo slot is omitted in real sends: clubs
-// carry no logo asset in the schema, and a dashed "CLUB LOGO" placeholder
-// must never reach a recipient.
+// The header logo ships as an INLINE CID ATTACHMENT (owner's ruling): the
+// HTML references cid:bridgetx-logo and every Resend sender attaches the PNG
+// (lib/emailLogo.ts) with that content id. Inline beats a hosted URL twice
+// over — no dependency on the asset being deployed anywhere, and it renders
+// even for recipients whose clients block remote images. The design's
+// club-logo slot is omitted in real sends: clubs carry no logo asset in the
+// schema, and a dashed "CLUB LOGO" placeholder must never reach a recipient.
+// (The two Supabase-sent templates in docs/emails/ cannot attach files and
+// keep the hosted bridgetx.co URL.)
 //
 // Deviations from the design mocks, all deliberate:
 //   - links point at routes that exist (bridgetx.co, /admin/leads, the
@@ -27,7 +31,11 @@
 //     monthly skip limits, not percentages)
 
 const SITE = "https://bridgetx.co";
-const LOGO_URL = `${SITE}/brand/email-logo.png`;
+
+/** The content id every sender's inline logo attachment must carry —
+ *  lib/resend.ts builds the attachment from lib/emailLogo.ts with this id. */
+export const EMAIL_LOGO_CONTENT_ID = "bridgetx-logo";
+const LOGO_URL = `cid:${EMAIL_LOGO_CONTENT_ID}`;
 
 const FONT_BODY = "Inter,Arial,Helvetica,sans-serif";
 const FONT_HEAD = "'General Sans',Arial,Helvetica,sans-serif";

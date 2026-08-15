@@ -1,6 +1,7 @@
 import "server-only";
 import { Resend } from "resend";
-import { complianceAlertEmail, newLeadEmail, reportSharedEmail } from "@/lib/emailTemplates";
+import { EMAIL_LOGO_CONTENT_ID, complianceAlertEmail, newLeadEmail, reportSharedEmail } from "@/lib/emailTemplates";
+import { EMAIL_LOGO_BASE64 } from "@/lib/emailLogo";
 
 // Server-only — never expose RESEND_API_KEY to the client.
 //
@@ -14,6 +15,16 @@ import { complianceAlertEmail, newLeadEmail, reportSharedEmail } from "@/lib/ema
 //     new intake or a requested meeting time reaches the owner's inbox the
 //     moment it happens rather than waiting to be noticed on /admin/leads.
 const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL ?? "Bridgetx <reports@bridgetx.com>";
+
+/** The header logo, attached inline on EVERY send (owner's ruling): the
+ *  templates reference cid:bridgetx-logo, so an email without this
+ *  attachment shows a broken image. Inline beats a hosted URL — no deploy
+ *  dependency, and it renders even when a client blocks remote images. */
+const LOGO_ATTACHMENT = {
+  filename: "bridgetx-logo.png",
+  content: EMAIL_LOGO_BASE64,
+  contentId: EMAIL_LOGO_CONTENT_ID,
+};
 
 export async function sendReportSharedEmail(params: {
   to: string;
@@ -40,7 +51,7 @@ export async function sendReportSharedEmail(params: {
     sharedDate: params.sharedDate,
   });
   const resend = new Resend(apiKey);
-  const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: params.to, subject, html });
+  const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: params.to, subject, html, attachments: [LOGO_ATTACHMENT] });
 
   if (error) {
     throw new Error(error.message);
@@ -91,7 +102,7 @@ export async function sendLeadNotificationEmail(params: {
     requestedSlot: params.requestedSlot,
   });
   const resend = new Resend(apiKey);
-  const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: LEAD_INBOX, subject, html });
+  const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: LEAD_INBOX, subject, html, attachments: [LOGO_ATTACHMENT] });
 
   if (error) {
     throw new Error(error.message);
@@ -119,7 +130,7 @@ export async function sendComplianceAlertEmail(params: {
     summary: params.summary,
   });
   const resend = new Resend(apiKey);
-  const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: params.to, subject, html });
+  const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: params.to, subject, html, attachments: [LOGO_ATTACHMENT] });
 
   if (error) {
     throw new Error(error.message);
