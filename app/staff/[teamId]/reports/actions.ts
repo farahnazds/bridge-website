@@ -577,7 +577,7 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
 
   const { data: report, error: reportError } = await supabase
     .from("reports")
-    .select("id, report_types, shared_with, generated_by")
+    .select("id, report_types, shared_with, generated_by, athlete_ids")
     .eq("id", reportId)
     .single();
   if (reportError || !report) {
@@ -611,6 +611,22 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
     .join(" + ");
   const practitionerName = `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email;
 
+  // Context for the email template's fact panel and club card — best-effort
+  // reads on the caller's client; a blank falls back to neutral copy rather
+  // than blocking the share.
+  const [{ data: reportAthletes }, { data: teamRow }] = await Promise.all([
+    supabase
+      .from("athletes")
+      .select("first_name, last_name")
+      .in("id", (report.athlete_ids as string[]) ?? []),
+    supabase.from("teams").select("name, clubs(name)").eq("id", teamId).maybeSingle(),
+  ]);
+  const athleteName =
+    (reportAthletes ?? []).map((a) => `${a.first_name} ${a.last_name}`.trim()).join(", ") || "—";
+  const teamName = (teamRow?.name as string | undefined) ?? "";
+  const clubName = ((teamRow?.clubs as unknown as { name: string } | null)?.name ?? "your club").trim();
+  const sharedDate = new Intl.DateTimeFormat("en-GB", { dateStyle: "long" }).format(new Date());
+
   // ---- In-app notifications (docs/04-user-flows.md Flow 7, step 8) ----
   // RLS-scoped via "report generator notifies recipients"
   // (database/migrations/005_report_share_notification_policy.sql).
@@ -642,6 +658,10 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
           recipientName: r.first_name ?? "there",
           practitionerName,
           reportTypeLabel,
+          athleteName,
+          clubName,
+          teamName,
+          sharedDate,
         })
       )
     );

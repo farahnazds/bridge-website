@@ -82,7 +82,7 @@ export async function createClub(
   const adminClient = createAdminClient();
   const { data: invite, error: inviteError } =
     await adminClient.auth.admin.inviteUserByEmail(managerEmail, {
-      data: { first_name: managerFirstName, last_name: managerLastName },
+      data: { first_name: managerFirstName, last_name: managerLastName, club_name: name },
       redirectTo: `${baseUrl}/staff/activate`,
     });
 

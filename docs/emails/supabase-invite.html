@@ -1,0 +1,125 @@
+<!--
+  BRIDGETX INVITE EMAIL — paste into Supabase Dashboard → Authentication →
+  Emails → Templates → "Invite user" (body field).
+  Subject line to set alongside it:  You have been invited to join {{ if .Data.club_name }}{{ .Data.club_name }}{{ else }}your club{{ end }} on Bridgetx
+
+  Notes:
+  - {{ .ConfirmationURL }} is Supabase's invite-acceptance link (redirects to
+    the athlete/staff activation page the inviting action chose).
+  - {{ .Data.club_name }} arrives via the invite call's user_metadata — all
+    four inviting actions in the codebase now pass it; the {{ if }} fallback
+    keeps older/blank invites reading naturally.
+  - One template serves BOTH athlete and staff invites, so the copy names no
+    role. Table-based, inline styles, no web-font dependency (falls back to
+    Arial), hosted PNG logo.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>You have been invited to Bridgetx</title>
+<!--[if mso]>
+<xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+<![endif]-->
+<style>
+  a { color: #073CF4; }
+  @media only screen and (max-width:620px) {
+    .wrap { width:100% !important; }
+    .pad { padding-left:22px !important; padding-right:22px !important; }
+    .h1 { font-size:25px !important; line-height:32px !important; }
+    .btn a { display:block !important; text-align:center !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#EEF1F6;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;">You have been invited to join {{ if .Data.club_name }}{{ .Data.club_name }}{{ else }}your club{{ end }} on Bridgetx. The link expires soon.</span>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="page" style="width:100%;border-collapse:collapse;background:#EEF1F6;">
+  <tr>
+    <td align="center" style="padding:32px 12px 44px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="wrap" style="width:600px;max-width:600px;border-collapse:collapse;">
+
+        <tr><td style="padding:0;font-size:0;line-height:0;border-radius:12px 12px 0 0;overflow:hidden;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;border-collapse:collapse;"><tr>
+              <td width="150" height="3" bgcolor="#08D9DE" style="width:150px;height:3px;line-height:3px;font-size:0;">&nbsp;</td>
+              <td width="150" height="3" bgcolor="#08B7E8" style="width:150px;height:3px;line-height:3px;font-size:0;">&nbsp;</td>
+              <td width="150" height="3" bgcolor="#087BF2" style="width:150px;height:3px;line-height:3px;font-size:0;">&nbsp;</td>
+              <td width="150" height="3" bgcolor="#073CF4" style="width:150px;height:3px;line-height:3px;font-size:0;">&nbsp;</td>
+            </tr></table></td></tr>
+
+        <tr>
+          <td bgcolor="#FFFFFF" style="background:#FFFFFF;border-left:1px solid #E3E8F2;border-right:1px solid #E3E8F2;border-bottom:1px solid #E3E8F2;border-radius:0 0 12px 12px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;">
+
+              <tr><td class="pad" style="padding:28px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr>
+                <td align="left" valign="middle" style="padding:0;">
+                  <img src="https://bridgetx.co/brand/email-logo.png" width="150" height="44" alt="Bridgetx" style="display:block;border:0;width:150px;height:44px;">
+                </td>
+                <td align="right" valign="middle" style="padding:0;font-family:Inter,Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.6px;color:#8A94AC;">SPORTS&nbsp;NUTRITION<br>INTELLIGENCE</td>
+              </tr></table></td></tr>
+
+              <tr><td class="pad" style="padding:30px 36px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>
+                  <td height="1" width="22" bgcolor="#08B7E8" style="width:22px;height:2px;line-height:2px;font-size:0;background:#08B7E8;">&nbsp;</td>
+                  <td style="padding-left:11px;font-family:Inter,Arial,Helvetica,sans-serif;font-size:11px;line-height:15px;mso-line-height-rule:exactly;letter-spacing:1.8px;font-weight:600;color:#0891C6;text-transform:uppercase;">Invitation</td>
+                </tr></table>
+              </td></tr>
+
+              <tr><td class="pad" style="padding:14px 36px 0;">
+                <h1 class="h1" style="margin:0;font-family:'General Sans',Arial,Helvetica,sans-serif;font-size:29px;line-height:36px;mso-line-height-rule:exactly;letter-spacing:-0.7px;font-weight:700;color:#0D1B4C;">You have been invited to join your club on Bridgetx.</h1>
+              </td></tr>
+
+              <tr><td class="pad" style="padding:14px 36px 0;">
+                <p style="margin:0;font-family:Inter,Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;mso-line-height-rule:exactly;color:#4A5878;">You have been invited to <strong style="color:#0D1B4C;font-weight:600;">{{ if .Data.club_name }}{{ .Data.club_name }}{{ else }}your club{{ end }}</strong> on Bridgetx. Accept the invitation to set your password and you will land in the right place for your account.</p>
+              </td></tr>
+
+              <tr><td class="pad" style="padding:22px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:#F4F6FB;border:1px solid #E3E8F2;border-radius:10px;"><tr>
+                <td valign="middle" style="padding:14px 16px;font-family:Inter,Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#0D1B4C;font-weight:600;">{{ if .Data.club_name }}{{ .Data.club_name }}{{ else }}Your club{{ end }}<br>
+                  <span style="font-family:Inter,Arial,Helvetica,sans-serif;font-size:12px;line-height:17px;mso-line-height-rule:exactly;color:#8A94AC;font-weight:400;">Invitation to Bridgetx</span>
+                </td>
+              </tr></table></td></tr>
+
+              <tr><td class="pad btn" align="left" style="padding:26px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>
+                <td align="center" bgcolor="#073CF4" style="border-radius:10px;background:#073CF4;background-image:linear-gradient(135deg,#08D9DE 0%,#08B7E8 34%,#087BF2 68%,#073CF4 100%);">
+                  <a href="{{ .ConfirmationURL }}" style="display:block;padding:15px 34px;font-family:'General Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:20px;mso-line-height-rule:exactly;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;">Accept Invitation</a>
+                </td>
+              </tr></table></td></tr>
+
+              <tr><td class="pad" style="padding:18px 36px 0;">
+                <p style="margin:0;font-family:Inter,Arial,Helvetica,sans-serif;font-size:12.5px;line-height:19px;mso-line-height-rule:exactly;color:#8A94AC;">If the link has lapsed, ask whoever invited you to send a new one.</p>
+              </td></tr>
+
+              <tr><td class="pad" style="padding:28px 36px 0;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr>
+                  <td height="1" bgcolor="#E3E8F2" style="height:1px;line-height:1px;font-size:0;background:#E3E8F2;">&nbsp;</td>
+                </tr></table>
+              </td></tr>
+
+              <tr><td class="pad" style="padding:18px 36px 30px;">
+                <p style="margin:0 0 10px;font-family:Inter,Arial,Helvetica,sans-serif;font-size:11.5px;line-height:18px;mso-line-height-rule:exactly;color:#8A94AC;">You are receiving this because your club entered this address when inviting you to Bridgetx. If you were not expecting it, you can ignore this email.</p>
+                <p style="margin:0;font-family:Inter,Arial,Helvetica,sans-serif;font-size:11.5px;line-height:18px;mso-line-height-rule:exactly;color:#8A94AC;">
+                  <a href="https://bridgetx.co" style="color:#8A94AC;text-decoration:underline;">bridgetx.co</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;<a href="mailto:admin@bridgetx.co" style="color:#8A94AC;text-decoration:underline;">admin@bridgetx.co</a>
+                </p>
+              </td></tr>
+
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:18px 24px 0;">
+            <p style="margin:0;font-family:Inter,Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;mso-line-height-rule:exactly;color:#8A94AC;">
+              Bridgetx &middot; Sports Nutrition Intelligence Platform<br>
+              Dubai, United Arab Emirates
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

@@ -207,10 +207,13 @@ export async function registerAthlete(
   // RLS policy, so this one stays on the admin client. Authorization is
   // the hasRole() check at the top of this action.
   const baseUrl = await getBaseUrl();
+  // club_name rides the invite's user_metadata so the Supabase invite email
+  // template can name the club ({{ .Data.club_name }}).
+  const { data: clubRow } = await supabase.from("clubs").select("name").eq("id", clubId).maybeSingle();
   const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
     email,
     {
-      data: { first_name: firstName, last_name: lastName },
+      data: { first_name: firstName, last_name: lastName, club_name: (clubRow?.name as string | undefined) ?? "" },
       redirectTo: `${baseUrl}/athlete/activate`,
     }
   );

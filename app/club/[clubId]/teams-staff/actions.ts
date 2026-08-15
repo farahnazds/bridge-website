@@ -118,8 +118,11 @@ export async function invitePractitioner(
   // inviteUserByEmail is a Supabase Auth Admin API call, not a table
   // operation — always requires the service-role key regardless of RLS.
   const baseUrl = await getBaseUrl();
+  // club_name rides the invite's user_metadata so the Supabase invite email
+  // template can name the club ({{ .Data.club_name }}).
+  const { data: clubRow } = await supabase.from("clubs").select("name").eq("id", clubId).maybeSingle();
   const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    data: { first_name: firstName, last_name: lastName },
+    data: { first_name: firstName, last_name: lastName, club_name: (clubRow?.name as string | undefined) ?? "" },
     redirectTo: `${baseUrl}/staff/activate`,
   });
   if (inviteError || !invite.user) {

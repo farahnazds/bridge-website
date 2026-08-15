@@ -85,6 +85,11 @@ export async function confirmAthleteImport(_prevState: ConfirmState, formData: F
   const adminClient = createAdminClient();
   const baseUrl = await getBaseUrl();
 
+  // Carried into each invite's user_metadata so the Supabase invite email
+  // template can name the club ({{ .Data.club_name }}).
+  const { data: clubRow } = await supabase.from("clubs").select("name").eq("id", clubId).maybeSingle();
+  const clubName = (clubRow?.name as string | undefined) ?? "";
+
   // Re-validate from scratch server-side — never trust the client's "new"
   // labels, and time has passed since preview so teams/codes may have
   // changed. Each row's own code is passed through as-is (not blank) so
@@ -191,7 +196,7 @@ export async function confirmAthleteImport(_prevState: ConfirmState, formData: F
     await supabase.from("athletes").update({ profile_id: athleteProfileId }).eq("id", athlete.id);
 
     const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(row.email, {
-      data: { first_name: row.firstName, last_name: row.lastName },
+      data: { first_name: row.firstName, last_name: row.lastName, club_name: clubName },
       redirectTo: `${baseUrl}/athlete/activate`,
     });
     if (inviteError || !invite.user) {
