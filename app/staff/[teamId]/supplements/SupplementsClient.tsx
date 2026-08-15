@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { BADGE, BTN_PRIMARY, BTN_SECONDARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
@@ -90,6 +91,26 @@ const groupRank = (g: string) => {
 };
 
 const CUSTOM = "__custom__";
+
+/** The mockup's section marker: small dot, mono label, hairline to the edge.
+ *  Flat dot rather than the mockup's halo — docs/06: no box-shadows. */
+function SectionHead({ tone, outlined, label }: { tone: string; outlined?: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={outlined ? { border: `1.5px solid ${tone}` } : { backgroundColor: tone }}
+      />
+      <span
+        className="text-[10px] font-medium"
+        style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.18em", color: "var(--text-muted)" }}
+      >
+        {label}
+      </span>
+      <span className="h-px flex-1" style={{ backgroundColor: "var(--border)" }} />
+    </div>
+  );
+}
 
 /** The coverage helpers take snake_case rows; the client works in camelCase. */
 function asCoverage(p: ProtocolRow) {
@@ -417,6 +438,8 @@ function ProtocolCard({
   alternatives,
   clinical,
   allergenLabels,
+  defaultWhyOpen,
+  conflictLabels,
 }: {
   teamId: string;
   row: ProtocolRow;
@@ -426,9 +449,18 @@ function ProtocolCard({
   alternatives: CatalogueProductLite[];
   clinical: AthleteClinicalContext | null;
   allergenLabels: Record<string, string>;
+  /** The page-level "Show rationale" toggle; a card's own peek click overrides it. */
+  defaultWhyOpen: boolean;
+  /** Conflict labels from the page-level live safety recomputation — the same
+   *  shared checks the server gates run, re-evaluated against CURRENT
+   *  declarations, so a declaration that changed after prescribing surfaces
+   *  here on the affected row itself. Empty = nothing flagged. */
+  conflictLabels: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [whyOverride, setWhyOverride] = useState<boolean | null>(null);
+  const whyOpen = whyOverride ?? defaultWhyOpen;
   const [dose, setDose] = useState(row.dose);
   const [timing, setTiming] = useState(row.timing);
   const [startDate, setStartDate] = useState(row.startDate);
@@ -446,21 +478,42 @@ function ProtocolCard({
     dose !== row.dose || timing !== row.timing || startDate !== row.startDate || (endDate || null) !== row.endDate;
   const rationaleStale = (dose !== row.dose || timing !== row.timing) && rationale === row.rationale;
 
+  // The mockup's left accent edge, in priority order: a live conflict beats
+  // everything, then the planner-written "no library entry" warning, then the
+  // phase tone.
+  const edge =
+    conflictLabels.length > 0
+      ? "var(--danger)"
+      : row.supplementLibraryId === null
+        ? "var(--warning)"
+        : PHASE_TONE[phase];
+
+  const whyPeek = row.rationale ? `${row.rationale.split(/[.;]/)[0].slice(0, 64).trim()}…` : "";
+
   return (
     <div
-      className={`${PANEL} p-4`}
+      id={`protocol-${row.id}`}
+      className={`${PANEL} flex flex-col gap-2.5 p-4 transition-colors duration-200 ease-out`}
       style={{
-        borderColor: phase === "active" ? "var(--brand-teal)" : "var(--border)",
+        borderColor: "var(--border)",
+        borderLeftWidth: 2,
+        borderLeftColor: edge,
         backgroundColor: phase === "ended" ? "transparent" : "var(--surface)",
         opacity: phase === "ended" ? 0.7 : 1,
+        // A card with its editor or alternatives open takes the whole grid
+        // row — the forms need width, not a 330px column.
+        gridColumn: open || showAlternatives ? "1 / -1" : undefined,
       }}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
-              {row.supplementName}
-            </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <p
+            className="text-sm font-semibold"
+            style={{ fontFamily: "var(--font-heading)", color: "var(--text)", letterSpacing: "-0.01em" }}
+          >
+            {row.supplementName}
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
             <span
               className={BADGE}
               style={{
@@ -475,45 +528,81 @@ function ProtocolCard({
                 Not in library
               </span>
             )}
+            {conflictLabels.length > 0 && (
+              <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}>
+                Conflicts with declared {conflictLabels.join(", ")}
+              </span>
+            )}
           </div>
-          <p className="mt-0.5 text-sm" style={{ color: "var(--text-muted)" }}>
-            {row.dose} · {row.timing}
-          </p>
-          <p className="text-xs" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
-            {protocolWindowLabel(asCoverage(row), today)}
-          </p>
         </div>
         {canEdit && (
-          <div className="flex shrink-0 items-center gap-3">
-            {/* Only meaningful on rows the catalogue has instances of, and
-                only while the row is live — an ended prescription's product
-                is history, not something to switch. */}
-            {alternatives.length > 0 && phase !== "ended" && (
-              <button
-                type="button"
-                onClick={() => { setShowAlternatives(!showAlternatives); setOpen(false); }}
-                className="text-xs font-medium underline-offset-2 hover:underline"
-                style={{ color: "var(--brand-blue)" }}
-              >
-                {showAlternatives ? "Close alternatives" : `Alternatives (${alternatives.length})`}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => { setOpen(!open); setShowAlternatives(false); }}
-              className="text-xs font-medium underline-offset-2 hover:underline"
-              style={{ color: "var(--brand-blue)" }}
-            >
-              {open ? "Close" : "Edit"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => { setOpen(!open); setShowAlternatives(false); }}
+            className={`${PANEL} shrink-0 px-3 py-1 text-xs font-medium transition-colors duration-150 ease-out hover:border-white/25`}
+            style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+          >
+            {open ? "Close" : "Edit"}
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-0.5">
+        <p
+          className="text-base font-semibold"
+          style={{ fontFamily: "var(--font-heading)", color: "var(--text)", letterSpacing: "-0.01em" }}
+        >
+          {row.dose}
+        </p>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {row.timing}
+        </p>
+      </div>
+
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 border-t pt-2.5"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <p
+          className="text-[11px]"
+          style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}
+        >
+          {protocolWindowLabel(asCoverage(row), today)}
+        </p>
+        {/* Only meaningful on rows the catalogue has instances of, and only
+            while the row is live — an ended prescription's product is
+            history, not something to switch. */}
+        {canEdit && alternatives.length > 0 && phase !== "ended" && (
+          <button
+            type="button"
+            onClick={() => { setShowAlternatives(!showAlternatives); setOpen(false); }}
+            className="text-xs font-medium underline-offset-2 hover:underline"
+            style={{ color: "var(--brand-blue)" }}
+          >
+            {showAlternatives ? "Close alternatives" : `Alternatives (${alternatives.length})`}
+          </button>
         )}
       </div>
 
       {row.rationale && !open && !showAlternatives && (
-        <p className="mt-2 text-xs leading-snug" style={{ color: "var(--text-muted)" }}>
-          {row.rationale}
-        </p>
+        whyOpen ? (
+          <p
+            className={`${PANEL} m-0 cursor-pointer px-3 py-2.5 text-xs leading-relaxed`}
+            style={{ borderColor: "var(--border)", backgroundColor: "color-mix(in srgb, var(--text) 3%, transparent)", color: "var(--text-muted)" }}
+            onClick={() => setWhyOverride(false)}
+          >
+            {row.rationale}
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setWhyOverride(true)}
+            className="self-start text-left text-xs transition-colors duration-150 ease-out"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Why this — {whyPeek}
+          </button>
+        )
       )}
 
       {showAlternatives && canEdit && (
@@ -756,8 +845,8 @@ function AddProtocolForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-start text-xs font-medium underline-offset-2 hover:underline"
-        style={{ color: "var(--brand-blue)" }}
+        className={`${BTN_SECONDARY} self-start text-xs`}
+        style={{ borderColor: "var(--border)", color: "var(--text)" }}
       >
         + Add a supplement
       </button>
@@ -1008,7 +1097,10 @@ export default function SupplementsClient({
   preselectedAthleteId: string | null;
 }) {
   const [athleteFilter, setAthleteFilter] = useState<string>(preselectedAthleteId ?? "all");
-  const [showEnded, setShowEnded] = useState(false);
+  /** Phase filter pills — "ended" is where the old "Show ended" checkbox's
+   *  history view lives now; every state it could reach is still reachable. */
+  const [phaseFilter, setPhaseFilter] = useState<"all" | "active" | "scheduled" | "ended">("all");
+  const [allWhy, setAllWhy] = useState(false);
 
   const visible = useMemo(
     () => (athleteFilter === "all" ? data : data.filter((a) => a.athleteId === athleteFilter)),
@@ -1047,47 +1139,251 @@ export default function SupplementsClient({
     return { active, scheduled, athletesWithNone };
   }, [data, today]);
 
+  // Live (not-ended) rows written by the planner without a clinical library
+  // entry — the "needs a product match" number.
+  const notInLibrary = useMemo(
+    () =>
+      data.reduce(
+        (n, a) =>
+          n +
+          a.protocols.filter(
+            (p) => p.supplementLibraryId === null && protocolPhase(asCoverage(p), today) !== "ended"
+          ).length,
+        0
+      ),
+    [data, today]
+  );
+
+  /**
+   * The LIVE safety recomputation behind the "Safety conflicts" stat.
+   *
+   * Genuinely live by construction, never cached and never approximate: the
+   * page is a server component that re-reads declarations and protocol rows
+   * on every request (and every action revalidates the path), and this memo
+   * re-runs the SAME pure checks the server gates enforce with —
+   * checkPlanItems for entity contraindications and age bounds,
+   * productAllergenConflicts for the attached product — against exactly those
+   * fresh props. Nothing here is a second opinion or a heuristic; it is the
+   * gate's own functions pointed at what is already prescribed, which is the
+   * one case the save-time gates cannot cover: a declaration that CHANGED
+   * after the row was written.
+   *
+   * Ended rows are excluded — history is history — and each finding carries
+   * its row id so the stat can link straight to the affected card.
+   */
+  const safetyFindings = useMemo(() => {
+    const productById = new Map(products.map((p) => [p.id, p]));
+    const findings: {
+      rowId: string;
+      athleteId: string;
+      athleteName: string;
+      supplementName: string;
+      labels: string[];
+    }[] = [];
+    for (const a of data) {
+      if (!a.clinical) continue;
+      const live = a.protocols.filter((p) => protocolPhase(asCoverage(p), today) !== "ended");
+      if (live.length === 0) continue;
+      const result = checkPlanItems(
+        live.map((p) => ({
+          athleteId: a.athleteId,
+          date: null,
+          supplementName: p.supplementName,
+          supplementLibraryId: p.supplementLibraryId,
+          dose: p.dose,
+          timing: p.timing,
+          rationale: p.rationale,
+        })),
+        new Map([[a.athleteId, a.clinical]]),
+        library
+      );
+      live.forEach((p, i) => {
+        const labels = new Set<string>();
+        for (const f of result.findings) {
+          if (f.supplementName === p.supplementName && result.unsafeIndexes.has(i)) {
+            f.conflictingLabels.forEach((l) => labels.add(l));
+            if (f.conflictingLabels.length === 0) labels.add(f.reason);
+          }
+        }
+        const product = p.productId ? productById.get(p.productId) : undefined;
+        if (product && a.clinical) {
+          productAllergenConflicts(product.allergens, a.clinical).forEach((l) => labels.add(l));
+        }
+        if (labels.size > 0) {
+          findings.push({
+            rowId: p.id,
+            athleteId: a.athleteId,
+            athleteName: a.name,
+            supplementName: p.supplementName,
+            labels: [...labels],
+          });
+        }
+      });
+    }
+    return findings;
+  }, [data, products, library, today]);
+
+  const conflictsByRow = useMemo(
+    () => new Map(safetyFindings.map((f) => [f.rowId, f.labels])),
+    [safetyFindings]
+  );
+
+  /** Jump from the stat card to the affected row: clear any filter that
+   *  would hide it, then scroll once the row is in the DOM. */
+  const jumpToRow = (rowId: string, athleteId: string) => {
+    setAthleteFilter(athleteId);
+    setPhaseFilter("all");
+    setTimeout(() => {
+      document.getElementById(`protocol-${rowId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  };
+
+  const stats: { label: string; value: number; tone: string; sub: string }[] = [
+    {
+      label: "TAKING NOW",
+      value: totals.active,
+      tone: "var(--success)",
+      sub: `across ${data.length} athlete${data.length === 1 ? "" : "s"}${
+        totals.athletesWithNone > 0 ? ` · ${totals.athletesWithNone} with none` : ""
+      }`,
+    },
+    { label: "SCHEDULED", value: totals.scheduled, tone: "var(--text)", sub: "queued to start" },
+    {
+      label: "NOT IN LIBRARY",
+      value: notInLibrary,
+      tone: notInLibrary > 0 ? "var(--warning)" : "var(--text)",
+      sub: notInLibrary > 0 ? "needs a product match" : "every live row has a clinical entry",
+    },
+    {
+      label: "SAFETY CONFLICTS",
+      value: safetyFindings.length,
+      tone: safetyFindings.length > 0 ? "var(--danger)" : "var(--text)",
+      // "flagged", deliberately not "cleared" — this is a passive
+      // recomputation against current declarations, not a completed review.
+      sub: `${safetyFindings.length} flagged — checked now against current declarations`,
+    },
+  ];
+
   return (
-    <div className="flex flex-col gap-6">
-      <div
-        className={`${CARD} flex flex-wrap items-center justify-between gap-4 p-5`}
-        style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
-      >
-        <div>
-          <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
-            {totals.active} active · {totals.scheduled} scheduled across {data.length} athlete
-            {data.length === 1 ? "" : "s"}
-          </p>
-          <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
-            {totals.athletesWithNone === 0
-              ? "Every athlete has at least one protocol."
-              : `${totals.athletesWithNone} athlete${totals.athletesWithNone === 1 ? " has" : "s have"} nothing active or scheduled.`}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            value={athleteFilter}
-            onChange={(e) => setAthleteFilter(e.target.value)}
-            className={INPUT}
-            style={{ ...INPUT_STYLE, width: "auto" }}
-            aria-label="Filter by athlete"
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            className={`${CARD} flex flex-col gap-1 px-4 py-3.5`}
+            style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
-            <option value="all">All athletes</option>
-            {data.map((a) => (
-              <option key={a.athleteId} value={a.athleteId}>{a.name}</option>
-            ))}
-          </select>
-          <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text)" }}>
-            <input
-              type="checkbox"
-              checked={showEnded}
-              onChange={(e) => setShowEnded(e.target.checked)}
-              className="h-4 w-4 rounded"
-              style={{ accentColor: "var(--brand-blue)" }}
-            />
-            Show ended
-          </label>
+            <span
+              className="text-[9px] font-medium"
+              style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.16em", color: "var(--text-muted)" }}
+            >
+              {s.label}
+            </span>
+            <span
+              className="text-2xl font-semibold"
+              style={{ fontFamily: "var(--font-heading)", letterSpacing: "-0.02em", color: s.tone }}
+            >
+              {s.value}
+            </span>
+            <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{s.sub}</span>
+            {s.label === "SAFETY CONFLICTS" && safetyFindings.length > 0 && (
+              <div className="mt-1 flex flex-col items-start gap-1">
+                {safetyFindings.map((f) => (
+                  <button
+                    key={f.rowId}
+                    type="button"
+                    onClick={() => jumpToRow(f.rowId, f.athleteId)}
+                    className="text-left text-[11px] font-medium underline-offset-2 hover:underline"
+                    style={{ color: "var(--danger)" }}
+                  >
+                    {f.athleteName} — {f.supplementName}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Where protocols come FROM — the planner remains the front door; this
+          page is oversight and quick edits. Shown to editors only. */}
+      {canEdit && (
+        <div
+          className={`${CARD} flex flex-wrap items-center gap-4 px-5 py-3.5`}
+          style={{
+            borderColor: "var(--border)",
+            background:
+              "linear-gradient(90deg, color-mix(in srgb, var(--brand-teal) 7%, var(--surface)), color-mix(in srgb, var(--brand-blue-deep) 6%, var(--surface)) 55%, var(--surface))",
+          }}
+        >
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+              Protocols are built in the Nutrition Planner
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Set doses against the week&apos;s sessions there — they appear here for review and quick edits.
+            </p>
+          </div>
+          <Link
+            href={`/staff/${teamId}/supplements/planner`}
+            className={`${BTN_PRIMARY} ml-auto shrink-0`}
+            style={{ backgroundImage: "var(--brand-gradient-action)" }}
+          >
+            Nutrition Planner →
+          </Link>
         </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <select
+          value={athleteFilter}
+          onChange={(e) => setAthleteFilter(e.target.value)}
+          className={INPUT}
+          style={{ ...INPUT_STYLE, width: "auto" }}
+          aria-label="Filter by athlete"
+        >
+          <option value="all">All athletes</option>
+          {data.map((a) => (
+            <option key={a.athleteId} value={a.athleteId}>{a.name}</option>
+          ))}
+        </select>
+        {(
+          [
+            ["all", "All"],
+            ["active", "Taking now"],
+            ["scheduled", "Scheduled"],
+            ["ended", "Ended"],
+          ] as const
+        ).map(([key, label]) => {
+          const on = phaseFilter === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setPhaseFilter(key)}
+              className={`${PANEL} px-3.5 py-2 text-xs transition-colors duration-150 ease-out ${on ? "font-semibold" : "hover:border-white/25"}`}
+              style={
+                on
+                  ? {
+                      borderColor: "color-mix(in srgb, var(--success) 45%, transparent)",
+                      backgroundColor: "color-mix(in srgb, var(--success) 13%, transparent)",
+                      color: "var(--success)",
+                    }
+                  : { borderColor: "var(--border)", color: "var(--text-muted)" }
+              }
+            >
+              {label}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setAllWhy(!allWhy)}
+          className={`${PANEL} ml-auto px-3.5 py-2 text-xs transition-colors duration-150 ease-out hover:border-white/25`}
+          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+        >
+          {allWhy ? "Hide rationale" : "Show rationale"}
+        </button>
       </div>
 
       {visible.map((a) => {
@@ -1097,6 +1393,10 @@ export default function SupplementsClient({
           .filter((x) => x.phase === "scheduled")
           .sort((x, y) => x.p.startDate.localeCompare(y.p.startDate));
         const ended = withPhase.filter((x) => x.phase === "ended");
+
+        const showActive = (phaseFilter === "all" || phaseFilter === "active") && active.length > 0;
+        const showScheduled = (phaseFilter === "all" || phaseFilter === "scheduled") && scheduled.length > 0;
+        const showEndedSection = phaseFilter === "ended" && ended.length > 0;
 
         const card = ({ p, phase }: { p: ProtocolRow; phase: ProtocolPhase }) => (
           <ProtocolCard
@@ -1109,7 +1409,14 @@ export default function SupplementsClient({
             alternatives={alternativesFor(p)}
             clinical={a.clinical}
             allergenLabels={allergenLabels}
+            defaultWhyOpen={allWhy}
+            conflictLabels={conflictsByRow.get(p.id) ?? []}
           />
+        );
+        const grid = (items: { p: ProtocolRow; phase: ProtocolPhase }[]) => (
+          <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))" }}>
+            {items.map(card)}
+          </div>
         );
 
         return (
@@ -1118,52 +1425,64 @@ export default function SupplementsClient({
             className={`${CARD} flex flex-col gap-4 p-5`}
             style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
           >
-            <div>
-              <p className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
-                {a.name} <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>({a.code})</span>
+            <div
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 border-b pb-3"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <p
+                className="text-base font-semibold"
+                style={{ fontFamily: "var(--font-heading)", color: "var(--text)", letterSpacing: "-0.015em" }}
+              >
+                {a.name}
               </p>
+              <span
+                className="text-[10px]"
+                style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.12em", color: "var(--text-muted)" }}
+              >
+                {a.code}
+              </span>
               {/* Always on screen, never behind a disclosure — the same
                   component and the same wording the planner's review grid uses. */}
-              <div className="mt-1">
-                <ClinicalFlagChips flags={a.flags} />
-              </div>
+              <ClinicalFlagChips flags={a.flags} />
+              <span className="ml-auto text-xs" style={{ color: "var(--text-muted)" }}>
+                {active.length} active · {scheduled.length} scheduled
+              </span>
             </div>
 
-            {active.length === 0 && scheduled.length === 0 && (
+            {phaseFilter !== "ended" && active.length === 0 && scheduled.length === 0 && (
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                 Nothing active or scheduled.
               </p>
             )}
+            {phaseFilter === "ended" && ended.length === 0 && (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                No ended prescriptions.
+              </p>
+            )}
 
-            {active.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  Taking now
-                </p>
-                {active.map(card)}
+            {showActive && (
+              <div className="flex flex-col gap-2.5">
+                <SectionHead tone="var(--success)" label="TAKING NOW" />
+                {grid(active)}
               </div>
             )}
 
-            {scheduled.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  Scheduled
-                </p>
-                {scheduled.map(card)}
+            {showScheduled && (
+              <div className="flex flex-col gap-2.5">
+                <SectionHead tone="var(--text-muted)" outlined label="SCHEDULED" />
+                {grid(scheduled)}
               </div>
             )}
 
-            {showEnded && ended.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  Ended ({ended.length})
-                </p>
-                {ended.map(card)}
+            {showEndedSection && (
+              <div className="flex flex-col gap-2.5">
+                <SectionHead tone="var(--text-muted)" outlined label={`ENDED (${ended.length})`} />
+                {grid(ended)}
               </div>
             )}
-            {!showEnded && ended.length > 0 && (
+            {phaseFilter !== "ended" && ended.length > 0 && (
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                {ended.length} ended prescription{ended.length === 1 ? "" : "s"} kept in history.
+                {ended.length} ended prescription{ended.length === 1 ? "" : "s"} kept in history — see the Ended filter.
               </p>
             )}
 
