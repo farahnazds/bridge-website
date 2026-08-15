@@ -400,6 +400,18 @@ export async function cancelScheduledProtocol(
 // ---------------------------------------------------------------------------
 
 /**
+ * A protocol's display name once a product is attached: "Product (Brand)",
+ * unless the product name already carries the brand. Shared by creation and
+ * the Alternatives switch so My Protocol reads identically however the
+ * product got there.
+ */
+function productDisplayName(productName: string, brandName: string | undefined): string {
+  return brandName && !productName.toLowerCase().includes(brandName.toLowerCase())
+    ? `${productName} (${brandName})`
+    : productName;
+}
+
+/**
  * The one creation path outside the Nutrition Planner. Always runs the safety
  * gate — there is no "reducing coverage" exemption for something new.
  */
@@ -415,6 +427,7 @@ export async function createProtocol(
   const teamId = String(formData.get("team_id") ?? "").trim();
   const athleteId = String(formData.get("athlete_id") ?? "").trim();
   const libraryId = String(formData.get("supplement_library_id") ?? "").trim();
+  const productId = String(formData.get("product_id") ?? "").trim();
   const dose = String(formData.get("dose") ?? "").trim();
   const timing = String(formData.get("timing") ?? "").trim();
   const startDate = String(formData.get("start_date") ?? "").trim();
@@ -437,6 +450,13 @@ export async function createProtocol(
   // the planner's confirm path still writes unmatched model suggestions.)
   if (!libraryId) return { ...EMPTY, error: "Choose a supplement from the library." };
 
+  // PRODUCT-REQUIRED since 2026-08-15, same decision's second half: a
+  // prescription names the certified SKU the athlete actually picks up.
+  // Every offered entity has at least one certified product, so this can
+  // never dead-end a legitimate choice. (The planner's confirm path still
+  // writes entity-only rows; those pick up a product via Alternatives.)
+  if (!productId) return { ...EMPTY, error: "Choose a certified product." };
+
   const supabase = await createClient();
 
   // Roster membership re-derived server-side rather than trusted from the form,
@@ -454,7 +474,25 @@ export async function createProtocol(
   const library = await loadSupplementLibrary();
   const entry = library.find((s) => s.id === libraryId);
   if (!entry) return { ...EMPTY, error: "That supplement isn't in the library any more." };
-  const supplementName = entry.name;
+
+  // The product must genuinely be an instance of the chosen clinical entity —
+  // re-derived server-side rather than trusted from the client, the same rule
+  // switchProtocolProduct enforces: a crafted form cannot attach a caffeine
+  // product to a creatine prescription.
+  const { data: product } = await supabase
+    .from("products")
+    .select("id, name, supplement_library_id, allergens, brands(name)")
+    .eq("id", productId)
+    .maybeSingle();
+  if (!product) return { ...EMPTY, error: "That product no longer exists." };
+  if (product.supplement_library_id !== libraryId) {
+    return { ...EMPTY, error: "That product is a different supplement — pick one of the chosen supplement's certified products." };
+  }
+
+  const supplementName = productDisplayName(
+    product.name as string,
+    (product.brands as unknown as { name: string } | null)?.name
+  );
 
   const safetyMessage = await runSafetyGate({
     athleteId,
@@ -467,11 +505,27 @@ export async function createProtocol(
   });
   if (safetyMessage) return { ...EMPTY, safetyMessage };
 
+  // THE PRODUCT HALF of the structural check, exactly as the Alternatives
+  // switch runs it: entity codes pass is necessary but not sufficient when a
+  // specific product is being attached — two products of one entity can
+  // differ on allergens.
+  const ctx = (await loadAthleteClinicalContext([athleteId])).get(athleteId);
+  if (ctx) {
+    const conflicts = productAllergenConflicts((product.allergens as string[] | null) ?? [], ctx);
+    if (conflicts.length > 0) {
+      return {
+        ...EMPTY,
+        safetyMessage: `${supplementName} contains ${conflicts.join(", ")}, which this athlete has declared — the protocol was not saved. Another product of the same supplement may be fine; check its allergen chips.`,
+      };
+    }
+  }
+
   const { data, error } = await supabase
     .from("supplement_protocols")
     .insert({
       athlete_id: athleteId,
       supplement_library_id: libraryId,
+      product_id: productId,
       supplement_name: supplementName,
       dose,
       timing,
@@ -563,10 +617,10 @@ export async function switchProtocolProduct(
     return { ...EMPTY, error: "That product is a different supplement — alternatives must share the same clinical library entry." };
   }
 
-  const brandName = (product.brands as unknown as { name: string } | null)?.name;
-  const newName = brandName && !(product.name as string).toLowerCase().includes(brandName.toLowerCase())
-    ? `${product.name} (${brandName})`
-    : (product.name as string);
+  const newName = productDisplayName(
+    product.name as string,
+    (product.brands as unknown as { name: string } | null)?.name
+  );
 
   const safetyMessage = await runSafetyGate({
     athleteId: before.athlete_id as string,

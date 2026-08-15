@@ -48,6 +48,11 @@ export interface CatalogueProductLite {
   allergens: string[];
   vegan: boolean;
   defaultDosing: string | null;
+  /** Label timing split out of default_dosing by migration 045. Canonical
+   *  values match SUPPLEMENT_TIMING_OPTIONS and pre-select that option; a
+   *  non-canonical value (the Beet It loading protocol) pre-fills the Custom
+   *  timing input verbatim. */
+  defaultTiming: string | null;
 }
 
 export interface AthleteProtocols {
@@ -283,12 +288,14 @@ function AlternativesPanel({
   row,
   alternatives,
   clinical,
+  allergenLabels,
   onClose,
 }: {
   teamId: string;
   row: ProtocolRow;
   alternatives: CatalogueProductLite[];
   clinical: AthleteClinicalContext | null;
+  allergenLabels: Record<string, string>;
   onClose: () => void;
 }) {
   const [state, action] = useActionState(switchProtocolProduct, initialState);
@@ -296,7 +303,10 @@ function AlternativesPanel({
   const [dose, setDose] = useState(row.dose);
   const [timing, setTiming] = useState(row.timing);
   const [rationale, setRationale] = useState(row.rationale);
-  const codeLabels = clinical?.codeLabels ?? {};
+  // Vocabulary labels first, the athlete's own declaration labels (which can
+  // carry an "other" note) over them — so every chip reads as a human label,
+  // declared or not.
+  const codeLabels = { ...allergenLabels, ...(clinical?.codeLabels ?? {}) };
 
   // The product half of the structural check, live — same pure function the
   // server action enforces with, run the moment a product is picked.
@@ -406,6 +416,7 @@ function ProtocolCard({
   canEdit,
   alternatives,
   clinical,
+  allergenLabels,
 }: {
   teamId: string;
   row: ProtocolRow;
@@ -414,6 +425,7 @@ function ProtocolCard({
   canEdit: boolean;
   alternatives: CatalogueProductLite[];
   clinical: AthleteClinicalContext | null;
+  allergenLabels: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
@@ -510,6 +522,7 @@ function ProtocolCard({
           row={row}
           alternatives={alternatives}
           clinical={clinical}
+          allergenLabels={allergenLabels}
           onClose={() => setShowAlternatives(false)}
         />
       )}
@@ -627,8 +640,8 @@ function ProtocolCard({
 /**
  * The Add form, rebuilt 2026-08-15 as library-only (the "Not in the library"
  * free-text path is gone — see createProtocol). Flow: category → supplement →
- * dose → timing → reason, with the athlete's declarations pinned on top and
- * the shared safety check running live on selection.
+ * PRODUCT → dose → timing → reason, with the athlete's declarations pinned on
+ * top and the shared safety check running live on selection.
  *
  * The category dropdown is the BROAD docs/13 section (category_group,
  * migration 044), not the narrow clinical slug — six groups with the specific
@@ -637,10 +650,20 @@ function ProtocolCard({
  * predates the certified catalogue) is not offered here at all; its history
  * and safety codes are untouched.
  *
- * Dose presets are DERIVED from the entity's certified products'
- * default_dosing strings — real label dosing already in the data, deduplicated
- * at render — with the same Custom escape hatch as timing. Nothing is
- * invented: an entity whose products carry no dosing falls back to free text.
+ * The PRODUCT step is REQUIRED: a prescription names the certified SKU the
+ * athlete actually picks up, not just the clinical entity — the same cards,
+ * badges and live allergen check the Alternatives switch uses, so the two
+ * flows cannot drift. (The first library-only rebuild shipped without this
+ * step; product attachment then existed only as a post-hoc Alternatives
+ * switch, leaving hand-added rows product-less.) Every offered entity has at
+ * least one certified product, so requiring one never dead-ends a choice.
+ *
+ * Dose and timing presets come from the CHOSEN product's own label data
+ * (default_dosing / default_timing, split clean by migration 045), with the
+ * Custom escape hatch. A canonical default_timing pre-selects that vocabulary
+ * option; the non-canonical one (Beet It's loading protocol) pre-fills the
+ * Custom input verbatim. Nothing is invented: absent label data falls back to
+ * free text / the practitioner's own choice.
  */
 function AddProtocolForm({
   teamId,
@@ -649,6 +672,7 @@ function AddProtocolForm({
   today,
   library,
   productsByLibrary,
+  allergenLabels,
 }: {
   teamId: string;
   athleteId: string;
@@ -656,11 +680,13 @@ function AddProtocolForm({
   today: string;
   library: SupplementLibraryRow[];
   productsByLibrary: Map<string, CatalogueProductLite[]>;
+  allergenLabels: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(createProtocol, initialState);
   const [group, setGroup] = useState("");
   const [libraryId, setLibraryId] = useState("");
+  const [productId, setProductId] = useState("");
   const [doseChoice, setDoseChoice] = useState("");
   const [doseCustom, setDoseCustom] = useState("");
   const [timingChoice, setTimingChoice] = useState<string>(SUPPLEMENT_TIMING_OPTIONS[0]);
@@ -686,15 +712,41 @@ function AddProtocolForm({
   const entry = library.find((s) => s.id === libraryId) ?? null;
   const findings = useMemo(() => liveFindings(entry, clinical), [entry, clinical]);
 
-  // Distinct label-dosing strings across this entity's certified products.
-  const doseOptions = useMemo(() => {
-    if (!libraryId) return [];
-    const dosings = (productsByLibrary.get(libraryId) ?? [])
-      .map((p) => p.defaultDosing?.trim())
-      .filter((d): d is string => Boolean(d));
-    return [...new Set(dosings)];
-  }, [libraryId, productsByLibrary]);
+  // The chosen entity's certified products — the required third step.
+  const entityProducts = useMemo(
+    () =>
+      (libraryId ? productsByLibrary.get(libraryId) ?? [] : [])
+        .slice()
+        .sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name)),
+    [libraryId, productsByLibrary]
+  );
+  const product = entityProducts.find((p) => p.id === productId) ?? null;
 
+  // The product half of the live structural check — same pure function the
+  // server action enforces with, run the moment a product is picked.
+  const productConflicts = product && clinical ? productAllergenConflicts(product.allergens, clinical) : [];
+
+  const resetSelection = () => {
+    setProductId("");
+    setDoseChoice("");
+  };
+  const chooseProduct = (p: CatalogueProductLite) => {
+    setProductId(p.id);
+    // The product's own label data becomes the starting point, still fully
+    // editable: its dosing is pre-selected, and its timing pre-selects the
+    // canonical option or pre-fills Custom verbatim (the Beet It loaders).
+    setDoseChoice(p.defaultDosing ? p.defaultDosing : CUSTOM);
+    if (p.defaultTiming) {
+      if ((SUPPLEMENT_TIMING_OPTIONS as readonly string[]).includes(p.defaultTiming)) {
+        setTimingChoice(p.defaultTiming);
+      } else {
+        setTimingChoice(CUSTOM);
+        setTimingCustom(p.defaultTiming);
+      }
+    }
+  };
+
+  const doseOptions = product?.defaultDosing ? [product.defaultDosing] : [];
   const dose = doseOptions.length === 0 || doseChoice === CUSTOM ? doseCustom : doseChoice;
   const timing = timingChoice === CUSTOM ? timingCustom : timingChoice;
   const rationale = whyChoice === CUSTOM ? whyCustom : whyChoice;
@@ -736,7 +788,7 @@ function AddProtocolForm({
           <label className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Category</label>
           <select
             value={group}
-            onChange={(e) => { setGroup(e.target.value); setLibraryId(""); setDoseChoice(""); }}
+            onChange={(e) => { setGroup(e.target.value); setLibraryId(""); resetSelection(); }}
             className={INPUT}
             style={INPUT_STYLE}
             required
@@ -753,7 +805,7 @@ function AddProtocolForm({
           <select
             name="supplement_library_id"
             value={libraryId}
-            onChange={(e) => { setLibraryId(e.target.value); setDoseChoice(""); }}
+            onChange={(e) => { setLibraryId(e.target.value); resetSelection(); }}
             className={INPUT}
             style={INPUT_STYLE}
             required
@@ -769,6 +821,62 @@ function AddProtocolForm({
 
       {/* The live mismatch check — same checkPlanItems as everywhere else. */}
       <LiveWarnings findings={findings} />
+
+      {/* The required product step — same cards, badges and radio pattern as
+          the Alternatives panel, so choosing a product reads identically in
+          both flows. */}
+      {libraryId && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+            Product — the certified item the athlete actually picks up
+          </p>
+          {entityProducts.map((p) => (
+            <label
+              key={p.id}
+              className={`${PANEL} flex cursor-pointer items-start gap-2 px-3 py-2`}
+              style={{
+                borderColor: productId === p.id ? "var(--brand-blue)" : "var(--border)",
+                backgroundColor: productId === p.id ? "color-mix(in srgb, var(--brand-blue) 8%, transparent)" : "var(--surface)",
+              }}
+            >
+              <input
+                type="radio"
+                name="product_id"
+                value={p.id}
+                checked={productId === p.id}
+                onChange={() => chooseProduct(p)}
+                className="mt-1"
+                required
+              />
+              <span className="flex min-w-0 flex-col gap-1 text-xs" style={{ color: "var(--text)" }}>
+                <span className="font-medium">
+                  {p.name} <span style={{ color: "var(--text-muted)" }}>— {p.brand}</span>
+                </span>
+                <ProductBadges p={p} codeLabels={{ ...allergenLabels, ...(clinical?.codeLabels ?? {}) }} />
+                {p.defaultDosing && (
+                  <span style={{ color: "var(--text-muted)" }}>Label dosing: {p.defaultDosing}</span>
+                )}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {productConflicts.length > 0 && (
+        <div
+          role="alert"
+          className={NOTICE}
+          style={{
+            borderColor: "var(--danger)",
+            color: "var(--text)",
+            backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+          }}
+        >
+          <strong style={{ color: "var(--danger)" }}>This product fails the safety check.</strong>{" "}
+          It contains {productConflicts.join(", ")}, which this athlete has declared. Saving will be
+          blocked by the same check on the server — pick another product of the same supplement.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
@@ -799,14 +907,14 @@ function AddProtocolForm({
                 />
               )}
               <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                Label dosing from this supplement&apos;s certified products.
+                This product&apos;s label dosing.
               </p>
             </>
           ) : (
             <input
               value={doseCustom}
               onChange={(e) => setDoseCustom(e.target.value)}
-              placeholder={libraryId ? "e.g. 5 g/day" : "Choose a supplement first"}
+              placeholder={productId ? "e.g. 5 g/day" : "Choose a product first"}
               className={INPUT}
               style={INPUT_STYLE}
               required
@@ -883,6 +991,7 @@ export default function SupplementsClient({
   data,
   library,
   products,
+  allergenLabels,
   canEdit,
   preselectedAthleteId,
 }: {
@@ -891,6 +1000,10 @@ export default function SupplementsClient({
   data: AthleteProtocols[];
   library: SupplementLibraryRow[];
   products: CatalogueProductLite[];
+  /** code → human label for the FULL allergy vocabulary, so product chips can
+   *  name allergens the athlete hasn't declared. Athlete-declared labels
+   *  (which can carry an "other" note) still win where both exist. */
+  allergenLabels: Record<string, string>;
   canEdit: boolean;
   preselectedAthleteId: string | null;
 }) {
@@ -995,6 +1108,7 @@ export default function SupplementsClient({
             canEdit={canEdit}
             alternatives={alternativesFor(p)}
             clinical={a.clinical}
+            allergenLabels={allergenLabels}
           />
         );
 
@@ -1061,6 +1175,7 @@ export default function SupplementsClient({
                 today={today}
                 library={library}
                 productsByLibrary={productsByLibrary}
+                allergenLabels={allergenLabels}
               />
             )}
           </div>

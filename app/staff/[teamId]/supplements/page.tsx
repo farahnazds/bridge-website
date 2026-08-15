@@ -63,7 +63,7 @@ export default async function SupplementsPage({
         .order("start_date", { ascending: false })
     : { data: [] };
 
-  const [contexts, library, productsRes, brandsRes] = await Promise.all([
+  const [contexts, library, productsRes, brandsRes, allergiesRes] = await Promise.all([
     loadAthleteClinicalContext(athleteIds),
     loadSupplementLibrary(),
     // The certified catalogue (migration 042): every product carrying a
@@ -71,9 +71,14 @@ export default async function SupplementsPage({
     // catalogue tables, authenticated-read under RLS.
     supabase
       .from("products")
-      .select("id, name, brand_id, supplement_library_id, informed_sport, nsf_certified, allergens, vegan, default_dosing")
+      .select("id, name, brand_id, supplement_library_id, informed_sport, nsf_certified, allergens, vegan, default_dosing, default_timing")
       .not("supplement_library_id", "is", null),
     supabase.from("brands").select("id, name"),
+    // The full allergy vocabulary, so a product chip can name an allergen the
+    // ATHLETE HASN'T declared. The athlete's own codeLabels only cover their
+    // declarations — without this, an undeclared allergen rendered as its raw
+    // code ("Contains milk_dairy").
+    supabase.from("allergies").select("code, label"),
   ]);
 
   const brandName = new Map(((brandsRes.data ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name]));
@@ -87,7 +92,11 @@ export default async function SupplementsPage({
     allergens: (p.allergens as string[] | null) ?? [],
     vegan: Boolean(p.vegan),
     defaultDosing: (p.default_dosing as string | null) ?? null,
+    defaultTiming: (p.default_timing as string | null) ?? null,
   }));
+  const allergenLabels: Record<string, string> = Object.fromEntries(
+    ((allergiesRes.data ?? []) as { code: string; label: string }[]).map((a) => [a.code, a.label])
+  );
 
   const byAthlete = new Map<string, ProtocolRow[]>();
   for (const r of protocolRows ?? []) {
@@ -167,6 +176,7 @@ export default async function SupplementsPage({
           data={data}
           library={library}
           products={products}
+          allergenLabels={allergenLabels}
           canEdit={canEdit}
           preselectedAthleteId={preselected}
         />
