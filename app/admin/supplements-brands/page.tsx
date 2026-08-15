@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import BrandsClient, { type Brand, type Product, type Pairing, type Target } from "./BrandsClient";
+import CertifiedCatalogue, { type CatalogueProduct, type LibraryEntry } from "./CertifiedCatalogue";
 import { NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Supplements & Brands — Admin — Bridgetx" };
@@ -24,14 +25,25 @@ export default async function AdminSupplementsBrandsPage() {
 
   const [clubs, scopeNoun] = await Promise.all([getAssignedClubs(), getScopeNoun()]);
 
-  const [brandsRes, productsRes, pairingsRes, segmentsRes] = await Promise.all([
+  const [brandsRes, productsRes, pairingsRes, segmentsRes, libraryRes, condsRes, allergiesRes, intolsRes] = await Promise.all([
     supabase.from("brands").select("id, name, logo_url, contact_email, external_store_url").order("name"),
-    supabase.from("products").select("id, brand_id, name, category, description, base_price, currency, image_url").order("name"),
+    // `*` rather than a column list, deliberately: migration 042 adds the
+    // certification/allergen columns, and this page must render both before
+    // and after it is applied. A named list of not-yet-existing columns would
+    // 400 the whole page pre-migration.
+    supabase.from("products").select("*").order("name"),
     supabase
       .from("club_brand_products")
       .select("id, club_id, segment_id, brand_id, is_prescription_brand, show_in_shop, discount_percent, discount_code, payment_mode")
       .order("created_at"),
     supabase.from("segments").select("id, name").order("name"),
+    supabase
+      .from("supplement_library")
+      .select("id, name, category, evidence_grade, age_min, contraindicated_conditions")
+      .order("name"),
+    supabase.from("medical_conditions").select("code, label"),
+    supabase.from("allergies").select("code, label"),
+    supabase.from("intolerances").select("code, label"),
   ]);
 
   const brands = (brandsRes.data ?? []) as Brand[];
@@ -97,6 +109,19 @@ export default async function AdminSupplementsBrandsPage() {
           pairings={pairings}
           targets={targets}
           canWrite={canWrite}
+        />
+      )}
+
+      {!loadError && (
+        <CertifiedCatalogue
+          products={(productsRes.data ?? []) as CatalogueProduct[]}
+          brands={brands.map((b) => ({ id: b.id, name: b.name }))}
+          library={(libraryRes.data ?? []) as LibraryEntry[]}
+          codeLabels={Object.fromEntries(
+            [...(condsRes.data ?? []), ...(allergiesRes.data ?? []), ...(intolsRes.data ?? [])].map(
+              (r) => [r.code as string, r.label as string]
+            )
+          )}
         />
       )}
     </div>

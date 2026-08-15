@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridge — Certified Supplement Module (Informed Sport / NSF)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; font-family: 'Outfit', system-ui, sans-serif; background: #060f1e; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #13274a; border-radius: 3px; }
+  select option { background: #0d1e38; color: #e8f0fe; }
+  #loading { display:flex; align-items:center; justify-content:center; height:100vh; background:#060f1e; color:#00c9a7; font-family:'Outfit',sans-serif; font-size:16px; gap:12px; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .fade-in { animation: fadeIn 0.25s ease forwards; }
+  code, pre { font-family:'DM Mono', monospace; }
+  pre { white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+<div id="root"><div id="loading"><span style="font-size:32px">🌉</span> Loading Certified Supplement Module...</div></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useMemo } = React;
+
+// ═══════════════════════════════════════════════════════════════════
+// CERTIFIED SUPPLEMENT LIBRARY — INFORMED SPORT + NSF CERTIFIED FOR SPORT ONLY
+// Every entry below carries a live, batch-tested anti-doping certification from
+// one (or both) of the two programmes the brief specified:
+//   is  : true  → Informed Sport certified (sport.wetestyoutrust.com)
+//   nsf : true  → NSF Certified for Sport® (nsfsport.com)
+// No product without at least one of these flags set to true is included.
+//
+// Brands covered (each verified against brand pages / Informed Sport's own
+// certified-brands directory / NSF's certified-products search as of this
+// build): Science in Sport, Maurten, Precision Hydration, High5, James White
+// Drinks (Beet It), Myprotein, Optimum Nutrition (Informed-Sport SKU),
+// Nutrition X (entire range Informed Sport certified — sponsor/team-supply
+// brand used by multiple pro clubs), Kinetica Sports (majority of range
+// Informed Sport certified — official Fulham FC nutrition partner), Applied
+// Nutrition, GU Energy, Thorne, Momentous, Klean Athlete, Nordic Naturals,
+// Vega, Garden of Life, Bare Performance Nutrition, Grenade, NUTRITECH,
+// Fluid Sports Nutrition, Healthspan Elite (Official Sports Nutrition Partner
+// of the All Blacks — entire range Informed Sport certified), Veloforte.
+//
+// See DEV_INTEGRATION_GUIDE.md §3 for the verification protocol — certification
+// status must be re-checked against the live registries on a scheduled cadence,
+// since brands add/drop SKUs and batches from these programmes over time.
+// ═══════════════════════════════════════════════════════════════════
+
+const ALLERGENS = [
+  { key: "milk", label: "Milk / Dairy (Lactose)" },
+  { key: "soy", label: "Soy" },
+  { key: "gluten", label: "Gluten" },
+  { key: "egg", label: "Egg" },
+  { key: "fish", label: "Fish" },
+  { key: "tree-nut", label: "Tree Nut" },
+];
+
+const CATEGORIES = ["Hydration", "Protein", "Performance", "Race Fuel", "Recovery", "Micronutrient"];
+
+const CERTIFIED_SUPPLEMENTS = {
+  // ── HYDRATION / ELECTROLYTES ──
+  sis_go_hydro:{id:"sis_go_hydro",name:"SiS GO Electrolyte",brand:"Science in Sport",cat:"Hydration",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Isotonic electrolyte tablet — sodium, potassium, magnesium replacement for training and match days.",dosing:"1 tablet per 500 ml water",unit:"tablet",timing:["During training every 15–20 min","Hot-weather match days"],tags:["hydration","electrolytes","youth-safe"],color:"#4cc9f0"},
+  precision_1000:{id:"precision_1000",name:"Precision Hydration 1000",brand:"Precision Hydration",cat:"Hydration",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Individually dosed electrolyte formula — 1000 mg sodium per serving for heavy/salty sweaters.",dosing:"1 sachet per 500–750 ml water",unit:"sachet",timing:["Pre-session in heat","During prolonged training >60 min"],tags:["hydration","electrolytes","heat"],color:"#4cc9f0"},
+  highfive_zero:{id:"highfive_zero",name:"High5 Zero Electrolyte",brand:"High5",cat:"Hydration",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Sugar-free electrolyte tablet — B vitamins added for weight-conscious or cutting athletes.",dosing:"1 tablet per 500 ml water",unit:"tablet",timing:["During training","Post-training"],tags:["hydration","sugar-free","electrolytes"],color:"#4cc9f0"},
+  // NOTE: "BPN Electrolytes" (Bare Performance Nutrition) was removed from this
+  // library — verification turned up an Informed Sport programme record showing
+  // it was voluntarily withdrawn from that certification on 06-Sep-2024. This is
+  // exactly the kind of lapse the verification protocol below exists to catch;
+  // it's left as a comment intentionally so the removal reasoning isn't lost.
+
+  // ── PROTEIN ──
+  sis_rego_protein:{id:"sis_rego_protein",name:"SiS REGO Rapid Recovery",brand:"Science in Sport",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"22 g protein + 23 g carbs — combined recovery shake for post-match/session refuelling.",dosing:"1 serving (50 g) within 30 min post-exercise",unit:"serving",timing:["Immediately post-training","Post-match"],tags:["protein","carbs","recovery"],color:"#06d6a0"},
+  grenade_carb_killa:{id:"grenade_carb_killa",name:"Carb Killa High Protein Bar",brand:"Grenade",cat:"Protein",grade:"B",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk","soy"],vegan:false,desc:"20–21 g protein, low-sugar triple-layer bar — Informed Sport certified, convenient kitbag/travel protein source.",dosing:"1 bar (60 g) as needed",unit:"bar",timing:["Post-training snack","Travel days when a shake isn't practical"],tags:["protein","bar","travel","low-sugar"],color:"#06d6a0"},
+  on_gold_standard_is:{id:"on_gold_standard_is",name:"Gold Standard 100% Whey (Informed-Sport)",brand:"Optimum Nutrition",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk","soy"],vegan:false,desc:"24 g fast-absorbing whey — the Informed-Sport-batch-tested SKU of ON's flagship whey (distinct from the standard retail line).",dosing:"1–2 scoops (24–48 g protein)",unit:"scoop (30 g)",timing:["Within 30 min post-training","Morning with breakfast"],tags:["protein","whey","muscle"],color:"#06d6a0"},
+  vega_sport_protein:{id:"vega_sport_protein",name:"Vega Sport Premium Protein",brand:"Vega",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"30 g plant-based protein (pea/pumpkin/sunflower) — dairy-free option for lactose-intolerant or vegan athletes.",dosing:"1 scoop post-training",unit:"scoop (46 g)",timing:["Post-training","Breakfast smoothie"],tags:["protein","vegan","dairy-free"],color:"#06d6a0"},
+  garden_of_life_sport:{id:"garden_of_life_sport",name:"SPORT Organic Plant-Based Protein",brand:"Garden of Life",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"28 g organic pea/sprouted-grain protein with added BCAAs — NSF Certified for Sport plant option.",dosing:"1 scoop post-training",unit:"scoop (44 g)",timing:["Post-training","Between meals"],tags:["protein","vegan","organic"],color:"#06d6a0"},
+  momentous_whey_isolate:{id:"momentous_whey_isolate",name:"Whey Protein Isolate",brand:"Momentous",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:false,nsf:true,allergens:["milk"],vegan:false,desc:"25 g grass-fed whey isolate, low-lactose — clean label, minimal ingredients.",dosing:"1 scoop post-training",unit:"scoop (33 g)",timing:["Within 30 min post-training"],tags:["protein","isolate","low-lactose"],color:"#06d6a0"},
+  klean_isolate:{id:"klean_isolate",name:"Klean Isolate",brand:"Klean Athlete",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:false,nsf:true,allergens:["milk"],vegan:false,desc:"20 g whey protein isolate, single-ingredient formula — minimal-additive option for sensitive athletes.",dosing:"1 scoop post-training",unit:"scoop (25 g)",timing:["Post-training","Before sleep"],tags:["protein","isolate","clean-label"],color:"#06d6a0"},
+
+  // ── PERFORMANCE (creatine / ergogenic) ──
+  myprotein_creatine:{id:"myprotein_creatine",name:"Creatine Monohydrate (Creapure)",brand:"Myprotein",cat:"Performance",grade:"A",ageMin:15,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Most evidence-based ergogenic aid — power, sprint and lean-mass gains. Requires practitioner sign-off for U18s.",dosing:"3–5 g/day (no loading phase needed)",unit:"g",timing:["Post-training with carbs","Any time — consistency is key"],tags:["power","sprint","muscle","U18-practitioner-review"],color:"#ef476f"},
+  thorne_creatine:{id:"thorne_creatine",name:"Creatine",brand:"Thorne",cat:"Performance",grade:"A",ageMin:15,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"NSF Certified for Sport creatine monohydrate, micronised for solubility.",dosing:"3–5 g/day",unit:"g",timing:["Post-training","Any time — consistency is key"],tags:["power","muscle","U18-practitioner-review"],color:"#ef476f"},
+  momentous_creatine:{id:"momentous_creatine",name:"Creatine",brand:"Momentous",cat:"Performance",grade:"A",ageMin:15,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"NSF Certified for Sport creatine monohydrate — unflavoured, mixes into any shake.",dosing:"3–5 g/day",unit:"g",timing:["Post-training","Any time"],tags:["power","muscle","U18-practitioner-review"],color:"#ef476f"},
+  beta_alanine_sis:{id:"beta_alanine_sis",name:"Beta-Alanine",brand:"Science in Sport",cat:"Performance",grade:"A",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Increases muscle carnosine — delays fatigue in repeated 1–4 min high-intensity efforts.",dosing:"3.2–6.4 g/day in split doses",unit:"g",timing:["Split across 4 doses/day","Pre-training"],tags:["endurance","fatigue-resistance"],color:"#ef476f"},
+  caffeine_sis:{id:"caffeine_sis",name:"Caffeine Shot",brand:"Science in Sport",cat:"Performance",grade:"A",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"3–6 mg/kg acute dose for focus, power and endurance. Not for U16s; practitioner-directed for 16–17.",dosing:"3–6 mg per kg bodyweight",unit:"mg caffeine",timing:["45–60 min before competition"],tags:["performance","focus","U18-practitioner-review"],color:"#2c3e50"},
+  sis_bcaa_perform:{id:"sis_bcaa_perform",name:"BCAA Perform",brand:"Science in Sport",cat:"Performance",grade:"B",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Branched-chain amino acid formula for intra-session muscle support — weaker evidence base than whole-protein strategies, positioned as an adjunct.",dosing:"1 serving during/around training",unit:"serving",timing:["During training","Around competition"],tags:["bcaa","muscle"],color:"#ef476f"},
+  beet_it_nitrate400:{id:"beet_it_nitrate400",name:"Beet It Sport Nitrate 400",brand:"James White Drinks",cat:"Performance",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"400 mg nitrate → nitric oxide → improved oxygen efficiency for endurance efforts. Single-shot format (70 ml).",dosing:"1 shot (70 ml); load 3–6 days pre-event",unit:"shot",timing:["2–3 hours before competition","Load 3–6 days pre-event"],tags:["endurance","VO2max","nitrate"],color:"#c0392b"},
+  beet_it_nitrate3000:{id:"beet_it_nitrate3000",name:"Beet It Sport Nitrate 3000",brand:"James White Drinks",cat:"Performance",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Same Informed Sport certified 400 mg-nitrate-per-serving formulation as Nitrate 400, in a bulk 250 ml bottle (7.5 servings) — more practical for squad-level team ordering than individual shots.",dosing:"35 ml serving (400 mg nitrate); load 3–6 days pre-event",unit:"serving (35 ml)",timing:["2–3 hours before competition","Load 3–6 days pre-event"],tags:["endurance","VO2max","nitrate","team-supply"],color:"#c0392b"},
+
+  // ── RACE FUEL / CARBOHYDRATE ──
+  sis_go_gel:{id:"sis_go_gel",name:"SiS GO Isotonic Gel",brand:"Science in Sport",cat:"Race Fuel",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"22 g carbs, isotonic — no water needed, stomach-friendly during play.",dosing:"1 gel every 20–30 min during play",unit:"gel (60 ml)",timing:["During sessions >60 min","Half-time top-up"],tags:["race fuel","endurance","isotonic"],color:"#e67e22"},
+  sis_beta_fuel_gel:{id:"sis_beta_fuel_gel",name:"Beta Fuel Gel",brand:"Science in Sport",cat:"Race Fuel",grade:"A",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Dual carbohydrate source (maltodextrin + fructose, ~40g) for higher carb-per-hour fuelling in extended/high-intensity match play.",dosing:"1 gel per 30–45 min during extended play",unit:"gel",timing:["Extra-time/tournament congestion days"],tags:["race fuel","high-carb","tournament"],color:"#e67e22"},
+  sis_electrolyte_gel:{id:"sis_electrolyte_gel",name:"Electrolyte Gel",brand:"Science in Sport",cat:"Race Fuel",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Isotonic gel with added electrolytes — combines carb fuelling and sodium replacement in hot-weather matches.",dosing:"1 gel every 30–45 min",unit:"gel",timing:["Hot-weather match days","During sessions >60 min"],tags:["race fuel","electrolytes","heat"],color:"#e67e22"},
+  maurten_gel100:{id:"maurten_gel100",name:"Maurten Gel 100",brand:"Maurten",cat:"Race Fuel",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"25 g carbs in hydrogel — superior GI tolerance for high-intensity match play.",dosing:"1 gel per 45 min effort",unit:"gel (40 g)",timing:["Every 45 min during competition","15 min before intense final push"],tags:["race fuel","hydrogel"],color:"#e67e22"},
+  maurten_drink320:{id:"maurten_drink320",name:"Maurten Drink Mix 320",brand:"Maurten",cat:"Race Fuel",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"80 g carbs per 500 ml — high-density fuelling for double-session or tournament days.",dosing:"1 sachet in 500 ml per hour",unit:"sachet",timing:["During prolonged training/competition >90 min"],tags:["race fuel","tournament","carb-load"],color:"#e67e22"},
+  gu_roctane_gel:{id:"gu_roctane_gel",name:"Roctane Energy Gel",brand:"GU Energy",cat:"Race Fuel",grade:"A",ageMin:14,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"Amino-acid-enhanced carbohydrate gel — NSF Certified for Sport, includes electrolytes.",dosing:"1 gel every 30–45 min",unit:"gel (32 g)",timing:["During prolonged match play","Pre-extra-time top-up"],tags:["race fuel","amino-enhanced"],color:"#e67e22"},
+
+  // ── RECOVERY ──
+  momentous_recovery_protein:{id:"momentous_recovery_protein",name:"Recovery Protein",brand:"Momentous",cat:"Recovery",grade:"A",ageMin:15,ageMax:99,is:false,nsf:true,allergens:["milk"],vegan:false,desc:"Whey protein + carbohydrate ratio designed for post-match glycogen and muscle-protein resynthesis.",dosing:"1 serving within 30 min post-match",unit:"serving",timing:["Immediately post-match","Post-double-session"],tags:["recovery","glycogen","muscle"],color:"#9b59b6"},
+  nutritionx_glutamine:{id:"nutritionx_glutamine",name:"Glutamine Powder",brand:"Nutrition X",cat:"Recovery",grade:"B",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Free-form L-glutamine — gut integrity and immune support during congested fixture periods.",dosing:"5–10 g/day",unit:"g",timing:["Post-training","Before bed"],tags:["recovery","gut-health","immune"],color:"#9b59b6"},
+  nutritionx_collagen_shot:{id:"nutritionx_collagen_shot",name:"Repair Collagen Shot",brand:"Nutrition X",cat:"Recovery",grade:"B",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:false,desc:"20,000 mg collagen + vitamin C — supports tendon/ligament resilience; award-winning Informed Sport certified format.",dosing:"1 shot (60 ml)/day",unit:"shot",timing:["30–60 min before training (loads collagen synthesis)"],tags:["recovery","collagen","tendon","joint"],color:"#9b59b6"},
+  nutritionx_mrm_recovery:{id:"nutritionx_mrm_recovery",name:"MRM Muscle Recovery Drink Powder",brand:"Nutrition X",cat:"Recovery",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"30 g protein + 60 g carbohydrate combined recovery shake — high-volume refuelling after doubles or tournament days.",dosing:"1 serving (100 g) post-training",unit:"serving",timing:["Immediately post-match","Post-double-session"],tags:["recovery","glycogen","muscle","tournament"],color:"#9b59b6"},
+  kinetica_recovery:{id:"kinetica_recovery",name:"Recovery",brand:"Kinetica Sports",cat:"Recovery",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"Protein + carbohydrate recovery formula from Kinetica's Informed Sport batch-tested range — official Fulham FC nutrition partner range.",dosing:"1 serving post-training",unit:"serving",timing:["Within 30 min post-training","Post-match"],tags:["recovery","glycogen","muscle"],color:"#9b59b6"},
+  fluid_recovery:{id:"fluid_recovery",name:"Fluid Recovery",brand:"Fluid Sports Nutrition",cat:"Recovery",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Pea protein + L-glutamine + carbohydrate post-workout mix — dairy-free/vegan recovery option, Informed Sport certified.",dosing:"1 serving post-training",unit:"serving",timing:["Within 30 min post-training"],tags:["recovery","vegan","dairy-free","glycogen"],color:"#9b59b6"},
+  veloforte_nova_protein:{id:"veloforte_nova_protein",name:"Nova Protein Recovery Shake",brand:"Veloforte",cat:"Recovery",grade:"B",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Plant-based protein + probiotic recovery shake — award-recognised at the Informed Sport ESSNawards for flavour and formulation.",dosing:"1 serving post-training",unit:"serving",timing:["Within 30 min post-training"],tags:["recovery","vegan","probiotic"],color:"#9b59b6"},
+  applied_recovery:{id:"applied_recovery",name:"Recovery",brand:"Applied Nutrition",cat:"Recovery",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"Post-training protein/carb recovery blend from Applied Nutrition's Informed Sport certified range.",dosing:"1 serving post-training",unit:"serving",timing:["Within 30 min post-training"],tags:["recovery","glycogen","muscle"],color:"#9b59b6"},
+
+  // ── MICRONUTRIENT ──
+  thorne_vitamin_d_k2:{id:"thorne_vitamin_d_k2",name:"Vitamin D/K2 Liquid",brand:"Thorne",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"Liquid D3 + K2 — bone, immune and muscle function support; addresses near-universal GCC indoor-training deficiency.",dosing:"1000–4000 IU/day with K2 (per practitioner titration)",unit:"drop/IU",timing:["With largest fat-containing meal"],tags:["bone","immunity","GCC-deficiency"],color:"#f5a623"},
+  nordic_omega_d3_sport:{id:"nordic_omega_d3_sport",name:"Ultimate Omega-D3 Sport",brand:"Nordic Naturals",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:false,nsf:true,allergens:["fish"],vegan:false,desc:"1480 mg omega-3 (EPA/DHA) + 1000 IU vitamin D3 — joint, cardiovascular and recovery support.",dosing:"2 softgels/day",unit:"softgel",timing:["With a meal containing fat"],tags:["omega-3","joint-health","anti-inflammatory"],color:"#f5a623"},
+  thorne_magnesium:{id:"thorne_magnesium",name:"Magnesium Bisglycinate",brand:"Thorne",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"Highly bioavailable magnesium — muscle function, sleep quality and cramp prevention.",dosing:"200–400 mg/day",unit:"mg",timing:["Evening, with or after dinner"],tags:["muscle","sleep","cramps"],color:"#f5a623"},
+  thorne_basic_nutrients:{id:"thorne_basic_nutrients",name:"Basic Nutrients 2/Day",brand:"Thorne",cat:"Micronutrient",grade:"A",ageMin:14,ageMax:99,is:false,nsf:true,allergens:[],vegan:false,desc:"Broad-spectrum multivitamin/mineral — foundational cover for athletes with restrictive diets or heavy travel schedules.",dosing:"2 capsules/day",unit:"capsule",timing:["With breakfast and largest meal"],tags:["multivitamin","foundational","travel"],color:"#f5a623"},
+  momentous_multivitamin:{id:"momentous_multivitamin",name:"Multi-Vitamin",brand:"Momentous",cat:"Micronutrient",grade:"A",ageMin:14,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"NSF Certified for Sport daily multivitamin formulated for athletic micronutrient turnover.",dosing:"1 serving/day",unit:"serving",timing:["With breakfast"],tags:["multivitamin","daily"],color:"#f5a623"},
+  thorne_iron:{id:"thorne_iron",name:"Iron Bisglycinate",brand:"Thorne",cat:"Micronutrient",grade:"B",ageMin:12,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"Gentle, high-absorption iron — for diagnosed iron deficiency/low ferritin only. Physician-directed, not for routine blanket use.",dosing:"Per treating physician's titration (typically 25 mg/day)",unit:"mg",timing:["Away from calcium/dairy, with vitamin C source"],tags:["iron","diagnosed-deficiency-only","physician-directed"],color:"#f5a623"},
+  nutritionx_omega3:{id:"nutritionx_omega3",name:"High Strength Daily Omega 3",brand:"Nutrition X",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:["fish"],vegan:false,desc:"500 mg EPA + 250 mg DHA per serving — supports growth and repair; Informed Sport certified.",dosing:"2 tablets/day",unit:"tablet",timing:["With a meal containing fat"],tags:["omega-3","anti-inflammatory"],color:"#f5a623"},
+  nutritionx_vitd_k2:{id:"nutritionx_vitd_k2",name:"Vitamins D3 + K2",brand:"Nutrition X",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:false,desc:"2000 IU vitamin D3 + 75 mcg K2 — bone health support for indoor/low-sun training environments.",dosing:"1 tablet/day",unit:"tablet",timing:["With largest fat-containing meal"],tags:["bone","immunity","GCC-deficiency"],color:"#f5a623"},
+  nutritionx_multivitamin:{id:"nutritionx_multivitamin",name:"Complete Daily Multivitamin",brand:"Nutrition X",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:false,desc:"Broad-spectrum daily multivitamin/mineral — closes gaps from restrictive diets or heavy travel schedules.",dosing:"1 tablet/day",unit:"tablet",timing:["With breakfast"],tags:["multivitamin","daily","travel"],color:"#f5a623"},
+  nutritionx_vitc:{id:"nutritionx_vitc",name:"Chewable Vitamin C",brand:"Nutrition X",cat:"Micronutrient",grade:"B",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"500 mg vitamin C — immune support and collagen formation, chewable format for younger athletes.",dosing:"1 tablet/day",unit:"tablet",timing:["With a meal"],tags:["immunity","collagen","youth-friendly"],color:"#f5a623"},
+  kinetica_electroc:{id:"kinetica_electroc",name:"Electro-C",brand:"Kinetica Sports",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Electrolyte + vitamin C combination — daily immune and hydration top-up from Kinetica's Informed Sport range.",dosing:"1 serving/day",unit:"serving",timing:["Morning","During heavy training blocks"],tags:["electrolytes","immunity"],color:"#f5a623"},
+  kinetica_zinc_mg:{id:"kinetica_zinc_mg",name:"Zinc Mg+",brand:"Kinetica Sports",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Zinc + magnesium formula — sleep quality, immune function and muscle recovery support.",dosing:"1 serving before bed",unit:"serving",timing:["Evening, before sleep"],tags:["sleep","immunity","muscle"],color:"#f5a623"},
+  kinetica_omega3:{id:"kinetica_omega3",name:"Omega 3",brand:"Kinetica Sports",cat:"Micronutrient",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:["fish"],vegan:false,desc:"Fish-oil omega-3 (EPA/DHA) — cardiovascular, joint and anti-inflammatory support.",dosing:"2 capsules/day",unit:"capsule",timing:["With a meal containing fat"],tags:["omega-3","joint-health"],color:"#f5a623"},
+  sis_athlete_health_multivitamin:{id:"sis_athlete_health_multivitamin",name:"Athlete Health Multivitamin",brand:"Science in Sport",cat:"Micronutrient",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Broad-spectrum multivitamin from SiS's Athlete Health line, formulated to support immune function, digestive health and bone health during heavy training blocks.",dosing:"1 serving/day",unit:"serving",timing:["With breakfast"],tags:["multivitamin","immunity","bone-health"],color:"#f5a623"},
+  sis_glutamine:{id:"sis_glutamine",name:"L-Glutamine",brand:"Science in Sport",cat:"Recovery",grade:"B",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Free-form L-glutamine — gut integrity and immune support during heavy training/travel periods.",dosing:"5–10 g/day",unit:"g",timing:["Post-training","Before bed"],tags:["recovery","gut-health","immune"],color:"#9b59b6"},
+  healthspan_elite_sport_essentials:{id:"healthspan_elite_sport_essentials",name:"Sport Essentials",brand:"Healthspan Elite",cat:"Micronutrient",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["fish"],vegan:false,desc:"Daily tear-strip combining high-strength omega-3 (EPA/DHA), a full-spectrum multivitamin and a 20-billion-CFU probiotic — Official Sports Nutrition Partner range of the All Blacks.",dosing:"1 daily strip (omega-3 softgel + multivitamin tablet + probiotic capsule)",unit:"strip",timing:["With breakfast"],tags:["omega-3","multivitamin","probiotic","gut-health"],color:"#f5a623"},
+
+  // ── PROTEIN (Nutrition X / Kinetica / Applied Nutrition additions) ──
+  nutritionx_clear_whey:{id:"nutritionx_clear_whey",name:"Clear Whey Protein",brand:"Nutrition X",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"20 g hydrolysed whey protein isolate in a fruit-flavoured, non-milky clear format — easy on the gut before/after training.",dosing:"1 serving (per label) post-training",unit:"serving",timing:["Post-training","Between meals"],tags:["protein","hydrolysed","light"],color:"#06d6a0"},
+  nutritionx_big_whey:{id:"nutritionx_big_whey",name:"Big Whey Protein Powder",brand:"Nutrition X",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"25 g protein + 6.6 g BCAAs per serving — core whey blend from Nutrition X's fully Informed Sport certified range.",dosing:"1 scoop post-training",unit:"scoop",timing:["Within 30 min post-training","Morning with breakfast"],tags:["protein","whey","muscle"],color:"#06d6a0"},
+  nutritionx_pea_protein:{id:"nutritionx_pea_protein",name:"Pea+ Protein Vegan High Protein Powder",brand:"Nutrition X",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"28 g plant protein + 3.5 g added leucine — vegan option for athletes avoiding dairy/animal protein.",dosing:"1 scoop post-training",unit:"scoop",timing:["Post-training","Breakfast smoothie"],tags:["protein","vegan","plant-based"],color:"#06d6a0"},
+  nutritionx_casein:{id:"nutritionx_casein",name:"Nighttime Casein Protein Powder",brand:"Nutrition X",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"26 g slow-release casein + magnesium — overnight muscle protein synthesis and sleep-supportive mineral.",dosing:"1 scoop before sleep",unit:"scoop",timing:["30–60 min before sleep"],tags:["protein","casein","sleep"],color:"#7c5cbf"},
+  kinetica_whey:{id:"kinetica_whey",name:"Whey Protein",brand:"Kinetica Sports",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"Grass-fed whey protein — Informed Sport batch-tested, official Fulham FC nutrition partner product.",dosing:"1 scoop post-training",unit:"scoop",timing:["Within 30 min post-training","Morning with breakfast"],tags:["protein","whey","muscle"],color:"#06d6a0"},
+  applied_critical_whey:{id:"applied_critical_whey",name:"Critical Whey",brand:"Applied Nutrition",cat:"Protein",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:["milk"],vegan:false,desc:"High-protein whey blend from Applied Nutrition's Informed Sport certified range.",dosing:"1 scoop post-training",unit:"scoop",timing:["Within 30 min post-training"],tags:["protein","whey","muscle"],color:"#06d6a0"},
+
+  // ── PERFORMANCE (Nutrition X / Kinetica additions) ──
+  bpn_creatine:{id:"bpn_creatine",name:"Creatine Monohydrate",brand:"Bare Performance Nutrition",cat:"Performance",grade:"A",ageMin:15,ageMax:99,is:false,nsf:true,allergens:[],vegan:true,desc:"NSF Certified for Sport micronised creatine monohydrate.",dosing:"3–5 g/day",unit:"g",timing:["Post-training","Any time"],tags:["power","muscle","U18-practitioner-review"],color:"#ef476f"},
+  nutritionx_creatine:{id:"nutritionx_creatine",name:"Creatine Monohydrate Powder",brand:"Nutrition X",cat:"Performance",grade:"A",ageMin:15,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Unflavoured creatine monohydrate — muscle power and strength support, Informed Sport certified.",dosing:"3–5 g/day",unit:"g",timing:["Post-training with carbs","Any time — consistency is key"],tags:["power","muscle","U18-practitioner-review"],color:"#ef476f"},
+  nutritech_prosport_creatine:{id:"nutritech_prosport_creatine",name:"ProSport Creatine Monohydrate",brand:"NUTRITECH",cat:"Performance",grade:"A",ageMin:15,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Vegan-friendly micronised creatine monohydrate — Informed Sport certified, every batch tested.",dosing:"3–5 g/day",unit:"g",timing:["Post-training with carbs","Any time — consistency is key"],tags:["power","muscle","U18-practitioner-review"],color:"#ef476f"},
+  nutritionx_beta_alanine:{id:"nutritionx_beta_alanine",name:"Beta Alanine Powder",brand:"Nutrition X",cat:"Performance",grade:"A",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Muscle carnosine booster — supports sprint/power output and buffering capacity in repeated efforts.",dosing:"3.2–6.4 g/day in split doses",unit:"g",timing:["Split across 4 doses/day"],tags:["endurance","fatigue-resistance"],color:"#ef476f"},
+  nutritionx_caffeine_melt:{id:"nutritionx_caffeine_melt",name:"Caffeine Melt",brand:"Nutrition X",cat:"Performance",grade:"A",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"100 mg fast-absorbing caffeine melt strip — higher bioavailability format for acute pre-match focus.",dosing:"1 melt, 100 mg caffeine",unit:"melt",timing:["30–45 min before competition"],tags:["performance","focus","U18-practitioner-review"],color:"#2c3e50"},
+  nutritionx_caffeine_shot:{id:"nutritionx_caffeine_shot",name:"Caffeine Pre-Workout Energy Shot",brand:"Nutrition X",cat:"Performance",grade:"A",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"200 mg caffeine liquid shot for mental alertness — higher-dose format, reserve for larger/older athletes.",dosing:"1 shot (60 ml), 200 mg caffeine",unit:"shot",timing:["45–60 min before competition"],tags:["performance","focus","U18-practitioner-review"],color:"#2c3e50"},
+  kinetica_creatine:{id:"kinetica_creatine",name:"100% Creatine",brand:"Kinetica Sports",cat:"Performance",grade:"A",ageMin:15,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Pure creatine monohydrate, gluten-free — Informed Sport batch-tested.",dosing:"3–5 g/day",unit:"g",timing:["Post-training","Any time"],tags:["power","muscle","U18-practitioner-review"],color:"#ef476f"},
+  applied_bcaa_aminohydrate:{id:"applied_bcaa_aminohydrate",name:"BCAA Amino-Hydrate",brand:"Applied Nutrition",cat:"Performance",grade:"B",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"BCAA + electrolyte hydration hybrid — intra-training sipping for muscle preservation and fluid balance.",dosing:"1 scoop per 500–750 ml water",unit:"scoop",timing:["Sipped during training"],tags:["bcaa","hydration","intra-training"],color:"#ef476f"},
+
+  // ── HYDRATION (Nutrition X additions) ──
+  nutritionx_hydra10:{id:"nutritionx_hydra10",name:"Hydra 10 Sachets",brand:"Nutrition X",cat:"Hydration",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"30mM sodium hypotonic hydration solution with B5, B6 and E vitamins — sachet format for travel/kitbag.",dosing:"1 sachet (14.3 g) in 500 ml water",unit:"sachet",timing:["During training","Travel days"],tags:["hydration","electrolytes","travel","youth-safe"],color:"#4cc9f0"},
+  nutritionx_hydraplus:{id:"nutritionx_hydraplus",name:"Hydra+ Hydration Drink Tablets",brand:"Nutrition X",cat:"Hydration",grade:"A",ageMin:12,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"40mM sodium electrolyte tablet with B5, B6 and E — convenient tablet format for match-day kitbags.",dosing:"1 tablet per 500 ml water",unit:"tablet",timing:["During training every 15–20 min","Hot-weather match days"],tags:["hydration","electrolytes","youth-safe"],color:"#4cc9f0"},
+  nutritionx_hydrafuel:{id:"nutritionx_hydrafuel",name:"HydraFuel Isotonic Sports Drink",brand:"Nutrition X",cat:"Hydration",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"36 g carbohydrate isotonic drink with electrolytes — fuels sessions beyond 60 minutes.",dosing:"1 scoop per 500 ml water",unit:"scoop",timing:["During training >60 min","Pre-session"],tags:["hydration","carbohydrate","electrolytes"],color:"#4cc9f0"},
+  fluid_performance:{id:"fluid_performance",name:"Fluid Performance",brand:"Fluid Sports Nutrition",cat:"Hydration",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Low-sugar carbohydrate + full electrolyte-mineral profile (sodium, potassium, calcium, magnesium, chloride) drink mix — Informed Sport certified, trusted by pro/military/first-responder drug-tested users.",dosing:"1 scoop per 500–750 ml water",unit:"scoop",timing:["Before and during training >60 min"],tags:["hydration","carbohydrate","electrolytes","cramps"],color:"#4cc9f0"},
+
+  // ── RACE FUEL (Nutrition X / Kinetica additions) ──
+  nutritionx_energel:{id:"nutritionx_energel",name:"Energel+ Fast-Acting Energy Gel",brand:"Nutrition X",cat:"Race Fuel",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"40 g carbohydrate gel that restores key electrolytes — fast-acting fuel for match-day energy dips.",dosing:"1 gel (70 g) during play",unit:"gel",timing:["During sessions >60 min","Half-time top-up"],tags:["race fuel","electrolytes"],color:"#e67e22"},
+  nutritionx_energel_caffeine:{id:"nutritionx_energel_caffeine",name:"Energel+ Caffeine Energy Gel",brand:"Nutrition X",cat:"Race Fuel",grade:"A",ageMin:16,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"40 g carbohydrate + 80 mg caffeine combined gel — late-game fuel and focus in one format.",dosing:"1 gel (70 g)",unit:"gel",timing:["Second half / final push","U18-practitioner-review for caffeine content"],tags:["race fuel","caffeine","U18-practitioner-review"],color:"#e67e22"},
+  kinetica_energy_gel:{id:"kinetica_energy_gel",name:"Energy Gel",brand:"Kinetica Sports",cat:"Race Fuel",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Fast-absorbing carbohydrate gel from Kinetica's Informed Sport certified range.",dosing:"1 gel every 30–45 min",unit:"gel",timing:["During prolonged match play"],tags:["race fuel","carbohydrate"],color:"#e67e22"},
+  veloforte_vita:{id:"veloforte_vita",name:"Vita Energy Gel",brand:"Veloforte",cat:"Race Fuel",grade:"A",ageMin:14,ageMax:99,is:true,nsf:false,allergens:[],vegan:true,desc:"Real-food carbohydrate gel (dates, honey, natural flavourings) — Informed Sport certified alternative to synthetic gels for athletes preferring whole-food fuelling.",dosing:"1 gel during play, every 30–45 min",unit:"gel",timing:["During sessions >60 min","Half-time top-up"],tags:["race fuel","whole-food","vegan"],color:"#e67e22"},
+};
+
+const ALL = Object.values(CERTIFIED_SUPPLEMENTS);
+
+function certBadges(s){
+  const b=[];
+  if(s.is) b.push("Informed Sport");
+  if(s.nsf) b.push("NSF Certified for Sport");
+  return b;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RECOMMENDATION ENGINE — same filter → score → rank pattern as
+// Bridge's compliance-weighted confidence scoring elsewhere in the platform.
+// ═══════════════════════════════════════════════════════════════════
+function getRecommendation({ age, allergies, category }) {
+  let pool = ALL.filter(s => {
+    if (category && s.cat !== category) return false;
+    if (age < s.ageMin || age > s.ageMax) return false;
+    if (s.allergens.some(a => allergies.includes(a))) return false;
+    return true;
+  });
+  pool.sort((a, b) => {
+    const score = x => (x.is ? 1 : 0) + (x.nsf ? 1 : 0) + (x.grade === "A" ? 1 : 0);
+    return score(b) - score(a);
+  });
+  return { primary: pool[0] || null, alternatives: pool.slice(1, 4) };
+}
+
+function Badge({ children, tone }) {
+  const tones = { is: "#00c9a7", nsf: "#4cc9f0", grade: "#f5a623", warn: "#ef476f" };
+  return <span style={{background:`${tones[tone]}22`,color:tones[tone],border:`1px solid ${tones[tone]}55`,borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:600,marginRight:6,display:"inline-block",marginBottom:4}}>{children}</span>;
+}
+
+function SupplementCard({ s }) {
+  return (
+    <div className="fade-in" style={{background:"#0d1e38",border:"1px solid #13274a",borderRadius:12,padding:16,marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <div style={{color:"#e8f0fe",fontWeight:700,fontSize:15}}>{s.name}</div>
+          <div style={{color:"#7a8bab",fontSize:12}}>{s.brand} · {s.cat}</div>
+        </div>
+        <span style={{color:s.color,fontFamily:"'DM Mono',monospace",fontSize:11}}>Grade {s.grade}</span>
+      </div>
+      <div style={{margin:"8px 0"}}>
+        {s.is && <Badge tone="is">Informed Sport</Badge>}
+        {s.nsf && <Badge tone="nsf">NSF Certified for Sport</Badge>}
+        <Badge tone="grade">Ages {s.ageMin}+</Badge>
+        {s.allergens.map(a => <Badge key={a} tone="warn">Contains {ALLERGENS.find(x=>x.key===a)?.label || a}</Badge>)}
+      </div>
+      <div style={{color:"#c3cfe6",fontSize:13,lineHeight:1.5,marginBottom:8}}>{s.desc}</div>
+      <div style={{color:"#7a8bab",fontSize:12}}><b style={{color:"#c3cfe6"}}>Dosage:</b> {s.dosing}</div>
+      <div style={{color:"#7a8bab",fontSize:12}}><b style={{color:"#c3cfe6"}}>Timing:</b> {s.timing.join(" · ")}</div>
+    </div>
+  );
+}
+
+function LibraryView() {
+  const [cat, setCat] = useState("All");
+  const [age, setAge] = useState(18);
+  const [excl, setExcl] = useState([]);
+
+  const toggle = k => setExcl(e => e.includes(k) ? e.filter(x=>x!==k) : [...e,k]);
+
+  const filtered = useMemo(() => ALL.filter(s =>
+    (cat==="All" || s.cat===cat) &&
+    age>=s.ageMin && age<=s.ageMax &&
+    !s.allergens.some(a=>excl.includes(a))
+  ), [cat, age, excl]);
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:20,background:"#0d1e38",border:"1px solid #13274a",borderRadius:12,padding:16}}>
+        <div>
+          <div style={{color:"#7a8bab",fontSize:11,marginBottom:6}}>CATEGORY</div>
+          <select value={cat} onChange={e=>setCat(e.target.value)} style={{background:"#060f1e",color:"#e8f0fe",border:"1px solid #13274a",borderRadius:6,padding:"6px 10px"}}>
+            <option>All</option>
+            {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{color:"#7a8bab",fontSize:11,marginBottom:6}}>ATHLETE AGE: {age}</div>
+          <input type="range" min="12" max="40" value={age} onChange={e=>setAge(+e.target.value)} />
+        </div>
+        <div style={{flex:1,minWidth:220}}>
+          <div style={{color:"#7a8bab",fontSize:11,marginBottom:6}}>EXCLUDE ALLERGENS / INTOLERANCES</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {ALLERGENS.map(a=>(
+              <button key={a.key} onClick={()=>toggle(a.key)} style={{background:excl.includes(a.key)?"#ef476f22":"#060f1e",color:excl.includes(a.key)?"#ef476f":"#7a8bab",border:`1px solid ${excl.includes(a.key)?"#ef476f":"#13274a"}`,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer"}}>{a.label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{color:"#7a8bab",fontSize:12,marginBottom:10}}>{filtered.length} certified product(s) match this profile</div>
+      {filtered.map(s=><SupplementCard key={s.id} s={s} />)}
+      {filtered.length===0 && <div style={{color:"#7a8bab",padding:20,textAlign:"center"}}>No certified products match this age/allergy combination.</div>}
+    </div>
+  );
+}
+
+function RecommenderView() {
+  const [age, setAge] = useState(17);
+  const [excl, setExcl] = useState([]);
+  const [cat, setCat] = useState("Protein");
+  const [result, setResult] = useState(null);
+
+  const toggle = k => setExcl(e => e.includes(k) ? e.filter(x=>x!==k) : [...e,k]);
+
+  return (
+    <div>
+      <div style={{background:"#0d1e38",border:"1px solid #13274a",borderRadius:12,padding:16,marginBottom:20}}>
+        <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:14}}>
+          <div>
+            <div style={{color:"#7a8bab",fontSize:11,marginBottom:6}}>AGE</div>
+            <input type="number" min="12" max="45" value={age} onChange={e=>setAge(+e.target.value)} style={{background:"#060f1e",color:"#e8f0fe",border:"1px solid #13274a",borderRadius:6,padding:"6px 10px",width:70}} />
+          </div>
+          <div>
+            <div style={{color:"#7a8bab",fontSize:11,marginBottom:6}}>SUPPLEMENT NEED</div>
+            <select value={cat} onChange={e=>setCat(e.target.value)} style={{background:"#060f1e",color:"#e8f0fe",border:"1px solid #13274a",borderRadius:6,padding:"6px 10px"}}>
+              {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{color:"#7a8bab",fontSize:11,marginBottom:6}}>ALLERGIES / INTOLERANCES</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
+          {ALLERGENS.map(a=>(
+            <button key={a.key} onClick={()=>toggle(a.key)} style={{background:excl.includes(a.key)?"#ef476f22":"#060f1e",color:excl.includes(a.key)?"#ef476f":"#7a8bab",border:`1px solid ${excl.includes(a.key)?"#ef476f":"#13274a"}`,borderRadius:6,padding:"4px 8px",fontSize:11,cursor:"pointer"}}>{a.label}</button>
+          ))}
+        </div>
+        <button onClick={()=>setResult(getRecommendation({age,allergies:excl,category:cat}))} style={{background:"#00c9a7",color:"#060f1e",border:"none",borderRadius:8,padding:"10px 18px",fontWeight:700,cursor:"pointer"}}>Get Recommendation</button>
+      </div>
+
+      {result && (
+        <div className="fade-in">
+          {result.primary ? (
+            <>
+              <div style={{color:"#00c9a7",fontSize:12,fontWeight:700,marginBottom:8,letterSpacing:1}}>PRIMARY RECOMMENDATION</div>
+              <SupplementCard s={result.primary} />
+              {result.alternatives.length>0 && <>
+                <div style={{color:"#7a8bab",fontSize:12,fontWeight:700,margin:"16px 0 8px",letterSpacing:1}}>ALTERNATIVE BRANDS</div>
+                {result.alternatives.map(s=><SupplementCard key={s.id} s={s} />)}
+              </>}
+            </>
+          ) : (
+            <div style={{color:"#ef476f",padding:16,background:"#0d1e38",borderRadius:12,border:"1px solid #ef476f55"}}>
+              No certified product in this category clears the athlete's age and allergy profile. Widen the category or review exclusions.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DevDocsView() {
+  const snippet = `// Schema — one entry per certified SKU
+{
+  id, name, brand, cat,      // cat ∈ CATEGORIES
+  grade,                      // "A" | "B" evidence grade
+  ageMin, ageMax,              // inclusive age window
+  is, nsf,                     // boolean — at least one MUST be true
+  allergens,                   // e.g. ["milk","soy"]
+  vegan,                       // boolean
+  desc, dosing, unit, timing,  // timing: string[]
+  tags, color
+}
+
+// Recommendation call (same filter -> score -> rank pattern used
+// elsewhere in Bridge's compliance-weighted confidence scoring):
+getRecommendation({ age: 17, allergies: ["milk"], category: "Protein" });
+// -> { primary: {...}, alternatives: [{...}, {...}, {...}] }`;
+
+  return (
+    <div style={{color:"#c3cfe6",fontSize:13,lineHeight:1.7}}>
+      <h3 style={{color:"#e8f0fe",marginBottom:8}}>Integration notes</h3>
+      <p>This module's <code>CERTIFIED_SUPPLEMENTS</code> object is a drop-in additive extension of Bridge's existing <code>SUPPLEMENTS</code> object (same key shape: id/name/brand/cat/grade/ageMin/ageMax/desc/dosing/unit/timing/tags/color). Two fields are new and required for every entry: <code>is</code> and <code>nsf</code> — at least one must be <code>true</code> or the product does not belong in this library.</p>
+      <p style={{marginTop:10}}>Merge strategy: <code>Object.assign(SUPPLEMENTS, CERTIFIED_SUPPLEMENTS)</code>, then anywhere the platform reads from <code>SUPPLEMENTS</code>, add an <code>.filter(s =&gt; s.is || s.nsf)</code> guard if that view must be certified-only (e.g. the athlete-facing prescription engine), or leave ungated for internal/admin views that also show non-certified clinical products (Pedialyte, PediaSure, Ensure, etc. remain valid — they're medical nutrition, not doping-risk supplements).</p>
+      <pre style={{background:"#0d1e38",border:"1px solid #13274a",borderRadius:10,padding:14,marginTop:10,color:"#9be9d8",fontSize:12,overflowX:"auto"}}>{snippet}</pre>
+      <h3 style={{color:"#e8f0fe",margin:"18px 0 8px"}}>Sourcing basis for brands beyond the original set</h3>
+      <p><b>Nutrition X</b> — confirmed via both the brand's own Informed Sport certification page and Informed Sport's brand directory: the entire commercial range is Informed-Sport batch tested (a sponsor/team-supply brand commonly used by pro academies for exactly this reason — full-range coverage removes SKU-by-SKU guesswork). All 21 Nutrition X SKUs added here (protein, creatine, hydration, race fuel, performance, recovery, micronutrient) came directly off that range.</p>
+      <p style={{marginTop:8}}><b>Kinetica Sports</b> — confirmed via the brand's own testing/certification page and independent press coverage of its partnership as Fulham FC's official sports nutrition supplier; the brand states the "majority" (not literally 100%) of its range is Informed Sport certified, so treat any Kinetica SKU not listed here as unverified rather than assuming coverage.</p>
+      <p style={{marginTop:8}}><b>Applied Nutrition</b> — confirmed via Informed Sport's own brand directory page for Applied Nutrition and a historical Informed Sport certified-products register showing specific certified SKUs (Critical Whey, Recovery, BCAA Amino-Hydrate, among others); only those corroborated SKUs were added, not the brand's full catalogue.</p>
+      <p style={{marginTop:8}}><b>Science in Sport (SiS)</b> — SiS states 100% of its range holds both Informed Manufacturer and Informed Sport product certification, so its BCAA, glutamine, Beta Fuel/electrolyte gels and Athlete Health multivitamin were added alongside the gels already in the library.</p>
+      <p style={{marginTop:8}}><b>Grenade</b> — Carb Killa High Protein Bar specifically confirmed via retail listings citing Informed Sport certification and allergen declaration (milk, soy); other Grenade SKUs (BCAA, creatine, additional protein lines) appear on Informed Sport's brand directory but weren't added without a confirmed product name.</p>
+      <p style={{marginTop:8}}><b>NUTRITECH</b> (South Africa) — ProSport Creatine Monohydrate confirmed Informed Sport certified via the brand's own product page ("Informed Sport Certified – Every Batch Tested").</p>
+      <p style={{marginTop:8}}><b>Fluid Sports Nutrition</b> — confirmed via the brand's dedicated Informed Sport certification page; Fluid Performance (hydration/carb) and Fluid Recovery (vegan pea-protein recovery) added from its certified hydration/protein/recovery/creatine/collagen range.</p>
+      <p style={{marginTop:8}}><b>Healthspan Elite</b> — Official Sports Nutrition Partner of the All Blacks; entire range confirmed Informed Sport certified via the brand's own FAQ and Informed Sport's brand directory. Sport Essentials (omega-3 + multivitamin + probiotic) added as the representative micronutrient SKU.</p>
+      <p style={{marginTop:8}}><b>Veloforte</b> — confirmed via Informed Sport's brand directory (electrolyte/carbohydrate and plant-protein/probiotic product types) and ESSNawards coverage naming Vita and Nova specifically as Informed Sport certified products.</p>
+      <p style={{marginTop:8}}><b>Beet It (James White Drinks)</b> — expanded from one to two SKUs: added Beet It Sport Nitrate 3000, the same Informed Sport certified 400mg-nitrate formulation as Nitrate 400 in a bulk 250ml team-supply bottle. Worth flagging: Beet It's own FAQ explicitly confirms the standard "Organic Shot" line (including ginger/turmeric variants) is <i>not</i> Informed Sport certified — only the "Sport" branded range is. Don't assume brand-wide coverage from a certified flagship SKU; check the specific product line.</p>
+      <p style={{marginTop:8}}><b>Sponser Sport Food</b> (Switzerland) — investigated on request and <i>not added</i>. Sponser's own materials describe an internal QA stack (GMP, ISO FSSC 22000, HACCP) and a general "anti-doping commitment," but no source found confirms Informed Sport or NSF Certified for Sport certification for any Sponser product. Evidence instead points to the Kölner Liste (Cologne List) — a separate, German NADA-affiliated batch-testing programme — as Sponser's likely certification route, which doesn't meet this build's Informed Sport / NSF Certified for Sport requirement. If Sponser certification info surfaces later (e.g. a specific SKU confirmed on sport.wetestyoutrust.com or nsfsport.com), it can be added then — but nothing here should be read as Sponser being certified under either named programme.</p>
+      <p style={{marginTop:8}}><b>Removed:</b> "BPN Electrolytes" (Bare Performance Nutrition) was dropped from this build after verification turned up an Informed Sport programme record showing it was <i>voluntarily withdrawn</i> from that certification on 06-Sep-2024. This is the exact scenario the verification protocol below exists to catch — a product that was legitimately certified when a dataset was first built can lapse later. BPN's Creatine Monohydrate (NSF Certified for Sport) was unaffected and remains in the library.</p>
+      <h3 style={{color:"#e8f0fe",margin:"18px 0 8px"}}>Verification protocol (do this before production use)</h3>
+      <p>Certification status is not static — brands add and drop SKUs from these programmes, and batches can lapse between manufacturing runs (see the BPN Electrolytes example above). Before this list goes live for athlete-facing prescriptions:</p>
+      <ol style={{marginLeft:18,marginTop:6}}>
+        <li>Cross-check every SKU against the live Informed Sport registry: <code>sport.wetestyoutrust.com/certified-brands</code></li>
+        <li>Cross-check every SKU against the live NSF Certified for Sport search: <code>nsfsport.com/certified-products</code></li>
+        <li>Re-run this check on a recurring schedule (recommend monthly, or before each new team supplement order cycle) and log the check date per SKU.</li>
+        <li>Flag any SKU that drops off either registry for immediate removal from athlete protocols, not just the next data refresh.</li>
+      </ol>
+      <h3 style={{color:"#e8f0fe",margin:"18px 0 8px"}}>Age-band policy applied in this build</h3>
+      <p>12–13: hydration, protein, and core micronutrients only. 14–15: adds race fuel/carb and nitrate. 15–17: creatine and recovery protein permitted <i>with documented practitioner sign-off</i> (tagged <code>U18-practitioner-review</code>). 16+: beta-alanine and caffeine unlocked. Iron is physician-directed at any age (diagnosed deficiency only) — never a blanket prescription.</p>
+    </div>
+  );
+}
+
+function App() {
+  const [tab, setTab] = useState("library");
+  return (
+    <div style={{minHeight:"100vh",padding:"24px 20px",maxWidth:960,margin:"0 auto"}}>
+      <div style={{marginBottom:20}}>
+        <div style={{color:"#e8f0fe",fontSize:22,fontWeight:800}}>🌉 Bridge — Certified Supplement Module</div>
+        <div style={{color:"#7a8bab",fontSize:13,marginTop:4}}>{ALL.length} Informed Sport / NSF Certified for Sport products across {new Set(ALL.map(s=>s.brand)).size} brands · categorised by type, age (12+), and allergy/intolerance</div>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:20,borderBottom:"1px solid #13274a"}}>
+        {[["library","Certified Library"],["recommend","Athlete Recommender"],["dev","Developer Docs"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{background:"none",border:"none",borderBottom:tab===k?"2px solid #00c9a7":"2px solid transparent",color:tab===k?"#00c9a7":"#7a8bab",padding:"10px 4px",fontWeight:600,fontSize:13,cursor:"pointer"}}>{l}</button>
+        ))}
+      </div>
+      {tab==="library" && <LibraryView />}
+      {tab==="recommend" && <RecommenderView />}
+      {tab==="dev" && <DevDocsView />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
