@@ -10,6 +10,7 @@ import {
   loadAthleteClinicalContext,
   loadSupplementLibrary,
 } from "@/lib/supplementPlanSafety";
+import { productAllergenConflicts } from "@/lib/supplementPlanCheck";
 
 // Direct read/edit over supplement_protocols, for oversight and manual
 // adjustment after the fact. The Nutrition Planner remains the way protocols
@@ -166,7 +167,7 @@ export async function updateProtocol(
   // visible to them before anything is compared or written.
   const { data: before } = await supabase
     .from("supplement_protocols")
-    .select("id, athlete_id, supplement_name, supplement_library_id, dose, timing, start_date, end_date")
+    .select("id, athlete_id, supplement_name, supplement_library_id, product_id, dose, timing, start_date, end_date")
     .eq("id", protocolId)
     .maybeSingle();
   if (!before) return { ...EMPTY, error: "That protocol no longer exists, or you can't edit it." };
@@ -193,6 +194,37 @@ export async function updateProtocol(
       rationale: rationale ?? "",
     });
     if (safetyMessage) return { ...EMPTY, safetyMessage };
+
+    // A row that carries a specific product re-checks THAT product's
+    // allergens too, exactly as the entity gate re-runs above: declarations
+    // can change after a product was attached, and an edit that keeps or
+    // extends the prescription is the moment to catch it. The exemption
+    // above still applies — ending or shortening a conflicting row must
+    // never be blocked.
+    if (before.product_id) {
+      const { data: attachedProduct } = await supabase
+        .from("products")
+        .select("allergens")
+        .eq("id", before.product_id as string)
+        .maybeSingle();
+      const ctx = (await loadAthleteClinicalContext([before.athlete_id as string])).get(
+        before.athlete_id as string
+      );
+      if (attachedProduct && ctx) {
+        const conflicts = productAllergenConflicts(
+          (attachedProduct.allergens as string[] | null) ?? [],
+          ctx
+        );
+        if (conflicts.length > 0) {
+          return {
+            ...EMPTY,
+            safetyMessage: `${before.supplement_name as string} — the attached product contains ${conflicts.join(
+              ", "
+            )}, which this athlete has declared. You can still end or shorten this prescription, or switch to another product of the same supplement; keeping or extending it is blocked.`,
+          };
+        }
+      }
+    }
   }
 
   const { data, error } = await supabase
@@ -523,7 +555,7 @@ export async function switchProtocolProduct(
   // form cannot swap a creatine prescription to a caffeine product.
   const { data: product } = await supabase
     .from("products")
-    .select("id, name, supplement_library_id, brands(name)")
+    .select("id, name, supplement_library_id, allergens, brands(name)")
     .eq("id", productId)
     .maybeSingle();
   if (!product) return { ...EMPTY, error: "That product no longer exists." };
@@ -546,6 +578,22 @@ export async function switchProtocolProduct(
     rationale: rationale ?? "",
   });
   if (safetyMessage) return { ...EMPTY, safetyMessage };
+
+  // THE PRODUCT HALF of the structural check — same treatment as the entity
+  // half, not a visual chip. Two products of one entity can differ on
+  // allergens (soy in one whey bar and not another), so passing the entity
+  // gate is necessary but not sufficient to attach this specific product.
+  const ctxMap = await loadAthleteClinicalContext([before.athlete_id as string]);
+  const ctx = ctxMap.get(before.athlete_id as string);
+  if (ctx) {
+    const conflicts = productAllergenConflicts((product.allergens as string[] | null) ?? [], ctx);
+    if (conflicts.length > 0) {
+      return {
+        ...EMPTY,
+        safetyMessage: `${newName} contains ${conflicts.join(", ")}, which this athlete has declared — the switch was not saved. Another product of the same supplement may be fine; check its allergen chips.`,
+      };
+    }
+  }
 
   const { data, error } = await supabase
     .from("supplement_protocols")

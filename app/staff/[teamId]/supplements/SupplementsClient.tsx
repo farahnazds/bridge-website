@@ -8,6 +8,7 @@ import { protocolPhase, protocolWindowLabel, type ProtocolPhase } from "@/lib/su
 import { SUPPLEMENT_TIMING_OPTIONS, SUPPLEMENT_RATIONALE_OPTIONS } from "@/lib/constants";
 import {
   checkPlanItems,
+  productAllergenConflicts,
   type AthleteClinicalContext,
   type SupplementLibraryRow,
 } from "@/lib/supplementPlanCheck";
@@ -312,6 +313,12 @@ function AlternativesPanel({
   const [rationale, setRationale] = useState(row.rationale);
   const codeLabels = clinical?.codeLabels ?? {};
 
+  // The product half of the structural check, live — same pure function the
+  // server action enforces with, run the moment a product is picked.
+  const selectedProduct = alternatives.find((p) => p.id === selected) ?? null;
+  const productConflicts =
+    selectedProduct && clinical ? productAllergenConflicts(selectedProduct.allergens, clinical) : [];
+
   return (
     <form
       action={action}
@@ -377,12 +384,28 @@ function AlternativesPanel({
         <textarea name="rationale" rows={2} value={rationale} onChange={(e) => setRationale(e.target.value)} className={INPUT} style={{ ...INPUT_STYLE, lineHeight: 1.45 }} />
       </div>
 
+      {productConflicts.length > 0 && (
+        <div
+          role="alert"
+          className={NOTICE}
+          style={{
+            borderColor: "var(--danger)",
+            color: "var(--text)",
+            backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+          }}
+        >
+          <strong style={{ color: "var(--danger)" }}>This product fails the safety check.</strong>{" "}
+          It contains {productConflicts.join(", ")}, which this athlete has declared. Switching will
+          be blocked by the same check on the server — pick another product of the same supplement.
+        </div>
+      )}
+
       <ActionNotices state={state} />
       <div className="flex items-center gap-3">
         <SubmitButton label="Switch product" busyLabel="Switching…" />
         <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-          The clinical entry stays the same, so the contraindication check is unchanged. Product
-          allergen chips above are display only — check them against the declarations.
+          The clinical entry stays the same, so the entity check is unchanged — and each product&apos;s
+          own allergens are checked structurally against the declarations, here and on the server.
         </p>
       </div>
     </form>

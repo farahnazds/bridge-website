@@ -169,3 +169,56 @@ export function checkPlanItems(
     } not saved. ${lines.join(" ")}`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Product-level allergens
+// ---------------------------------------------------------------------------
+
+/**
+ * Definitional implications between declarable codes, used ONLY for
+ * product-allergen matching. Each line is a fact about what a substance
+ * contains, not a clinical judgment: milk contains lactose, wheat contains
+ * gluten. Without these, a product marked milk_dairy would pass for an
+ * athlete who declared lactose_intolerance but not the allergy — a miss the
+ * entity-level check happens to cover for whey (that entry carries both
+ * codes) but nothing would cover for a milk-containing product under a
+ * non-dairy entity.
+ */
+const ALLERGEN_IMPLIES: Record<string, string[]> = {
+  milk_dairy: ["lactose_intolerance"],
+  wheat_gluten: ["gluten_sensitivity", "coeliac_disease"],
+};
+
+/**
+ * The PRODUCT half of the structural safety check — the entity half is
+ * checkPlanItems() above, and this deliberately mirrors its shape: codes
+ * intersected against the athlete's declaredCodes, labels resolved through
+ * the athlete's own codeLabels, nothing free-text.
+ *
+ * Exists because two products of the SAME clinical entity can differ on
+ * allergens (one whey bar contains soy, another doesn't), and entity codes
+ * cannot express that. Runs wherever a specific product is being attached to
+ * a prescription: the alternatives switch, and any future add-flow that
+ * selects a product. Pure and client-safe for the same reason
+ * checkPlanItems is — the browser warns live, the server action blocks.
+ *
+ * Returns the conflicting labels, empty when safe. An empty allergens array
+ * is genuinely safe-to-pass: the certified import records allergens as codes
+ * on every product, so absence means "none", not "unknown".
+ */
+export function productAllergenConflicts(
+  productAllergens: string[],
+  ctx: AthleteClinicalContext
+): string[] {
+  const declared = new Set(ctx.declaredCodes.map((c) => c.toLowerCase()));
+  const conflicts: string[] = [];
+  for (const code of productAllergens) {
+    const lower = code.toLowerCase();
+    for (const candidate of [lower, ...(ALLERGEN_IMPLIES[lower] ?? [])]) {
+      if (declared.has(candidate)) {
+        conflicts.push(ctx.codeLabels[candidate] ?? candidate);
+      }
+    }
+  }
+  return [...new Set(conflicts)];
+}
