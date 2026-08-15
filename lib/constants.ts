@@ -351,3 +351,54 @@ export function isWithinEditWindow(createdAt: string, now: number = Date.now()):
 /** The wording every surface uses when the window has closed. One string so
  *  the profile modal and the dedicated pages cannot describe it differently. */
 export const EDIT_WINDOW_CLOSED_LABEL = "Edit window closed";
+
+// ---------------------------------------------------------------------------
+// Supplement prescription vocabularies (Supplement Protocols "Add" form)
+// ---------------------------------------------------------------------------
+//
+// There was NO shared timing vocabulary anywhere in the app before this —
+// verified 2026-08-15: the planner's timings are model-written free text, and
+// the certified catalogue's timing_notes are per-product label strings. Rather
+// than invent one, this list is DERIVED from that imported catalogue: the 70
+// products' timing strings cluster into exactly these patterns (12×
+// "Post-training", 9× "Within 30 min post-training", 4× "With breakfast",
+// 4× "Any time — consistency is key", …). Canonical forms of the real
+// clusters, not a plausible-sounding invention.
+//
+// "Custom…" is deliberately absent here — the form renders its own free-text
+// escape hatch, same pattern as the "Other" options elsewhere. Values are
+// stored as the plain strings (supplement_protocols.timing is text), so
+// nothing existing needs migrating and planner-written rows coexist freely.
+export const SUPPLEMENT_TIMING_OPTIONS = [
+  "With breakfast",
+  "With a meal containing fat",
+  "Before training (30–60 min)",
+  "During training",
+  "Immediately post-training (within 30 min)",
+  "Post-match",
+  "Between meals",
+  "Evening, before bed",
+  "Split doses across the day",
+  "Any time — consistency is key",
+  "Match days only",
+] as const;
+
+// Common prescription rationales, grounded in the catalogue's own curated
+// use-case tags (recovery, sleep, immunity, bone, iron, hydration, power,
+// tendon, travel…) rather than free-associated. The athlete reads the chosen
+// line on My Protocol under "Why you're taking this", so these are written in
+// that register. The form pairs this with a free-text option — a dropdown
+// alone could never carry a real clinical reason like a specific ferritin
+// result.
+export const SUPPLEMENT_RATIONALE_OPTIONS = [
+  "Recovery support during a heavy training block",
+  "Muscle power and strength development",
+  "Hydration and cramp prevention",
+  "Fuelling for long or double sessions",
+  "Sleep quality support",
+  "Immune support during congested fixtures or travel",
+  "Bone health support",
+  "Tendon and ligament support",
+  "Diagnosed deficiency — physician-directed",
+  "Covering a dietary gap (restrictive diet or travel)",
+] as const;

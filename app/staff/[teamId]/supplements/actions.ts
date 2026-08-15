@@ -382,13 +382,12 @@ export async function createProtocol(
 
   const teamId = String(formData.get("team_id") ?? "").trim();
   const athleteId = String(formData.get("athlete_id") ?? "").trim();
-  const libraryId = String(formData.get("supplement_library_id") ?? "").trim() || null;
+  const libraryId = String(formData.get("supplement_library_id") ?? "").trim();
   const dose = String(formData.get("dose") ?? "").trim();
   const timing = String(formData.get("timing") ?? "").trim();
   const startDate = String(formData.get("start_date") ?? "").trim();
   const endDate = String(formData.get("end_date") ?? "").trim() || null;
   const rationale = String(formData.get("rationale") ?? "").trim() || null;
-  let supplementName = String(formData.get("supplement_name") ?? "").trim();
 
   if (!teamId || !athleteId) return { ...EMPTY, error: "Athlete is required." };
   if (!startDate) return { ...EMPTY, error: "A start date is required." };
@@ -396,6 +395,15 @@ export async function createProtocol(
     return { ...EMPTY, error: "The end date is before the start date." };
   }
   if (!dose || !timing) return { ...EMPTY, error: "Dose and timing are both required." };
+
+  // LIBRARY-ONLY since 2026-08-15, by the owner's decision — the free-text
+  // "not in the library" path is gone from this action, not just its form.
+  // The 20-entity clinical library now covers what this form is for, and a
+  // free-text row is precisely the row the contraindication check cannot see.
+  // (Migration 020's "a practitioner must not be blocked by the library"
+  // stance is superseded for THIS surface; the column stays nullable because
+  // the planner's confirm path still writes unmatched model suggestions.)
+  if (!libraryId) return { ...EMPTY, error: "Choose a supplement from the library." };
 
   const supabase = await createClient();
 
@@ -409,16 +417,12 @@ export async function createProtocol(
     .maybeSingle();
   if (!onTeam) return { ...EMPTY, error: "That athlete isn't on this team." };
 
-  // A library selection names the supplement, so the stored label and the
-  // clinical entry cannot disagree. Free text is still allowed — migration 020
-  // is explicit that a practitioner must not be blocked by the library.
-  if (libraryId) {
-    const library = await loadSupplementLibrary();
-    const entry = library.find((s) => s.id === libraryId);
-    if (!entry) return { ...EMPTY, error: "That supplement isn't in the library any more." };
-    supplementName = entry.name;
-  }
-  if (!supplementName) return { ...EMPTY, error: "Choose a supplement, or type a name." };
+  // The library names the supplement, so the stored label and the clinical
+  // entry cannot disagree.
+  const library = await loadSupplementLibrary();
+  const entry = library.find((s) => s.id === libraryId);
+  if (!entry) return { ...EMPTY, error: "That supplement isn't in the library any more." };
+  const supplementName = entry.name;
 
   const safetyMessage = await runSafetyGate({
     athleteId,
@@ -452,6 +456,120 @@ export async function createProtocol(
   if (error) return { ...EMPTY, error: `Couldn't add that protocol: ${error.message}` };
   if (!data || data.length === 0) {
     return { ...EMPTY, error: "That protocol was refused — you may not have permission for this athlete." };
+  }
+
+  revalidatePath(`/staff/${teamId}/supplements`);
+  return { error: null, safetyMessage: null, savedAt: Date.now() };
+}
+
+// ---------------------------------------------------------------------------
+// Switch the prescribed product (Alternatives)
+// ---------------------------------------------------------------------------
+
+/**
+ * Points a protocol row at a different certified product of the SAME clinical
+ * entity — different brand or format, same supplement. The entity link
+ * (supplement_library_id) never changes here, which is what keeps the
+ * contraindication check's view of the row identical across a switch.
+ *
+ * Dose/timing/rationale are kept unless the practitioner edited them in the
+ * alternatives panel, in which case they arrive changed in the form data.
+ *
+ * THE SAFETY GATE ALWAYS RUNS — deliberately not using updateProtocol's
+ * reduces-coverage exemption. A switch is a substitution, not a reduction,
+ * and the gate is the same checkPlanItems the planner and the report path
+ * use: same entity codes, same age bounds. Product-level allergen differences
+ * (one whey has soy, another doesn't) are NOT structurally checked — the
+ * structured check reads entity codes only — which is why the alternatives
+ * panel displays each product's allergen chips for the practitioner's eye.
+ *
+ * The denormalised supplement_name becomes "Product (Brand)" so My Protocol
+ * tells the athlete exactly what to pick up, while the entity link keeps the
+ * clinical identity.
+ */
+export async function switchProtocolProduct(
+  _prev: ProtocolActionState,
+  formData: FormData
+): Promise<ProtocolActionState> {
+  const profile = await getCurrentProfile();
+  if (!profile || !canManage(profile.role)) {
+    return { ...EMPTY, error: "You don't have permission to do this." };
+  }
+
+  const teamId = String(formData.get("team_id") ?? "").trim();
+  const protocolId = String(formData.get("protocol_id") ?? "").trim();
+  const productId = String(formData.get("product_id") ?? "").trim();
+  const dose = String(formData.get("dose") ?? "").trim();
+  const timing = String(formData.get("timing") ?? "").trim();
+  const rationale = String(formData.get("rationale") ?? "").trim() || null;
+
+  if (!teamId || !protocolId || !productId) return { ...EMPTY, error: "Missing protocol or product." };
+  if (!dose || !timing) return { ...EMPTY, error: "Dose and timing are both required." };
+
+  const supabase = await createClient();
+
+  const { data: before } = await supabase
+    .from("supplement_protocols")
+    .select("id, athlete_id, supplement_library_id")
+    .eq("id", protocolId)
+    .maybeSingle();
+  if (!before) return { ...EMPTY, error: "That protocol no longer exists, or you can't edit it." };
+  if (!before.supplement_library_id) {
+    return { ...EMPTY, error: "This protocol has no clinical library entry, so it has no alternatives to switch between." };
+  }
+
+  // The product must genuinely be an instance of this row's clinical entity —
+  // re-derived server-side rather than trusted from the client, so a crafted
+  // form cannot swap a creatine prescription to a caffeine product.
+  const { data: product } = await supabase
+    .from("products")
+    .select("id, name, supplement_library_id, brands(name)")
+    .eq("id", productId)
+    .maybeSingle();
+  if (!product) return { ...EMPTY, error: "That product no longer exists." };
+  if (product.supplement_library_id !== before.supplement_library_id) {
+    return { ...EMPTY, error: "That product is a different supplement — alternatives must share the same clinical library entry." };
+  }
+
+  const brandName = (product.brands as unknown as { name: string } | null)?.name;
+  const newName = brandName && !(product.name as string).toLowerCase().includes(brandName.toLowerCase())
+    ? `${product.name} (${brandName})`
+    : (product.name as string);
+
+  const safetyMessage = await runSafetyGate({
+    athleteId: before.athlete_id as string,
+    date: null,
+    supplementName: newName,
+    supplementLibraryId: before.supplement_library_id as string,
+    dose,
+    timing,
+    rationale: rationale ?? "",
+  });
+  if (safetyMessage) return { ...EMPTY, safetyMessage };
+
+  const { data, error } = await supabase
+    .from("supplement_protocols")
+    .update({
+      product_id: productId,
+      supplement_name: newName,
+      dose,
+      timing,
+      rationale,
+      updated_by: profile.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", protocolId)
+    .select("id");
+
+  if (isOverlapError(error)) {
+    return {
+      ...EMPTY,
+      error: await overlapExplanation(supabase, before.athlete_id as string, newName, protocolId),
+    };
+  }
+  if (error) return { ...EMPTY, error: `Couldn't switch the product: ${error.message}` };
+  if (!data || data.length === 0) {
+    return { ...EMPTY, error: "That change was refused — you may not have permission to edit this athlete's protocol." };
   }
 
   revalidatePath(`/staff/${teamId}/supplements`);

@@ -5,7 +5,7 @@ import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import { CARD } from "@/lib/ui";
 import { todayIso } from "@/lib/supplementProtocols";
 import { loadAthleteClinicalContext, loadSupplementLibrary } from "@/lib/supplementPlanSafety";
-import SupplementsClient, { type AthleteProtocols, type ProtocolRow } from "./SupplementsClient";
+import SupplementsClient, { type AthleteProtocols, type CatalogueProductLite, type ProtocolRow } from "./SupplementsClient";
 
 export const metadata: Metadata = { title: "Supplement Protocols — Bridgetx" };
 
@@ -57,16 +57,37 @@ export default async function SupplementsPage({
     ? await supabase
         .from("supplement_protocols")
         .select(
-          "id, athlete_id, supplement_name, supplement_library_id, dose, timing, rationale, start_date, end_date, prescribed_by, updated_at"
+          "id, athlete_id, supplement_name, supplement_library_id, product_id, dose, timing, rationale, start_date, end_date, prescribed_by, updated_at"
         )
         .in("athlete_id", athleteIds)
         .order("start_date", { ascending: false })
     : { data: [] };
 
-  const [contexts, library] = await Promise.all([
+  const [contexts, library, productsRes, brandsRes] = await Promise.all([
     loadAthleteClinicalContext(athleteIds),
     loadSupplementLibrary(),
+    // The certified catalogue (migration 042): every product carrying a
+    // clinical link is an alternative for protocols on that entity. Global
+    // catalogue tables, authenticated-read under RLS.
+    supabase
+      .from("products")
+      .select("id, name, brand_id, supplement_library_id, informed_sport, nsf_certified, allergens, vegan, default_dosing")
+      .not("supplement_library_id", "is", null),
+    supabase.from("brands").select("id, name"),
   ]);
+
+  const brandName = new Map(((brandsRes.data ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name]));
+  const products: CatalogueProductLite[] = ((productsRes.data ?? []) as Record<string, unknown>[]).map((p) => ({
+    id: p.id as string,
+    name: p.name as string,
+    brand: brandName.get(p.brand_id as string) ?? "—",
+    supplementLibraryId: p.supplement_library_id as string,
+    informedSport: Boolean(p.informed_sport),
+    nsfCertified: Boolean(p.nsf_certified),
+    allergens: (p.allergens as string[] | null) ?? [],
+    vegan: Boolean(p.vegan),
+    defaultDosing: (p.default_dosing as string | null) ?? null,
+  }));
 
   const byAthlete = new Map<string, ProtocolRow[]>();
   for (const r of protocolRows ?? []) {
@@ -75,6 +96,7 @@ export default async function SupplementsPage({
       athleteId: r.athlete_id as string,
       supplementName: r.supplement_name as string,
       supplementLibraryId: (r.supplement_library_id as string | null) ?? null,
+      productId: (r.product_id as string | null) ?? null,
       dose: r.dose as string,
       timing: r.timing as string,
       rationale: (r.rationale as string | null) ?? "",
@@ -104,6 +126,11 @@ export default async function SupplementsPage({
         redSFlag: clinical?.redSFlag ?? false,
         ironFlag: clinical?.ironFlag ?? false,
       },
+      // The full clinical context, for the Add form's safety banner and its
+      // real-time mismatch check — which runs checkPlanItems() in the browser,
+      // the same function the server gate and the planner run. Nothing here is
+      // data the practitioner can't already see on this page.
+      clinical: clinical ?? null,
       protocols: byAthlete.get(a.id) ?? [],
     };
   });
@@ -138,7 +165,8 @@ export default async function SupplementsPage({
           teamId={teamId}
           today={today}
           data={data}
-          library={library.map((s) => ({ id: s.id, name: s.name, category: s.category }))}
+          library={library}
+          products={products}
           canEdit={canEdit}
           preselectedAthleteId={preselected}
         />
