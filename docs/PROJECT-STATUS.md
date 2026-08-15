@@ -365,7 +365,31 @@ table renderer already half does this via `heightOfString` at `:301-304`.
 - **Brand typography.** `lib/reportPdf.ts:41-45` records that General Sans and
   Inter are not vendored — no `.ttf` in the repo.
 
-### 3b. Database separation (staging split) — PAUSED by request
+### 3b. Database separation (staging split) — PRIORITIZED 2026-08-15 (was: paused)
+
+**Status change, 2026-08-15, by the owner's direction: a real client is now
+live, so this split moves from paused to prioritized.** The shared database
+stopped being a tidiness problem and became a live-client problem:
+
+- Every dev-session and staging test writes into the same database the
+  client's staff use. The 2026-08-15 dev session alone generated test
+  reports (the TEST1 team's count moved 48 → 50), wrote supplement-protocol
+  test rows, and exercised report generation end-to-end — all of it landing
+  beside real client data. RLS keeps the client from *seeing* the test
+  fixtures; nothing keeps the test volume from *accumulating* around them.
+- **The audit below is now stale, and so is the recommendation built on it.**
+  The 2026-08-14 audit found "no pilot club exists yet" and concluded
+  production could be the clean project — "either the new one, or the current
+  one wiped and reseeded". With a real client live, **wipe-and-reseed of the
+  current project is off the table** unless a fresh audit proves their data
+  is elsewhere. Re-run the audit and re-decide the direction (most likely:
+  new project becomes STAGING after all, and the client's current database
+  is kept and cleaned deliberately, test fixtures removed with the
+  orphaned-PDF trap from `docs/08-integrations.md:13-28` in mind) before
+  creating anything.
+- The two traps below (storage buckets absent from migrations;
+  `NEXT_PUBLIC_*` inlined at build time) still hold and are the first things
+  the split will hit.
 
 Goal: a second Supabase project so staging (`thebridgehp.com`) stops sharing a
 database with production (`bridgetx.co`). Already the documented intent —
@@ -408,6 +432,7 @@ a fresh production database would mean re-inviting every account.
 it flips the recommendation.**
 
 ### Audit results — production contains only test data
+### (STALE as of 2026-08-15 — a real client is now live; re-run before acting)
 
 | Table | Count | | Table | Count |
 |---|---|---|---|---|
