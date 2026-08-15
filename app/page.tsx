@@ -129,7 +129,7 @@ export default function Home() {
               The intelligence platform where sports practitioners track, analyze, and report — across every sport, every athlete, one dashboard.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, animation: "lp-rise 1s .22s both cubic-bezier(.22,.7,.25,1)" }}>
-              <a href="#demo" className="lp-btn" style={{ flex: "none", whiteSpace: "nowrap", padding: "14px 26px", borderRadius: 11, fontSize: 15, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
+              <a href="/book" className="lp-btn" style={{ flex: "none", whiteSpace: "nowrap", padding: "14px 26px", borderRadius: 11, fontSize: 15, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
               <a href="#how-it-works" className="lp-ghost" style={{ flex: "none", whiteSpace: "nowrap", padding: "14px 24px", borderRadius: 11, fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,.86)", border: "1px solid rgba(255,255,255,.14)" }}>See How It Works</a>
             </div>
           </div>
@@ -298,7 +298,7 @@ export default function Home() {
                 <h3 style={{ margin: 0, fontFamily: HEAD, fontSize: 28, lineHeight: 1.14, letterSpacing: "-.022em", fontWeight: 600, color: "#fff", textWrap: "pretty" }}>High Performance Reports in Minutes</h3>
                 <p style={{ margin: 0, fontSize: 15, lineHeight: 1.7, color: "rgba(255,255,255,.6)", textWrap: "pretty" }}>Built from your athlete&apos;s real data and a research library your practitioners trust.</p>
                 <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
-                  <a href="#demo" className="lp-btn" style={{ padding: "12px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
+                  <a href="/book" className="lp-btn" style={{ padding: "12px 22px", borderRadius: 10, fontSize: 14, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
                   <span style={{ fontSize: 13, color: "rgba(255,255,255,.4)" }}>See a real report walked through live.</span>
                 </div>
                 <div style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,.07)", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -451,7 +451,7 @@ export default function Home() {
           <h2 style={{ margin: 0, maxWidth: 760, fontFamily: HEAD, fontSize: 66, lineHeight: 1, letterSpacing: "-.04em", fontWeight: 600, color: "#fff", textWrap: "pretty", animation: "lp-rise 1s both cubic-bezier(.22,.7,.25,1)", animationTimeline: "view()", animationRange: "entry 0% cover 32%" }}>Ready to bridge the gap?</h2>
           <p style={{ margin: 0, maxWidth: 560, fontSize: 18, lineHeight: 1.65, color: "rgba(255,255,255,.6)", textWrap: "pretty" }}>Book a 15-minute call and see how Bridgetx fits your club, your sport, your workflow.</p>
           <div style={{ display: "flex", marginTop: 6 }}>
-            <a data-cta-btn="1" href="mailto:admin@bridgetx.co?subject=Bridgetx%20demo" className="lp-btn" style={{ position: "relative", flex: "none", whiteSpace: "nowrap", padding: "15px 28px", borderRadius: 11, fontSize: 15, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
+            <a data-cta-btn="1" href="/book" className="lp-btn" style={{ position: "relative", flex: "none", whiteSpace: "nowrap", padding: "15px 28px", borderRadius: 11, fontSize: 15, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
           </div>
           <span style={{ fontSize: 14, color: "rgba(255,255,255,.42)" }}>Or email us directly — <a href="mailto:admin@bridgetx.co" style={{ color: "rgba(255,255,255,.62)" }}>admin@bridgetx.co</a></span>
         </div>
@@ -490,7 +490,7 @@ export default function Home() {
                 <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(255,255,255,.34)" }}>Connect</span>
                 <a href="mailto:admin@bridgetx.co" style={{ fontSize: 14 }}>admin@bridgetx.co</a>
                 <Link href="/login" style={{ fontSize: 14 }}>Sign In</Link>
-                <a href="#demo" style={{ fontSize: 14 }}>Book a Meeting</a>
+                <a href="/book" style={{ fontSize: 14 }}>Book a Meeting</a>
               </div>
             </div>
           </div>

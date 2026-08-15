@@ -34,7 +34,7 @@ schema.sql matches this.
 | `subscriptions` | Club subscription dates. Separate `plans` table (foundation) for future independent-tier Stripe pricing config. |
 | `messages` | Messenger — sender, recipient(s) (one or more practitioners), thread, read status. |
 | `notifications` | Compliance alerts, report-ready, subscription-expiry reminders, etc. |
-| `leads`, `content`, `articles` | Unchanged from v3. |
+| `leads`, `content`, `articles` | `leads` gained intake fields (role, country, sport, squad_size — migration 046) for the public Book-a-Meeting flow; meeting_date + meeting_booked=false together mean "time requested, awaiting confirmation". `content` and `articles` unchanged from v3. |
 | `partnerships_consultants`, `partnerships_consultant_clubs`, `brand_partners` | Unchanged from v3. |
 | `club_branding` | Super Admin-managed per club: logo, advertising banner, report template rules/color/Arabic format, Additional-Instructions guardrails. |
 | `role_permissions` | Ceiling-level matrix (Super Admin), overridable per staff member by Club Manager within that ceiling. |
