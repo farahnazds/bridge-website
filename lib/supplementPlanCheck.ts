@@ -52,6 +52,11 @@ export interface SupplementLibraryRow {
   id: string;
   name: string;
   category: string;
+  /** The broad docs/13 section (Hydration, Protein, Performance, Race Fuel,
+   *  Recovery, Micronutrient). NULL means not offered for new prescriptions —
+   *  the Add form's first dropdown groups by this; `category` stays the
+   *  precise clinical slug. See migration 044. */
+  categoryGroup: string | null;
   evidenceGrade: string | null;
   ageMin: number | null;
   ageMax: number | null;

@@ -74,30 +74,15 @@ const PHASE_LABEL: Record<ProtocolPhase, string> = {
   ended: "Ended",
 };
 
-/** Display labels for the library's category slugs. VALUES always come from
- *  the data — this map only prettifies known slugs for the dropdown, and an
- *  unknown slug falls back to itself rather than being hidden. */
-const CATEGORY_LABEL: Record<string, string> = {
-  bcaa: "BCAA",
-  beta_alanine: "Beta-Alanine",
-  caffeine: "Caffeine",
-  carbohydrate: "Carbohydrate Fuel",
-  collagen: "Collagen",
-  creatine: "Creatine",
-  electrolytes: "Electrolytes / Hydration",
-  glutamine: "Glutamine",
-  iron: "Iron",
-  magnesium: "Magnesium",
-  multivitamin: "Multivitamin",
-  nitrate: "Dietary Nitrate",
-  omega_3: "Omega-3",
-  protein: "Protein",
-  sodium_bicarbonate: "Sodium Bicarbonate",
-  vitamin_c: "Vitamin C",
-  vitamin_d: "Vitamin D",
-  zinc_magnesium: "Zinc + Magnesium",
+/** The docs/13 section order, used to sort whatever groups the DATA actually
+ *  carries — the values themselves always come from category_group, so a new
+ *  or renamed group still appears (appended, alphabetically) rather than
+ *  being hidden by a stale hardcoded list. */
+const GROUP_ORDER = ["Hydration", "Protein", "Performance", "Race Fuel", "Recovery", "Micronutrient"];
+const groupRank = (g: string) => {
+  const i = GROUP_ORDER.indexOf(g);
+  return i === -1 ? GROUP_ORDER.length : i;
 };
-const categoryLabel = (slug: string) => CATEGORY_LABEL[slug] ?? slug;
 
 const CUSTOM = "__custom__";
 
@@ -645,11 +630,17 @@ function ProtocolCard({
  * dose → timing → reason, with the athlete's declarations pinned on top and
  * the shared safety check running live on selection.
  *
- * Dose is free text FOR NOW: no structured per-supplement dose presets exist
- * anywhere yet (products carry one label-dosing string each, which is a
- * different thing). When supplement_library grows a real presets field with
- * clinically supplied options, this input becomes a dropdown + custom, same
- * shape as timing below.
+ * The category dropdown is the BROAD docs/13 section (category_group,
+ * migration 044), not the narrow clinical slug — six groups with the specific
+ * supplements nested under them, exactly how the catalogue itself is
+ * organised. An entry with NO group (currently only Sodium Bicarbonate, which
+ * predates the certified catalogue) is not offered here at all; its history
+ * and safety codes are untouched.
+ *
+ * Dose presets are DERIVED from the entity's certified products'
+ * default_dosing strings — real label dosing already in the data, deduplicated
+ * at render — with the same Custom escape hatch as timing. Nothing is
+ * invented: an entity whose products carry no dosing falls back to free text.
  */
 function AddProtocolForm({
   teamId,
@@ -657,35 +648,54 @@ function AddProtocolForm({
   clinical,
   today,
   library,
+  productsByLibrary,
 }: {
   teamId: string;
   athleteId: string;
   clinical: AthleteClinicalContext | null;
   today: string;
   library: SupplementLibraryRow[];
+  productsByLibrary: Map<string, CatalogueProductLite[]>;
 }) {
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(createProtocol, initialState);
-  const [category, setCategory] = useState("");
+  const [group, setGroup] = useState("");
   const [libraryId, setLibraryId] = useState("");
+  const [doseChoice, setDoseChoice] = useState("");
+  const [doseCustom, setDoseCustom] = useState("");
   const [timingChoice, setTimingChoice] = useState<string>(SUPPLEMENT_TIMING_OPTIONS[0]);
   const [timingCustom, setTimingCustom] = useState("");
   const [whyChoice, setWhyChoice] = useState<string>("");
   const [whyCustom, setWhyCustom] = useState("");
 
-  // Categories come from the library DATA — never a hardcoded list, so a new
-  // clinical entry's category appears here the moment it exists.
-  const categories = useMemo(
-    () => [...new Set(library.map((s) => s.category))].sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b))),
-    [library]
+  // Groups come from the library DATA — never a hardcoded value list, so a
+  // newly grouped clinical entry appears here the moment it exists. NULL-group
+  // entries are the deliberate exclusion: not offered for new prescriptions.
+  const offered = useMemo(() => library.filter((s) => s.categoryGroup !== null), [library]);
+  const groups = useMemo(
+    () =>
+      [...new Set(offered.map((s) => s.categoryGroup as string))].sort(
+        (a, b) => groupRank(a) - groupRank(b) || a.localeCompare(b)
+      ),
+    [offered]
   );
-  const inCategory = useMemo(
-    () => library.filter((s) => s.category === category).sort((a, b) => a.name.localeCompare(b.name)),
-    [library, category]
+  const inGroup = useMemo(
+    () => offered.filter((s) => s.categoryGroup === group).sort((a, b) => a.name.localeCompare(b.name)),
+    [offered, group]
   );
   const entry = library.find((s) => s.id === libraryId) ?? null;
   const findings = useMemo(() => liveFindings(entry, clinical), [entry, clinical]);
 
+  // Distinct label-dosing strings across this entity's certified products.
+  const doseOptions = useMemo(() => {
+    if (!libraryId) return [];
+    const dosings = (productsByLibrary.get(libraryId) ?? [])
+      .map((p) => p.defaultDosing?.trim())
+      .filter((d): d is string => Boolean(d));
+    return [...new Set(dosings)];
+  }, [libraryId, productsByLibrary]);
+
+  const dose = doseOptions.length === 0 || doseChoice === CUSTOM ? doseCustom : doseChoice;
   const timing = timingChoice === CUSTOM ? timingCustom : timingChoice;
   const rationale = whyChoice === CUSTOM ? whyCustom : whyChoice;
 
@@ -706,6 +716,7 @@ function AddProtocolForm({
     <form action={action} className={`${PANEL} flex flex-col gap-3 p-4`} style={{ borderColor: "var(--brand-blue)", backgroundColor: "var(--bg)" }}>
       <input type="hidden" name="team_id" value={teamId} />
       <input type="hidden" name="athlete_id" value={athleteId} />
+      <input type="hidden" name="dose" value={dose} />
       <input type="hidden" name="timing" value={timing} />
       <input type="hidden" name="rationale" value={rationale} />
 
@@ -724,15 +735,15 @@ function AddProtocolForm({
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Category</label>
           <select
-            value={category}
-            onChange={(e) => { setCategory(e.target.value); setLibraryId(""); }}
+            value={group}
+            onChange={(e) => { setGroup(e.target.value); setLibraryId(""); setDoseChoice(""); }}
             className={INPUT}
             style={INPUT_STYLE}
             required
           >
             <option value="" disabled>Choose a category…</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>{categoryLabel(c)}</option>
+            {groups.map((g) => (
+              <option key={g} value={g}>{g}</option>
             ))}
           </select>
         </div>
@@ -742,14 +753,14 @@ function AddProtocolForm({
           <select
             name="supplement_library_id"
             value={libraryId}
-            onChange={(e) => setLibraryId(e.target.value)}
+            onChange={(e) => { setLibraryId(e.target.value); setDoseChoice(""); }}
             className={INPUT}
             style={INPUT_STYLE}
             required
-            disabled={!category}
+            disabled={!group}
           >
-            <option value="" disabled>{category ? "Choose a supplement…" : "Choose a category first"}</option>
-            {inCategory.map((s) => (
+            <option value="" disabled>{group ? "Choose a supplement…" : "Choose a category first"}</option>
+            {inGroup.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
@@ -762,7 +773,45 @@ function AddProtocolForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Dose</label>
-          <input name="dose" placeholder="e.g. 5 g/day" className={INPUT} style={INPUT_STYLE} required />
+          {doseOptions.length > 0 ? (
+            <>
+              <select
+                value={doseChoice}
+                onChange={(e) => setDoseChoice(e.target.value)}
+                className={INPUT}
+                style={INPUT_STYLE}
+                required
+              >
+                <option value="" disabled>Choose a dose…</option>
+                {doseOptions.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+                <option value={CUSTOM}>Custom…</option>
+              </select>
+              {doseChoice === CUSTOM && (
+                <input
+                  value={doseCustom}
+                  onChange={(e) => setDoseCustom(e.target.value)}
+                  placeholder="e.g. 5 g/day"
+                  className={INPUT}
+                  style={INPUT_STYLE}
+                  required
+                />
+              )}
+              <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                Label dosing from this supplement&apos;s certified products.
+              </p>
+            </>
+          ) : (
+            <input
+              value={doseCustom}
+              onChange={(e) => setDoseCustom(e.target.value)}
+              placeholder={libraryId ? "e.g. 5 g/day" : "Choose a supplement first"}
+              className={INPUT}
+              style={INPUT_STYLE}
+              required
+            />
+          )}
         </div>
 
         <div className="flex flex-col gap-1">
@@ -1011,6 +1060,7 @@ export default function SupplementsClient({
                 clinical={a.clinical}
                 today={today}
                 library={library}
+                productsByLibrary={productsByLibrary}
               />
             )}
           </div>
