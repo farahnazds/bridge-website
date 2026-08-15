@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import { BTN_PRIMARY_FULL, CARD, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import AthleteSelectField from "@/components/AthleteSelectField";
 import { useFormStatus } from "react-dom";
 import AudienceField from "./AudienceField";
@@ -75,7 +75,7 @@ export default function InjuryReportForm({
 
   return (
     <div className="flex flex-col gap-6">
-      <form action={formAction} className="flex flex-col gap-5" noValidate>
+      <form action={formAction} className={FORM_GRID} noValidate>
         <input type="hidden" name="team_id" value={teamId} />
         <div className="flex max-w-xs flex-col gap-1.5">
           <label htmlFor="InjuryReportForm_language" className={labelClass} style={{ color: "var(--text)" }}>
@@ -145,7 +145,9 @@ export default function InjuryReportForm({
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        {/* Free text runs the full width of the grid rather than sitting in a
+            column. */}
+        <div className="col-span-full flex flex-col gap-1.5">
           <label htmlFor="inj_instructions" className={labelClass} style={{ color: "var(--text)" }}>
             Additional instructions (optional)
           </label>
@@ -162,7 +164,7 @@ export default function InjuryReportForm({
         {state.error && (
           <p
             role="alert"
-            className={NOTICE}
+            className={`${NOTICE} col-span-full`}
             style={{
               borderColor: "var(--danger)",
               color: "var(--danger)",
@@ -173,7 +175,11 @@ export default function InjuryReportForm({
           </p>
         )}
 
-        <SubmitButton />
+        {/* SubmitButton is still BTN_PRIMARY_FULL — it fills this wrapper, not
+            the card. Left unwrapped it would have become a ~1100px button. */}
+        <div className="col-span-full sm:max-w-xs">
+          <SubmitButton />
+        </div>
       </form>
 
       {state.dataCheckNote && !state.error && (

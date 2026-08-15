@@ -122,6 +122,30 @@
   --font-mono: var(--font-mono);
 }
 
+html {
+  /* Reserve the scrollbar's width whether or not a scrollbar is showing, so
+     the content column is the same width on every page.
+
+     Measured on Reports: the Generate tab is short enough to need no vertical
+     scrollbar and History (48 cards) is not, so switching between two tabs of
+     ONE page moved the content's right edge by 17px. Left edges were identical
+     at 288px; only the gutter differed. Not a layout bug — the two pages really
+     did have different viewport widths — which is why no amount of matching
+     widths in the components could have fixed it.
+
+     This also removes the shift when a modal opens. The scroll lock below sets
+     `overflow: hidden` on html, which normally takes the scrollbar away and
+     lets the page jump 17px wider underneath the overlay; an element with
+     `overflow: hidden` is still a scroll container, so the gutter stays
+     reserved and nothing moves.
+
+     `stable` rather than `stable both-edges`: one gutter on the inline-end
+     side, matching where the scrollbar actually sits. Unsupported in Safari
+     before 18.2, where it is simply ignored and the old behaviour returns —
+     no fallback needed. */
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--bg);
   color: var(--text);

@@ -64,6 +64,34 @@ export const BTN_TERTIARY =
   FOCUS;
 
 /**
+ * The field layout for a form that sits in a FULL-WIDTH card rather than a
+ * narrow column — currently the five report generators.
+ *
+ * Those forms used to be a single `flex flex-col` inside a `max-w-2xl` card,
+ * which read as a narrow strip beside the full-bleed Report History grid. The
+ * card is now the same width as History, and a one-column form inside it would
+ * have stretched an athlete picker and a date input across ~1100px.
+ *
+ * Column count comes from auto-fit against the CONTAINER, not from `md:` /
+ * `xl:` breakpoints against the viewport. That distinction is the whole fix:
+ * these forms sit to the right of a fixed 288px sidebar, so a viewport wide
+ * enough to trigger `md:grid-cols-2` does not mean the card is wide enough for
+ * two columns. Measured at an 888px window, breakpoint columns forced <main>
+ * from ~584px to 740px and pushed the shell into horizontal scroll.
+ *
+ * The 19rem floor is not a guess — it is the period row, whose two date inputs
+ * will not compress below ~144px each plus their gap. Set the floor lower and
+ * that row becomes the thing that overflows; auto-fit then guarantees a column
+ * is never narrower than its most inflexible child.
+ *
+ * Fields that are not a single control — a textarea, a checkbox row, an error,
+ * the submit — opt out with Tailwind's `col-span-full` at the call site, which
+ * is why that is not wrapped up here: which children span is a property of each
+ * form, not of the grid.
+ */
+export const FORM_GRID = "grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(19rem,1fr))]";
+
+/**
  * The small status pill used in tables and list rows: a tinted background
  * (callers pass a `color-mix` inline) with no border, carrying a state —
  * active, overdue, paid.

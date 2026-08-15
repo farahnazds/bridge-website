@@ -83,6 +83,12 @@ export default async function TeamLayout({
   { label: null, items: [
     { label: "Roster", href: `/staff/${teamId}`, icon: Users },
     { label: "Load & Periodization", href: `/staff/${teamId}/training-load`, icon: Gauge },
+    // Deliberately the section ROOT, which redirects to /generate, rather than
+    // pointing straight at a sub-route. SidebarNav highlights by path prefix
+    // unless an href is a prefix of a sibling's (see components/SidebarNav.tsx),
+    // so this href keeps "Reports" lit across /generate, /history AND
+    // /nutrition. Naming a sub-route here would cost one redirect but lose the
+    // highlight on the other two.
     { label: "Reports", href: `/staff/${teamId}/reports`, icon: FileText },
     { label: "Messenger", href: `/staff/${teamId}/messenger`, icon: MessageSquare },
   ] },

@@ -1,5 +1,22 @@
 "use server";
 
+// REVALIDATION AFTER THE GENERATE/HISTORY SPLIT
+//
+// Every revalidatePath below passes "layout", and the path is the SECTION root
+// rather than any one page. Reports is three sibling routes under a shared
+// layout now — /generate, /history and /nutrition — and a bare
+// revalidatePath("…/reports") would refresh only the redirect stub that lives
+// at that exact path, refreshing nothing anyone reads.
+//
+// Three things depend on this being right, and all three fail silently:
+//   - the history list itself, which is the only place a produced report shows;
+//   - the layout's History count badge, which would otherwise sit one behind;
+//   - the generator's per-type lookback, derived from prior report periods.
+//
+// shareReport matters most and is the easiest to overlook, because it writes no
+// report and looks like it has nothing to invalidate. It sets shared_with,
+// which is what draws the recipient avatars on a history card — miss it and
+// sharing appears to do nothing until a hard reload.
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -273,7 +290,7 @@ export async function generateComplianceReport(
   });
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
 
-  revalidatePath(`/staff/${teamId}/reports`);
+  revalidatePath(`/staff/${teamId}/reports`, "layout");
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id };
 }
 
@@ -521,7 +538,7 @@ export async function generateBodyCompositionReport(
   });
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
 
-  revalidatePath(`/staff/${teamId}/reports`);
+  revalidatePath(`/staff/${teamId}/reports`, "layout");
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id };
 }
 
@@ -626,7 +643,7 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
     }
   }
 
-  revalidatePath(`/staff/${teamId}/reports`);
+  revalidatePath(`/staff/${teamId}/reports`, "layout");
   revalidatePath(`/staff/${teamId}`);
   return { error: null, warning: emailWarning, success: true };
 }
@@ -828,7 +845,7 @@ export async function generatePerformanceReport(
   });
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
 
-  revalidatePath(`/staff/${teamId}/reports`);
+  revalidatePath(`/staff/${teamId}/reports`, "layout");
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id };
 }
 
@@ -1021,7 +1038,7 @@ export async function generateInjuryReport(
   });
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
 
-  revalidatePath(`/staff/${teamId}/reports`);
+  revalidatePath(`/staff/${teamId}/reports`, "layout");
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id };
 }
 
@@ -1154,7 +1171,7 @@ export async function generateCombinedReport(
     generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
   });
 
-  revalidatePath(`/staff/${teamId}/reports`);
+  revalidatePath(`/staff/${teamId}/reports`, "layout");
   return {
     error: null,
     reportText,

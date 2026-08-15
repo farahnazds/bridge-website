@@ -748,8 +748,11 @@ async function runConfirm(
     };
   });
 
-  revalidatePath(`/staff/${teamId}/reports`);
-  revalidatePath(`/staff/${teamId}/reports/nutrition`);
+  // "layout" covers the whole Reports section — history, the generator's
+  // lookback and the switcher's count badge — which a bare path revalidation of
+  // the section root no longer does now that the root is only a redirect. This
+  // one call subsumes the /reports/nutrition line that used to sit beside it.
+  revalidatePath(`/staff/${teamId}/reports`, "layout");
   revalidatePath(`/staff/${teamId}/supplements`);
   revalidatePath(`/staff/${teamId}`);
 
@@ -896,7 +899,7 @@ export async function generateReportForAthlete(
       audience: resolveReportAudience(ctx.audience),
     });
 
-    if (report.reportId) revalidatePath(`/staff/${teamId}/reports`);
+    if (report.reportId) revalidatePath(`/staff/${teamId}/reports`, "layout");
 
     return {
       athleteId,

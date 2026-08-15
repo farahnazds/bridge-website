@@ -111,7 +111,13 @@ export default async function TeamAthleteProfilePage({
         context.isOversight ? "You are viewing this athlete as oversight, not as assigned staff." : undefined
       }
       links={{
-        reports: `/staff/${teamId}/reports`,
+        // HISTORY, not the section root. This is the "see all" on a section
+        // listing this athlete's eight most recent reports, so the destination
+        // is the full list — before the split it landed on a page that happened
+        // to contain both the generator and the list, and following it now would
+        // otherwise redirect to the generator, which is the opposite of what the
+        // section is about.
+        reports: `/staff/${teamId}/reports/history`,
         back: { href: `/staff/${teamId}`, label: "Roster" },
       }}
     />

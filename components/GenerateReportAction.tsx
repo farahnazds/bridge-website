@@ -41,7 +41,12 @@ export default function GenerateReportAction({
 }) {
   return (
     <Link
-      href={`/staff/${teamId}/reports?athlete=${athleteId}`}
+      // Straight to /generate rather than leaning on the /reports redirect.
+      // The redirect does carry ?athlete= across, so this would work either
+      // way — but a "Generate Report" button should land on the generator
+      // without a hop, and naming the destination means a future change to the
+      // redirect cannot quietly reroute this button somewhere else.
+      href={`/staff/${teamId}/reports/generate?athlete=${athleteId}`}
       className={`${BTN_PRIMARY} inline-flex items-center gap-1.5`}
       style={{ backgroundImage: "var(--brand-gradient-action)" }}
     >

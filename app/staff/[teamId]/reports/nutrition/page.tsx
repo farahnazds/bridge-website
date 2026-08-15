@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { clubDefaultLanguage, clubIdForTeam } from "@/lib/reportLanguage";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
@@ -81,23 +80,17 @@ export default async function NutritionPlannerPage({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <Link
-          href={`/staff/${teamId}/reports`}
-          className="text-sm font-medium underline-offset-2 hover:underline"
-          style={{ color: "var(--brand-blue)" }}
-        >
-          ← Reports
-        </Link>
-        <h1
-          className="mt-2 text-2xl font-semibold"
-          style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}
-        >
-          Nutrition Planner
-        </h1>
-        <p className="mt-1 max-w-3xl text-sm" style={{ color: "var(--text-muted)" }}>
-          Plan supplements day by day across a period, for one athlete or the whole squad. Every suggestion is
-          reviewed and confirmed by you before anything is written — athletes never see a suggestion, only a
-          confirmed protocol.
+        {/* The "← Reports" back link and the "Nutrition Planner" <h1> that used
+            to open this page are both gone, and neither is a loss: the shared
+            layout above now renders the Reports heading and a switcher whose
+            Planner segment is this page, so the link went back to where the
+            reader already is and the heading was the second <h1> on the screen.
+            What survives is the half of the description the switcher's one-line
+            summary does not carry — who it can be run for, and the fact that
+            nothing is written until it is confirmed. */}
+        <p className="max-w-3xl text-sm" style={{ color: "var(--text-muted)" }}>
+          For one athlete or the whole squad. Every suggestion is reviewed and confirmed by you before anything
+          is written — athletes never see a suggestion, only a confirmed protocol.
         </p>
         {preselected && (
           <p
