@@ -5,6 +5,7 @@ import { getStaffTeamContext } from "@/lib/staffTeamContext";
 import { CARD } from "@/lib/ui";
 import { todayIso } from "@/lib/supplementProtocols";
 import { loadAthleteClinicalContext, loadSupplementLibrary } from "@/lib/supplementPlanSafety";
+import { loadTrainingLoadDays } from "@/lib/nutritionPlanData";
 import SupplementsClient, { type AthleteProtocols, type CatalogueProductLite, type ProtocolRow } from "./SupplementsClient";
 
 export const metadata: Metadata = { title: "Supplement Protocols — Bridgetx" };
@@ -63,7 +64,16 @@ export default async function SupplementsPage({
         .order("start_date", { ascending: false })
     : { data: [] };
 
-  const [contexts, library, productsRes, brandsRes, allergiesRes] = await Promise.all([
+  // Computed server-side and passed down, so every phase decision on this page
+  // is made against one date. A client-side today would drift across a UTC
+  // midnight and could label a row differently from the row above it.
+  const today = todayIso();
+  // The agenda's window: today through six days out. UTC arithmetic on the
+  // same `today` string, so the window can never straddle a different date
+  // than the phase decisions.
+  const agendaEnd = new Date(Date.parse(today) + 6 * 86400000).toISOString().slice(0, 10);
+
+  const [contexts, library, productsRes, brandsRes, allergiesRes, loadDaysByAthlete] = await Promise.all([
     loadAthleteClinicalContext(athleteIds),
     loadSupplementLibrary(),
     // The certified catalogue (migration 042): every product carrying a
@@ -79,7 +89,24 @@ export default async function SupplementsPage({
     // declarations — without this, an undeclared allergen rendered as its raw
     // code ("Contains milk_dairy").
     supabase.from("allergies").select("code, label"),
+    // Training-load context for the agenda's day rails — the same loader the
+    // planner uses, so both surfaces resolve athlete-over-team scope the same
+    // way. A day with no plan entry stays null and the agenda says so
+    // honestly ("No plan entry"), never inventing a rest day.
+    loadTrainingLoadDays(teamId, athleteIds, today, agendaEnd),
   ]);
+
+  // Maps don't cross the server→client boundary; flatten to the fields the
+  // agenda rail actually shows.
+  const agendaLoads: Record<string, { date: string; intensity: string | null; sessionType: string | null; rpe: number | null }[]> = {};
+  for (const [athleteId, days] of loadDaysByAthlete) {
+    agendaLoads[athleteId] = days.map((d) => ({
+      date: d.date,
+      intensity: d.load?.intensity ?? null,
+      sessionType: d.load?.sessionType ?? null,
+      rpe: d.load?.rpe ?? null,
+    }));
+  }
 
   const brandName = new Map(((brandsRes.data ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name]));
   const products: CatalogueProductLite[] = ((productsRes.data ?? []) as Record<string, unknown>[]).map((p) => ({
@@ -116,11 +143,6 @@ export default async function SupplementsPage({
     if (list) list.push(row);
     else byAthlete.set(row.athleteId, [row]);
   }
-
-  // Computed server-side and passed down, so every phase decision on this page
-  // is made against one date. A client-side today would drift across a UTC
-  // midnight and could label a row differently from the row above it.
-  const today = todayIso();
 
   const data: AthleteProtocols[] = athletes.map((a) => {
     const clinical = contexts.get(a.id);
@@ -177,6 +199,7 @@ export default async function SupplementsPage({
           library={library}
           products={products}
           allergenLabels={allergenLabels}
+          agendaLoads={agendaLoads}
           canEdit={canEdit}
           preselectedAthleteId={preselected}
         />

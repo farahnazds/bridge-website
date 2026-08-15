@@ -161,6 +161,143 @@ function ScheduleBar({
   );
 }
 
+/** One serialized training-load day for the agenda's rail — flattened from
+ *  the planner's loader on the server (Maps don't cross the boundary). */
+export interface AgendaLoadDay {
+  date: string;
+  intensity: string | null;
+  sessionType: string | null;
+  rpe: number | null;
+}
+
+interface AgendaItem {
+  row: ProtocolRow;
+  /** Dot colour: danger on a live conflict, else category tone, else muted. */
+  tone: string;
+  altCount: number;
+}
+
+interface AgendaDay {
+  date: string;
+  weekday: string;
+  label: string;
+  note: string;
+  isMatch: boolean;
+  items: AgendaItem[];
+}
+
+const AGENDA_WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "UTC" });
+const AGENDA_DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * The week agenda — the reference's primary scheduled-dates visual: one row
+ * per calendar day that has something DUE (active and scheduled rows both;
+ * a protocol already running is due tomorrow too), a left rail carrying the
+ * day and its training-load session, and one line per protocol occurrence.
+ * A range row deliberately repeats across every day it covers — that is the
+ * agenda answering "what's due when", while the range cards below keep
+ * answering "what protocols exist". Days with nothing due don't appear,
+ * exactly as in the reference.
+ *
+ * Edit/Alternatives here don't host their own forms — they signal the row's
+ * range card (the single home of those flows) open and scroll to it, so the
+ * agenda can never fork the edit surface.
+ */
+function WeekAgenda({
+  days,
+  canEdit,
+  onOpen,
+}: {
+  days: AgendaDay[];
+  canEdit: boolean;
+  onOpen: (rowId: string, panel: "edit" | "alternatives") => void;
+}) {
+  if (days.length === 0) {
+    return (
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        Nothing due in the next 7 days.
+      </p>
+    );
+  }
+  return (
+    <div className={`${PANEL} overflow-hidden`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+      {days.map((d, i) => (
+        <div
+          key={d.date}
+          className="grid"
+          style={{ gridTemplateColumns: "104px 1fr", borderBottom: i < days.length - 1 ? "1px solid var(--border)" : undefined }}
+        >
+          <div
+            className="flex flex-col gap-0.5 border-r px-3.5 py-3"
+            style={{ borderColor: "var(--border)", backgroundColor: "color-mix(in srgb, var(--text) 1.5%, transparent)" }}
+          >
+            <span
+              className="text-[10px]"
+              style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.1em", color: d.isMatch ? "var(--brand-blue)" : "var(--text-muted)" }}
+            >
+              {d.weekday}
+            </span>
+            <span
+              className="text-[15px] font-semibold"
+              style={{ fontFamily: "var(--font-heading)", letterSpacing: "-0.01em", color: "var(--text)" }}
+            >
+              {d.label}
+            </span>
+            <span className="text-[10.5px]" style={{ color: "var(--text-muted)" }}>{d.note}</span>
+          </div>
+          <div className="flex min-w-0 flex-col">
+            {d.items.map((it, j) => (
+              <div
+                key={it.row.id}
+                className="flex flex-wrap items-center gap-x-2.5 gap-y-1 px-3.5 py-2.5"
+                style={{
+                  borderBottom:
+                    j < d.items.length - 1 ? "1px solid color-mix(in srgb, var(--border) 55%, transparent)" : undefined,
+                }}
+              >
+                <span className="h-[5px] w-[5px] shrink-0 rounded-full" style={{ backgroundColor: it.tone }} />
+                <span className="min-w-0 text-[13px] font-semibold" style={{ color: "var(--text)", flex: "1 1 150px" }}>
+                  {it.row.supplementName}
+                </span>
+                <span className="min-w-0 text-xs" style={{ color: "var(--text-muted)", flex: "1 1 auto" }}>{it.row.dose}</span>
+                <span
+                  className="min-w-0 text-[9.5px]"
+                  style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}
+                >
+                  {it.row.timing}
+                </span>
+                {canEdit && (
+                  <span className="ml-auto flex shrink-0 items-center gap-3">
+                    {it.altCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => onOpen(it.row.id, "alternatives")}
+                        className="text-[11.5px] font-medium underline-offset-2 hover:underline"
+                        style={{ color: "var(--brand-blue)" }}
+                      >
+                        Alternatives ({it.altCount})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onOpen(it.row.id, "edit")}
+                      className={`${PANEL} px-2.5 py-1 text-[11.5px] font-medium transition-colors duration-150 ease-out hover:border-white/25`}
+                      style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                    >
+                      Edit
+                    </button>
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The mockup's section marker: small dot, mono label, hairline to the edge.
  *  Flat dot rather than the mockup's halo — docs/06: no box-shadows. */
 function SectionHead({ tone, outlined, label }: { tone: string; outlined?: boolean; label: string }) {
@@ -510,6 +647,8 @@ function ProtocolCard({
   categoryGroup,
   defaultWhyOpen,
   conflictLabels,
+  agendaOpenNonce,
+  agendaOpenPanel,
 }: {
   teamId: string;
   row: ProtocolRow;
@@ -529,9 +668,28 @@ function ProtocolCard({
    *  declarations, so a declaration that changed after prescribing surfaces
    *  here on the affected row itself. Empty = nothing flagged. */
   conflictLabels: string[];
+  /** Set (with a fresh nonce) when the week agenda asks this card to open its
+   *  editor or alternatives — the agenda holds no forms of its own. */
+  agendaOpenNonce?: number;
+  agendaOpenPanel?: "edit" | "alternatives";
 }) {
-  const [open, setOpen] = useState(false);
-  const [showAlternatives, setShowAlternatives] = useState(false);
+  // Which panel is open is DERIVED, not synced: the user's last explicit
+  // choice (recorded with the agenda nonce it was made under) wins until the
+  // agenda sends a NEW nonce, at which point the agenda's requested panel
+  // wins until the next click. No effect, no state mirroring.
+  const [manualPanel, setManualPanel] = useState<{
+    panel: "edit" | "alternatives" | null;
+    asOfNonce: number | undefined;
+  }>({ panel: null, asOfNonce: undefined });
+  const activePanel =
+    agendaOpenNonce !== undefined && manualPanel.asOfNonce !== agendaOpenNonce
+      ? agendaOpenPanel ?? "edit"
+      : manualPanel.panel;
+  const open = activePanel === "edit";
+  const showAlternatives = activePanel === "alternatives";
+  const choosePanel = (panel: "edit" | "alternatives" | null) =>
+    setManualPanel({ panel, asOfNonce: agendaOpenNonce });
+
   const [whyOverride, setWhyOverride] = useState<boolean | null>(null);
   const [hovered, setHovered] = useState(false);
   const whyOpen = whyOverride ?? defaultWhyOpen;
@@ -626,7 +784,7 @@ function ProtocolCard({
         {canEdit && (
           <button
             type="button"
-            onClick={() => { setOpen(!open); setShowAlternatives(false); }}
+            onClick={() => choosePanel(open ? null : "edit")}
             className={`${PANEL} shrink-0 px-3 py-1 text-xs font-medium transition-colors duration-150 ease-out hover:border-white/25`}
             style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
           >
@@ -672,7 +830,7 @@ function ProtocolCard({
         {canEdit && alternatives.length > 0 && phase !== "ended" && (
           <button
             type="button"
-            onClick={() => { setShowAlternatives(!showAlternatives); setOpen(false); }}
+            onClick={() => choosePanel(showAlternatives ? null : "alternatives")}
             className="text-xs font-medium underline-offset-2 hover:underline"
             style={{ color: "var(--brand-blue)" }}
           >
@@ -709,7 +867,7 @@ function ProtocolCard({
           alternatives={alternatives}
           clinical={clinical}
           allergenLabels={allergenLabels}
-          onClose={() => setShowAlternatives(false)}
+          onClose={() => choosePanel(null)}
         />
       )}
 
@@ -1178,6 +1336,7 @@ export default function SupplementsClient({
   library,
   products,
   allergenLabels,
+  agendaLoads,
   canEdit,
   preselectedAthleteId,
 }: {
@@ -1190,6 +1349,8 @@ export default function SupplementsClient({
    *  name allergens the athlete hasn't declared. Athlete-declared labels
    *  (which can carry an "other" note) still win where both exist. */
   allergenLabels: Record<string, string>;
+  /** Per-athlete training-load days for the agenda rail, today → +6. */
+  agendaLoads: Record<string, AgendaLoadDay[]>;
   canEdit: boolean;
   preselectedAthleteId: string | null;
 }) {
@@ -1338,6 +1499,22 @@ export default function SupplementsClient({
     setTimeout(() => {
       document.getElementById(`protocol-${rowId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 60);
+  };
+
+  /** An agenda line's Edit/Alternatives: the row's range card is the single
+   *  home of those flows, so signal it open, make sure no phase filter hides
+   *  it, and bring it into view. */
+  const [agendaTarget, setAgendaTarget] = useState<{
+    rowId: string;
+    panel: "edit" | "alternatives";
+    nonce: number;
+  } | null>(null);
+  const openFromAgenda = (rowId: string, panel: "edit" | "alternatives") => {
+    setPhaseFilter("all");
+    setAgendaTarget({ rowId, panel, nonce: Date.now() });
+    setTimeout(() => {
+      document.getElementById(`protocol-${rowId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
   };
 
   const stats: { label: string; value: number; tone: string; sub: string }[] = [
@@ -1517,6 +1694,40 @@ export default function SupplementsClient({
         const showScheduled = (phaseFilter === "all" || phaseFilter === "scheduled") && scheduled.length > 0;
         const showEndedSection = phaseFilter === "ended" && ended.length > 0;
 
+        // The agenda: today → +6, one entry per day a protocol is DUE — a row
+        // occurs on day D when startDate <= D <= (endDate ?? forever), so
+        // active and scheduled rows both appear and ended rows fall out
+        // naturally. Rail notes come from the athlete's resolved training
+        // load; a day with no entry says "No plan entry" — the honest data
+        // state, never an invented rest day.
+        const loadByDate = new Map((agendaLoads[a.athleteId] ?? []).map((l) => [l.date, l]));
+        const agendaDays: AgendaDay[] = [];
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(Date.parse(today) + i * 86400000).toISOString().slice(0, 10);
+          const items: AgendaItem[] = a.protocols
+            .filter((p) => p.startDate <= date && (p.endDate === null || p.endDate >= date))
+            .map((p) => ({
+              row: p,
+              tone: conflictsByRow.has(p.id)
+                ? "var(--danger)"
+                : (p.supplementLibraryId ? CATEGORY_TONE[groupByLibraryId.get(p.supplementLibraryId) ?? ""] : undefined) ??
+                  "var(--text-muted)",
+              altCount: alternativesFor(p).length,
+            }));
+          if (items.length === 0) continue;
+          const load = loadByDate.get(date);
+          const hasSession = Boolean(load && (load.sessionType || load.intensity || load.rpe !== null));
+          const sessionName = load?.sessionType ?? load?.intensity ?? "Session";
+          agendaDays.push({
+            date,
+            weekday: AGENDA_WEEKDAY.format(new Date(Date.parse(date))).toUpperCase(),
+            label: AGENDA_DATE.format(new Date(Date.parse(date))),
+            note: hasSession ? `${capitalise(sessionName)}${load?.rpe !== null && load?.rpe !== undefined ? ` · RPE ${load.rpe}` : ""}` : "No plan entry",
+            isMatch: (load?.sessionType ?? "").toLowerCase().includes("match"),
+            items,
+          });
+        }
+
         const card = ({ p, phase }: { p: ProtocolRow; phase: ProtocolPhase }) => (
           <ProtocolCard
             key={p.id}
@@ -1533,6 +1744,8 @@ export default function SupplementsClient({
             }
             defaultWhyOpen={allWhy}
             conflictLabels={conflictsByRow.get(p.id) ?? []}
+            agendaOpenNonce={agendaTarget?.rowId === p.id ? agendaTarget.nonce : undefined}
+            agendaOpenPanel={agendaTarget?.rowId === p.id ? agendaTarget.panel : undefined}
           />
         );
         const grid = (items: { p: ProtocolRow; phase: ProtocolPhase }[]) => (
@@ -1570,6 +1783,17 @@ export default function SupplementsClient({
                 {active.length} active · {scheduled.length} scheduled
               </span>
             </div>
+
+            {/* The agenda is the PRIMARY view — what's due when — with the
+                range cards kept below it, still answering what protocols
+                exist. Hidden only under the Ended filter, where nothing can
+                be due. */}
+            {phaseFilter !== "ended" && (
+              <div className="flex flex-col gap-2.5">
+                <SectionHead tone="var(--brand-blue)" label="DUE — NEXT 7 DAYS" />
+                <WeekAgenda days={agendaDays} canEdit={canEdit} onOpen={openFromAgenda} />
+              </div>
+            )}
 
             {phaseFilter !== "ended" && active.length === 0 && scheduled.length === 0 && (
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
