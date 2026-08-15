@@ -92,6 +92,75 @@ const groupRank = (g: string) => {
 
 const CUSTOM = "__custom__";
 
+/** The six docs/13 category groups → their globals.css accent tokens.
+ *  Decoration, never the only carrier of meaning — the card names its
+ *  supplement and the page carries a legend. Keys are the exact
+ *  category_group values from migration 044. */
+const CATEGORY_TONE: Record<string, string> = {
+  Hydration: "var(--category-hydration)",
+  Protein: "var(--category-protein)",
+  Performance: "var(--category-performance)",
+  "Race Fuel": "var(--category-race-fuel)",
+  Recovery: "var(--category-recovery)",
+  Micronutrient: "var(--category-micronutrient)",
+};
+
+/**
+ * The scheduled card's visual of its REAL date range: a lead-in segment from
+ * today to the start, then the prescription window, with the two derived
+ * facts (days until start, window length) captioned in mono. Deliberately
+ * NOT the day-by-day agenda the owner rejected — nothing here is expanded
+ * per-day or joined to session data; every pixel derives from start_date,
+ * end_date and today. Both sides parse as UTC midnight, so the maths is pure
+ * date arithmetic with no local-timezone involvement.
+ */
+function ScheduleBar({
+  startDate,
+  endDate,
+  today,
+  tone,
+}: {
+  startDate: string;
+  endDate: string | null;
+  today: string;
+  tone: string;
+}) {
+  const DAY = 86400000;
+  const lead = Math.max(1, Math.round((Date.parse(startDate) - Date.parse(today)) / DAY));
+  const duration = endDate ? Math.round((Date.parse(endDate) - Date.parse(startDate)) / DAY) + 1 : null;
+  // An open-ended row still needs a finite track to draw on; the fade below
+  // is what says "no end date", not the track length.
+  const total = lead + (duration ?? Math.max(7, Math.round(lead * 0.75)));
+  const leadPct = Math.min(88, Math.max(4, (lead / total) * 100));
+  return (
+    <div className="flex flex-col gap-1">
+      <div
+        className="relative h-1 w-full overflow-hidden rounded-full"
+        style={{ backgroundColor: "color-mix(in srgb, var(--text) 8%, transparent)" }}
+      >
+        <span
+          className="absolute inset-y-0 rounded-full"
+          style={{
+            left: `${leadPct}%`,
+            width: `${100 - leadPct}%`,
+            background:
+              duration === null
+                ? `linear-gradient(90deg, ${tone}, transparent)`
+                : tone,
+          }}
+        />
+      </div>
+      <div
+        className="flex items-baseline justify-between text-[10px]"
+        style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.06em", color: "var(--text-muted)" }}
+      >
+        <span>starts in {lead} day{lead === 1 ? "" : "s"}</span>
+        <span>{duration === null ? "ongoing" : `${duration} day${duration === 1 ? "" : "s"}`}</span>
+      </div>
+    </div>
+  );
+}
+
 /** The mockup's section marker: small dot, mono label, hairline to the edge.
  *  Flat dot rather than the mockup's halo — docs/06: no box-shadows. */
 function SectionHead({ tone, outlined, label }: { tone: string; outlined?: boolean; label: string }) {
@@ -438,6 +507,7 @@ function ProtocolCard({
   alternatives,
   clinical,
   allergenLabels,
+  categoryGroup,
   defaultWhyOpen,
   conflictLabels,
 }: {
@@ -449,6 +519,9 @@ function ProtocolCard({
   alternatives: CatalogueProductLite[];
   clinical: AthleteClinicalContext | null;
   allergenLabels: Record<string, string>;
+  /** The row's broad docs/13 category group, resolved from its clinical
+   *  entity — null for planner-written rows with no library entry. */
+  categoryGroup: string | null;
   /** The page-level "Show rationale" toggle; a card's own peek click overrides it. */
   defaultWhyOpen: boolean;
   /** Conflict labels from the page-level live safety recomputation — the same
@@ -478,22 +551,28 @@ function ProtocolCard({
     dose !== row.dose || timing !== row.timing || startDate !== row.startDate || (endDate || null) !== row.endDate;
   const rationaleStale = (dose !== row.dose || timing !== row.timing) && rationale === row.rationale;
 
-  // The mockup's left accent edge, in priority order: a live conflict beats
-  // everything, then the planner-written "no library entry" warning, then the
-  // phase tone.
+  // The left accent edge, in priority order: a live SAFETY state always beats
+  // the category colour — a conflict edge is danger red and a
+  // no-library-entry edge is warning amber, which is exactly why the
+  // --category-* palette contains neither hue. Category tone next; a
+  // library-linked row with NO group (Sodium Bicarbonate) gets a neutral
+  // muted edge, deliberately NOT the phase tone — the scheduled phase blue
+  // is the same hue as the Protein category token, and an uncategorised row
+  // must not masquerade as a categorised one.
+  const categoryTone = categoryGroup ? CATEGORY_TONE[categoryGroup] : undefined;
   const edge =
     conflictLabels.length > 0
       ? "var(--danger)"
       : row.supplementLibraryId === null
         ? "var(--warning)"
-        : PHASE_TONE[phase];
+        : categoryTone ?? "var(--text-muted)";
 
   const whyPeek = row.rationale ? `${row.rationale.split(/[.;]/)[0].slice(0, 64).trim()}…` : "";
 
   return (
     <div
       id={`protocol-${row.id}`}
-      className={`${PANEL} flex flex-col gap-2.5 p-4 transition-colors duration-200 ease-out`}
+      className={`${PANEL} group relative flex flex-col gap-2.5 overflow-hidden p-4 transition-colors duration-200 ease-out`}
       style={{
         borderColor: "var(--border)",
         borderLeftWidth: 2,
@@ -504,7 +583,23 @@ function ProtocolCard({
         // row — the forms need width, not a 330px column.
         gridColumn: open || showAlternatives ? "1 / -1" : undefined,
       }}
+      // The reference's cursor-following gradient, kept quiet: the handler
+      // writes two CSS vars straight onto the element (no React re-render
+      // per mousemove), and the overlay below fades in at 7% brand tint.
+      onPointerMove={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+        e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+      }}
     >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100"
+        style={{
+          background:
+            "radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, color-mix(in srgb, var(--brand-teal) 55%, var(--brand-sky)) 7%, transparent), transparent 70%)",
+        }}
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
           <p
@@ -558,6 +653,15 @@ function ProtocolCard({
           {row.timing}
         </p>
       </div>
+
+      {phase === "scheduled" && (
+        <ScheduleBar
+          startDate={row.startDate}
+          endDate={row.endDate}
+          today={today}
+          tone={categoryTone ?? "var(--brand-blue)"}
+        />
+      )}
 
       <div
         className="flex flex-wrap items-center justify-between gap-2 border-t pt-2.5"
@@ -1228,6 +1332,11 @@ export default function SupplementsClient({
     [safetyFindings]
   );
 
+  const groupByLibraryId = useMemo(
+    () => new Map(library.map((s) => [s.id, s.categoryGroup])),
+    [library]
+  );
+
   /** Jump from the stat card to the affected row: clear any filter that
    *  would hide it, then scroll once the row is in the DOM. */
   const jumpToRow = (rowId: string, athleteId: string) => {
@@ -1386,6 +1495,23 @@ export default function SupplementsClient({
         </button>
       </div>
 
+      {/* The key to the cards' left edges. The colours are decoration — the
+          card names its supplement — but a legend keeps them readable rather
+          than a private code. Safety states (red, amber) outrank these on
+          any card that carries one. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-0.5">
+        {Object.entries(CATEGORY_TONE).map(([label, tone]) => (
+          <span
+            key={label}
+            className="flex items-center gap-1.5 text-[9px]"
+            style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.12em", color: "var(--text-muted)" }}
+          >
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tone }} />
+            {label.toUpperCase()}
+          </span>
+        ))}
+      </div>
+
       {visible.map((a) => {
         const withPhase = a.protocols.map((p) => ({ p, phase: protocolPhase(asCoverage(p), today) }));
         const active = withPhase.filter((x) => x.phase === "active");
@@ -1409,6 +1535,9 @@ export default function SupplementsClient({
             alternatives={alternativesFor(p)}
             clinical={a.clinical}
             allergenLabels={allergenLabels}
+            categoryGroup={
+              p.supplementLibraryId ? groupByLibraryId.get(p.supplementLibraryId) ?? null : null
+            }
             defaultWhyOpen={allWhy}
             conflictLabels={conflictsByRow.get(p.id) ?? []}
           />

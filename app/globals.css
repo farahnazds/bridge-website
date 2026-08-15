@@ -79,6 +79,25 @@
   /* A combined report covers 2-3 domains and belongs to none of them. */
   --report-combined: #b8ccff;
 
+  /* Supplement category accents — the six broad docs/13 sections
+     (supplement_library.category_group, migration 044), used as the protocol
+     cards' left edge and schedule-bar fill on the Supplements page. Same
+     contract as the --report-* ramp above: DECORATION, never the only
+     carrier of meaning — every card names its supplement and the page
+     carries a legend — and every value clears the 3:1 WCAG floor for
+     non-text indicators on --surface. Three reuse brand hues; the other
+     three sit outside --brand-* because six distinguishable steps need more
+     room than the brand ramp offers, and they DELIBERATELY avoid red and
+     amber, which this same card edge uses for live safety states (conflict,
+     not-in-library) — a category colour must never be mistakable for a
+     safety flag. */
+  --category-hydration: var(--brand-sky);
+  --category-protein: var(--brand-blue);
+  --category-performance: var(--brand-teal);
+  --category-race-fuel: #f472b6;
+  --category-recovery: #4ade80;
+  --category-micronutrient: #a78bfa;
+
   /* The identity gradient — logo, hero moments, progress meters. Ends dark on
      purpose, which is why it is NOT the button fill on a dark page. */
   --brand-gradient: linear-gradient(

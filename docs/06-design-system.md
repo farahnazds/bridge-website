@@ -66,6 +66,25 @@ The dashboards are almost entirely tokenized (1,011 `var(--…)` colour usages
 across 117 files, against 12 hardcoded colours, all in the chrome), which is
 why this was a token change rather than a rewrite. Keep it that way.
 
+### Named decorative ramps
+
+Two families of accent tokens exist beyond the core palette, both following
+the same contract: **decoration, never the only carrier of meaning** (a
+label always sits beside the colour), and ≥3:1 contrast on their surface.
+
+- `--report-*` — one stop per report type, teal→blue progression
+  (globals.css documents the values and why two stops sit outside the brand
+  hues).
+- `--category-*` — one stop per supplement category group (Hydration,
+  Protein, Performance, Race Fuel, Recovery, Micronutrient), used as the
+  protocol cards' left edge and schedule-bar fill. Hydration/Protein/
+  Performance reuse `--brand-sky`/`--brand-blue`/`--brand-teal`; Race Fuel
+  (`#f472b6`), Recovery (`#4ade80`) and Micronutrient (`#a78bfa`) sit
+  outside the brand ramp for distinguishability, and the family
+  deliberately avoids red and amber — the same card edge uses those for
+  live safety states, and a category colour must never be mistakable for a
+  safety flag.
+
 ### Two gradients, and which is which
 
 **`--brand-gradient`** — the identity gradient (`#00B3A6, #0091D6, #0057FF,
