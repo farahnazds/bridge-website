@@ -56,11 +56,13 @@ const REPORTS = [
 ];
 
 const TOPICS = [
-  ["#00B3A6", "Carbohydrate Periodization"],
-  ["#0091D6", "Iron & Female Athletes"],
-  ["#4B86FF", "ACWR & Injury Risk"],
-  ["#8FB4FF", "RED-S Screening"],
-  ["#4FD8CE", "Return-to-Play Nutrition"],
+  ["#00B3A6", "Periodization"],
+  ["#0091D6", "Female Athlete Performance"],
+  ["#4B86FF", "ACWR & Injury"],
+  ["#8FB4FF", "RED-S"],
+  ["#4FD8CE", "Return to Play"],
+  ["#00B3A6", "Energy Availability"],
+  ["#0091D6", "Supplement Safety Screening"],
 ];
 
 const SPORTS = ["Basketball", "Football", "Rugby", "Swimming", "Cycling", "Motorsport", "Boxing", "Athletics", "Handball", "Volleyball", "Tennis", "Padel", "Judo", "Rowing", "Triathlon", "Netball", "Hockey", "Cricket", "Wrestling", "Gymnastics"];
