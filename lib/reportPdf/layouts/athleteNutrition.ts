@@ -136,6 +136,104 @@ function windowLabel(p: ProtocolRow): string {
   return `From ${shortDate(p.startDate)}`;
 }
 
+// ---------------------------------------------------------------------------
+// Supplement aggregation — one row per supplement, weekday grid
+// ---------------------------------------------------------------------------
+//
+// The planner writes day-specific protocols as one ROW PER DAY (merged only
+// when consecutive and identical), so a correct, period-filtered query still
+// arrives as e.g. seven one-day "Protein" rows and four one-day "Caffeine"
+// rows. Rendering rows verbatim made the table restate each supplement per
+// day — the table-format defect in the 2026-08-15 report feedback. Here they
+// collapse to one line per supplement with an M T W T F S S grid showing
+// which weekdays of the period it applies to.
+
+const GRID_LETTERS = ["M", "T", "W", "T", "F", "S", "S"]; // Monday-first
+
+/** 0..6 Monday-first, from an ISO date, computed in UTC like weekdayOf. */
+function mondayIndex(iso: string): number {
+  return (new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7;
+}
+
+function addDays(iso: string, n: number): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+}
+
+interface AggregatedProtocol {
+  supplementName: string;
+  doses: string[];
+  timings: string[];
+  /** Monday-first coverage of the report period; null when the period bounds
+   *  are unknown and a date window must be stated instead. */
+  weekdays: boolean[] | null;
+  windowFallback: string;
+  rationale: string | null;
+}
+
+function aggregateProtocols(
+  rows: ProtocolRow[],
+  periodStart: string | null,
+  periodEnd: string | null
+): AggregatedProtocol[] {
+  const groups = new Map<string, ProtocolRow[]>();
+  for (const p of rows) {
+    const key = p.supplementName.trim().toLowerCase();
+    const list = groups.get(key);
+    if (list) list.push(p);
+    else groups.set(key, [p]);
+  }
+
+  const out: AggregatedProtocol[] = [];
+  for (const list of groups.values()) {
+    const distinct = (vals: string[]) => [...new Set(vals.map((v) => v.trim()).filter(Boolean))];
+
+    let weekdays: boolean[] | null = null;
+    if (periodStart && periodEnd) {
+      weekdays = [false, false, false, false, false, false, false];
+      // Walk the period day by day (a report period is bounded — the strip
+      // itself caps at a fortnight) and mark weekdays any row covers.
+      for (let d = periodStart; d <= periodEnd; d = addDays(d, 1)) {
+        const covered = list.some(
+          (p) => p.startDate <= d && (p.endDate === null || p.endDate >= d)
+        );
+        if (covered) weekdays[mondayIndex(d)] = true;
+      }
+    }
+
+    const first = list.find((p) => p.rationale?.trim());
+    out.push({
+      supplementName: list[0].supplementName,
+      doses: distinct(list.map((p) => p.dose)),
+      timings: distinct(list.map((p) => p.timing)),
+      weekdays,
+      windowFallback: distinct(list.map(windowLabel)).join(", "),
+      rationale: first?.rationale?.trim() ?? null,
+    });
+  }
+  // Stable, readable order: alphabetical by name.
+  return out.sort((a, b) => a.supplementName.localeCompare(b.supplementName));
+}
+
+/** "M T W T F S S" with uncovered days as middots, e.g. "M · W · F · ·". */
+function weekdayGrid(weekdays: boolean[]): string {
+  return weekdays.map((on, i) => (on ? GRID_LETTERS[i] : "·")).join(" ");
+}
+
+/** One rationale line — the aggregated row carries a clause, not a paragraph. */
+function oneLine(text: string | null): string {
+  if (!text) return "—";
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > 140 ? `${flat.slice(0, 137)}…` : flat;
+}
+
+/** First N sentences of a paragraph — the "what this means" hard cap. The
+ *  prompt asks for three; this enforces it against a model that overruns. */
+function capSentences(text: string, max: number): string {
+  const matches = text.match(/[^.!?]+[.!?]+(\s|$)/g);
+  if (!matches || matches.length <= max) return text;
+  return matches.slice(0, max).join("").trim();
+}
+
 /** How many strip cells fit across the content width before they crowd. */
 const MAX_STRIP_DAYS = 7;
 
@@ -152,9 +250,16 @@ export function athleteNutritionBlocks(
   blocks.push(callout(STANDING_CALLOUT[identity.audience]));
 
   // ---- Daily targets (PRESCRIBED) ----
-  blocks.push(sectionTitle("Daily targets — standard training day"));
+  // Rendered ONLY when the narrative carries a targets table; otherwise the
+  // section is omitted entirely. It used to render a prominent "not
+  // confirmed" note at the top of page 1 — the 2026-08-15 feedback's rule is
+  // the right one: hero numbers up front or nothing, never an empty box. The
+  // prompt now derives the table from recorded assessment data (and itself
+  // omits the section when no assessment exists), so absence here means
+  // "nothing honest to show" and the page simply starts with the summary.
   const targets = prescribed.find((p) => /target|daily|macro/i.test(p.title));
   if (targets && targets.rows.length > 0) {
+    blocks.push(sectionTitle("Daily targets — standard training day"));
     // A targets table is rendered as the dark panel the template uses: first
     // column is the label, second the value.
     blocks.push(
@@ -166,15 +271,13 @@ export function athleteNutritionBlocks(
         }))
       )
     );
-  } else {
-    blocks.push(
-      missingNote(
-        "No confirmed daily energy or macronutrient targets are available for this period. These are set by your practitioner through the nutrition planner and are deliberately not estimated here."
-      )
-    );
   }
 
-  if (narrative.meansBox) blocks.push(meansBox(summaryHeading(identity), narrative.meansBox));
+  // Hard-capped at three sentences — the prompt asks for three, and this
+  // enforces it against an overrunning model rather than trusting one.
+  if (narrative.meansBox) {
+    blocks.push(meansBox(summaryHeading(identity), capSentences(narrative.meansBox, 3)));
+  }
 
   // ---- Weekly periodisation (MEASURED) ----
   blocks.push(sectionTitle("Weekly periodisation"));
@@ -239,16 +342,17 @@ export function athleteNutritionBlocks(
       )
     );
   } else {
+    const aggregated = aggregateProtocols(data.protocols, identity.periodStart, identity.periodEnd);
     blocks.push(
       table({
-        head: ["Supplement", "Dose", "Timing", "Active", "Rationale"],
+        head: ["Supplement", "Dose", "Timing", "Days", "Rationale"],
         weights: [1.5, 1, 1.4, 1.2, 2.4],
-        rows: data.protocols.map((p) => [
+        rows: aggregated.map((p) => [
           p.supplementName,
-          p.dose,
-          p.timing,
-          windowLabel(p),
-          p.rationale?.trim() || "—",
+          p.doses.join(" / "),
+          p.timings.join(" / "),
+          p.weekdays ? weekdayGrid(p.weekdays) : p.windowFallback,
+          oneLine(p.rationale),
         ]),
       })
     );

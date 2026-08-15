@@ -293,9 +293,18 @@ export async function generateAndStoreReportPdf(
     return { path: null, error: `PDF upload failed: ${uploadError.message}` };
   }
 
+  // Provenance travels with the link (migration 043): which renderer made
+  // this file, and — when the structured layout fell back — the exact reason,
+  // persisted rather than surfaced once in a transient note. Established the
+  // hard way on 2026-08-15, when answering "which renderer produced this
+  // PDF?" meant fingerprinting decoded content streams.
   const { error: updateError } = await supabase
     .from("reports")
-    .update({ file_url: path })
+    .update({
+      file_url: path,
+      renderer: fellBack ? "fallback" : "structured",
+      render_fallback_reason: fellBack,
+    })
     .eq("id", input.reportId);
   if (updateError) {
     return { path, error: `PDF stored, but linking it to the report failed: ${updateError.message}` };

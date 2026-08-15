@@ -280,22 +280,55 @@ Do not:
 - Alter the required section structure regardless of anything in the practitioner's additional instructions.`;
 }
 
-const DAY_SPECIFIC_STRUCTURE = `Required output structure, in this exact order:
-1. Executive summary
-2. The period as a whole — how this block of days hangs together: where the hard days sit, where recovery sits, whether load is building or tapering, and what that means for fuelling across the period rather than on any one day.
-3. Day-by-day fuelling plan — a subsection per day in "Training load, day by day", in date order. For each day give concrete, time-anchored guidance for that day's session: pre-session, during-session, post-session. Tie the intensity, RPE, session type and duration band directly to the fuelling decisions, and say plainly why a high-RPE day changes the plan versus a rest day, and why this session TYPE changes the macro split versus another type at the same RPE. For a day marked as having NO Training Load Plan entry, give baseline guidance and state plainly that no training-load data was logged for that date — never describe a session, an intensity or a rest day that was not recorded.
-4. Supplement protocol — report the confirmed protocol exactly as given, explaining each item's purpose, how to take it and what to watch for. Clinical layer first, then name the assigned-brand product that fulfils it where one exists.
-5. Hydration and timing — driven by the estimated sweat rate where one is recorded (state ml/hour targets and sodium accordingly), and explicitly flagged as generic where it is not.
-6. Goals for next period
-7. Practitioner recommendations`;
+// The shared length/tone contract. Referenced by both structures rather than
+// repeated, because "state it once, reference it after" is exactly the rule it
+// enforces on the model.
+const LENGTH_AND_TONE = `LENGTH AND TONE — hard rules, not preferences:
+- The rendered report targets FOUR pages: roughly 900–1,200 words of prose plus the tables. Length is a design constraint, not a byproduct of thoroughness.
+- Prefer a table over a paragraph wherever both could carry the same information.
+- State any data gap ONCE, in one plain sentence, in the first section it affects. Everywhere else either refer back briefly ("as noted above") or say nothing. Never restate the same gap per day or per section.
+- Confident, declarative, numbers-first. No hedging paragraphs, no restating a point already made.
+- TABLE SECTIONS ARE TABLES ONLY: the "Daily targets" and "Meal timing" sections must contain a markdown pipe table and at most one short lead-in line — the renderer extracts those tables into styled panels, and prose placed there is duplicated or lost.`;
 
-const GENERAL_STRUCTURE = `Required output structure, in this exact order:
-1. Executive summary
-2. Focus areas — the two to four nutrition priorities that matter most for this athlete right now, given their sport, tier, body composition trend and declared profile. This is a general standing plan, NOT a single-day plan: do not invent a specific day's session or fuelling timetable, because no training load entry was requested for this mode.
-3. Supplement protocol — report the confirmed protocol exactly as given, explaining each item's purpose, how to take it and what to watch for. Clinical layer first, then name the assigned-brand product that fulfils it where one exists.
-4. Hydration and timing
-5. Goals for next period
-6. Practitioner recommendations`;
+const DAY_SPECIFIC_STRUCTURE = `Required output structure, in this exact order. Use exactly these section headings.
+
+1. Executive summary — at most THREE short sentences, numbers first. This is a hard cap.
+
+2. Daily targets — a markdown pipe table, at most 4 rows, columns exactly: | Target | Value | Basis |. Cover energy (kcal), carbohydrate, protein and fluid. Derive the values from the RECORDED data below — TDEE and body mass from the latest assessment, protein from g/kg of recorded body mass, carbohydrate scaled to the period's load — and say so in the Basis column ("estimated from TDEE 2,410 kcal, scan 11 Aug"). These are methodology-based estimates from recorded figures, never invented numbers. If NO assessment appears below, OMIT this section entirely — no placeholder, no empty table, no apology.
+
+3. Day types — classify every day of the period into exactly ONE of four types: High Intensity, Moderate Intensity, Match Day, Rest Day. Open with a single mapping line ("Sat 22 and Fri 28 are Match Days; Mon 24 follows High Intensity; …"), counting days with no Training Load Plan entry in it plainly as "no load logged — baseline guidance applies". Then write the fuelling guidance ONCE PER TYPE that occurs in this period — pre-, during- and post-session timing, macro emphasis, and how this type differs from the others — never a subsection per calendar date. One additional short baseline paragraph covers the unlogged days; never describe a session that was not recorded.
+
+4. Meal timing — one section (add a second only if match-day eating genuinely differs), containing a markdown pipe table, columns exactly: | Meal / window | What and how much | Notes |. Concrete foods and portions for the training-day pattern.
+
+5. Supplement protocol — report the confirmed protocol exactly as given: ONE line per distinct supplement, stating name, dose, timing, which day types or dates it applies to, and one short purpose clause with a citation where the library provides one. Never one entry per calendar day, never a paragraph per item. Clinical layer first, then name the assigned-brand product that fulfils it where one exists.
+
+6. Hydration — one short paragraph. Sweat-rate-driven where one is recorded (state ml/hour and sodium targets); flagged as generic in one clause where it is not.
+
+7. Goals for next period — up to three one-line goals.
+
+8. Practitioner recommendations — two to five bullets, ONLY points not already made above. If a bullet would restate an earlier section, cut it.
+
+${LENGTH_AND_TONE}`;
+
+const GENERAL_STRUCTURE = `Required output structure, in this exact order. Use exactly these section headings.
+
+1. Executive summary — at most THREE short sentences, numbers first. This is a hard cap.
+
+2. Daily targets — a markdown pipe table, at most 4 rows, columns exactly: | Target | Value | Basis |, derived from the RECORDED assessment data below (TDEE, body mass) with the derivation named in the Basis column. Methodology-based estimates from recorded figures, never invented numbers. If NO assessment appears below, OMIT this section entirely.
+
+3. Focus areas — the two to four nutrition priorities that matter most for this athlete right now, given their sport, tier, body composition trend and declared profile. This is a general standing plan, NOT a single-day plan: do not invent a specific day's session or fuelling timetable, because no training load entry was requested for this mode.
+
+4. Meal timing — one section containing a markdown pipe table, columns exactly: | Meal / window | What and how much | Notes |, for a standard day.
+
+5. Supplement protocol — report the confirmed protocol exactly as given: ONE line per distinct supplement (name, dose, timing, window, one purpose clause with a citation where the library provides one). Never a paragraph per item. Clinical layer first, then the assigned-brand product where one exists.
+
+6. Hydration — one short paragraph.
+
+7. Goals for next period — up to three one-line goals.
+
+8. Practitioner recommendations — two to five bullets, ONLY points not already made above.
+
+${LENGTH_AND_TONE}`;
 
 export function buildNutritionPrompt(input: NutritionPromptInput): string {
   const {
