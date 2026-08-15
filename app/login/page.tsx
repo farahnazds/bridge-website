@@ -143,7 +143,7 @@ export default function LoginPage() {
       <div style={{ position: "relative", zIndex: 2, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 24px 60px" }}>
         <div style={{ width: "100%", maxWidth: 404, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 28 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, animation: "si-rise .8s .05s both cubic-bezier(.22,.7,.25,1)" }}>
-            <Image src="/brand/logo-mark-alpha.png" alt="Bridgetx" width={34} height={34} style={{ width: 34, height: "auto", display: "block" }} priority />
+            <Image src="/brand/icon.svg" alt="Bridgetx" width={72} height={72} style={{ width: 72, height: "auto", display: "block" }} priority />
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
               <h1 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: 32, lineHeight: 1.1, letterSpacing: "-.032em", fontWeight: 600, color: "#fff", textAlign: "center" }}>
                 Sign in to Bridgetx

@@ -101,7 +101,7 @@ export default function Home() {
       {/* ------------------------------- nav ------------------------------- */}
       <div style={{ position: "sticky", top: 0, zIndex: 40, borderBottom: "1px solid rgba(255,255,255,.07)", background: "rgba(5,9,26,.72)", backdropFilter: "blur(14px)" }}>
         <div style={{ maxWidth: 1120, margin: "0 auto", padding: "0 32px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <Image src="/brand/logo-wordmark-alpha.png" alt="Bridgetx" width={95} height={36} style={{ height: 36, width: 95, display: "block" }} priority />
+          <Image src="/brand/logo-horizontal-dark.svg" alt="Bridgetx" width={123} height={36} style={{ height: 36, width: 123, display: "block" }} priority />
           <div style={{ display: "flex", alignItems: "center", gap: 26, fontSize: 14, whiteSpace: "nowrap" }}>
             <a href="#platform">Platform</a>
             <a href="#reports">Reports</a>
@@ -168,7 +168,7 @@ export default function Home() {
             <span style={EYEBROW}>The problem</span>
             <h2 style={{ ...H2, maxWidth: 720 }}>High Performance shouldn&apos;t live in spreadsheets.</h2>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 1, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 14, overflow: "hidden" }}>
+          <div className="lp-problems" style={{ gap: 1, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 14, overflow: "hidden" }}>
             {[
               ["01", "#00B3A6", "Manual report writing takes hours. Your expertise should go into decisions, not documents.", 26],
               ["02", "#0091D6", "Athlete data is scattered across devices, apps, and paper forms. Nothing connects.", 30],
@@ -462,7 +462,7 @@ export default function Home() {
         <div style={{ maxWidth: 1120, margin: "0 auto", padding: "56px 32px 40px", display: "flex", flexDirection: "column", gap: 44 }}>
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 56 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 260 }}>
-              <Image src="/brand/logo-wordmark-alpha.png" alt="Bridgetx" width={233} height={81} style={{ height: 81, width: 233, display: "block" }} />
+              <Image src="/brand/logo-horizontal-dark.svg" alt="Bridgetx" width={277} height={81} style={{ height: 81, width: 277, display: "block" }} />
               <span style={{ fontSize: 13, lineHeight: 1.6, color: "rgba(255,255,255,.4)" }}>Bridging Potential to High Performance.</span>
               <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                 {SOCIALS.map((s) => (

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 898 898">
+  <defs>
+    <!-- Gradient matched to the supplied reference image -->
+    <linearGradient id="g1" x1="420" y1="145" x2="675" y2="475" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#08D9DE"/>
+      <stop offset="42%" stop-color="#08B7E8"/>
+      <stop offset="72%" stop-color="#087BF2"/>
+      <stop offset="100%" stop-color="#073CF4"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="315" y1="410" x2="690" y2="735" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#08D8DE"/>
+      <stop offset="35%" stop-color="#0799EE"/>
+      <stop offset="63%" stop-color="#0A55ED"/>
+      <stop offset="82%" stop-color="#1726C3"/>
+      <stop offset="100%" stop-color="#281080"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#g1)" d="M412.93 132.49s1.94-7.02 17.93 0c0 0 38.84 18.37 64.53 35.85 0 0 49.29 31.37 67.22 48.1 0 0 40.48 31.82 60.35 56.02 0 0 35.1 38.99 44.96 71.25 0 0 24.8 65.13-7.17 108.15 0 0-15.98 31.52-59.45 43.92 0 0-109.64-101.13-187.77-131.75l-.6-231.54Z"/>
+  <path fill="url(#g2)" d="M311.95 381.65s151.47 152.96 289.34 114.12c0 0 63.19 63.63 70.95 81.76 0 0 49 72.1 21.51 140.61 0 0-29.48 76.48-108.35 76.88 0 0-64.93 7.17-165.71-61.34 0 0-69.71-44.61-107.95-88.03l.2-264Z"/>
+</svg>

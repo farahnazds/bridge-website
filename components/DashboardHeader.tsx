@@ -64,7 +64,7 @@ export default function DashboardHeader({
               the role line carry the wordmark's job, rather than shrinking a
               horizontal lockup until neither reads. 36px against the old 26px,
               with the gap opened from 14 to 16. */}
-          <Image src="/brand/logo-mark-alpha.png" alt="Bridgetx" width={36} height={36}
+          <Image src="/brand/icon.svg" alt="Bridgetx" width={36} height={36}
             className="h-9 w-auto object-contain" priority />
         </Link>
         <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>

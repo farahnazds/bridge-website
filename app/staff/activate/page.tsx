@@ -13,9 +13,9 @@ export default function ActivatePage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col gap-2">
           <Image
-            src="/brand/logo-horizontal-light.png"
+            src="/brand/logo-horizontal-dark.svg"
             alt="Bridgetx"
-            width={48}
+            width={110}
             height={32}
             className="h-8 w-auto object-contain"
             priority

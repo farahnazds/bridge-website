@@ -260,6 +260,20 @@ body:has(.bx-modal[open]) {
 .lp-social { transition: color 200ms ease-out, border-color 200ms ease-out, background 200ms ease-out; }
 .lp-social:hover { color: var(--hov, #fff); border-color: var(--hovbd, rgba(255, 255, 255, .3)); background: var(--hovbg, rgba(255, 255, 255, .06)); }
 
+/* The landing's numbered problems panel. It holds THREE items, and the old
+   inline auto-fit grid wrapped them 2×2 at desktop widths — leaving a fourth
+   ghost cell of exposed container background (the .08 white that draws the
+   hairlines) that read as a broken, half-rendered block. Two columns with
+   the last item spanning the full row makes the odd count deliberate at
+   every width; a class rather than inline style because the single-column
+   collapse needs a media query. */
+.lp-problems { display: grid; grid-template-columns: 1fr 1fr; }
+.lp-problems > :last-child { grid-column: 1 / -1; }
+@media (max-width: 640px) {
+  .lp-problems { grid-template-columns: 1fr; }
+  .lp-problems > :last-child { grid-column: auto; }
+}
+
 @keyframes lp-rise { from { opacity: 0; transform: translateY(var(--rv, 22px)); } to { opacity: 1; transform: none; } }
 @keyframes lp-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lp-growX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
