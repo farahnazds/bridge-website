@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import DataModal from "@/components/DataModal";
 import ReportPdfLink from "@/components/ReportPdfLink";
+import ReportPdfModal from "@/components/ReportPdfModal";
 import ReportSummaryBody from "@/components/ReportSummaryBody";
 import ReportFilterBar from "@/components/ReportFilterBar";
 import { useReportSearch } from "@/lib/useReportSearch";
@@ -31,39 +33,56 @@ import { CARD } from "@/lib/ui";
 export type { ReportListItem as MyReportEntry };
 
 function ReportCard({ report }: { report: ReportListItem }) {
-  const [expanded, setExpanded] = useState(false);
+  const [viewing, setViewing] = useState(false);
+
+  const typeLabel = reportTypeLabel(report.reportTypes);
+  const period = `${report.periodStart} to ${report.periodEnd}`;
 
   return (
     <div className={`${CARD} p-5`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-            {reportTypeLabel(report.reportTypes)}
+            {typeLabel}
           </p>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {report.periodStart} to {report.periodEnd} · shared by {report.generatedByName} ·{" "}
-            {String(report.createdAt).slice(0, 10)}
+            {period} · shared by {report.generatedByName} · {String(report.createdAt).slice(0, 10)}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {report.hasPdf && <ReportPdfLink reportId={report.id} />}
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
+            onClick={() => setViewing(true)}
             className="text-xs font-medium underline-offset-2 hover:underline"
             style={{ color: "var(--brand-blue)" }}
           >
-            {expanded ? "Hide report" : "View report"}
+            View report
           </button>
         </div>
       </div>
 
-      {expanded && (
-        <div className="mt-4">
-          <ReportSummaryBody reportId={report.id} />
-        </div>
-      )}
+      {/* The athlete reads the same document the practitioner sent, laid out as
+          it was designed, rather than its source prose. Reports predating the
+          PDF pipeline have no file, and fall back to that prose so they stay
+          readable — see the same split in the practitioner's history. */}
+      {viewing &&
+        (report.hasPdf ? (
+          <ReportPdfModal
+            reportId={report.id}
+            title={typeLabel}
+            subtitle={period}
+            onClose={() => setViewing(false)}
+          />
+        ) : (
+          <DataModal
+            title={typeLabel}
+            subtitle={`${period} · no PDF stored for this report`}
+            onClose={() => setViewing(false)}
+          >
+            <ReportSummaryBody reportId={report.id} />
+          </DataModal>
+        ))}
     </div>
   );
 }

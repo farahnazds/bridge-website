@@ -316,9 +316,36 @@ export async function generateAndStoreReportPdf(
 }
 
 /** Short-lived signed URL for a stored report PDF. RLS on storage.objects
- *  decides whether the caller may have it (migration 019). */
-export async function signedReportPdfUrl(path: string, seconds = 120): Promise<string | null> {
+ *  decides whether the caller may have it (migration 019).
+ *
+ *  `download` is what separates the two things a caller can want from the same
+ *  object, and they are genuinely different:
+ *
+ *    omitted        Content-Disposition: inline. The browser RENDERS the file —
+ *                   which is what makes the in-page preview possible at all. An
+ *                   <iframe> pointed at an attachment response shows nothing.
+ *    true / string  Content-Disposition: attachment, so it lands in Downloads
+ *                   instead of taking over the tab. Pass a string to name the
+ *                   saved file; `true` falls back to the object's own name,
+ *                   which is a bare report id.
+ *
+ *  Before this existed the "Download PDF" link did not download: it minted an
+ *  inline URL and navigated to it, so the tab was replaced by a rendered PDF.
+ *  That was survivable while it was the only way to read a report, and stops
+ *  being so now that preview is its own affordance.
+ *
+ *  `seconds` is short by default because the URL is a bearer token in a query
+ *  string — anyone holding it has the file until it expires, RLS having already
+ *  been consulted at mint time and not again. Preview asks for longer only
+ *  because a reader may sit on an open modal; see the route. */
+export async function signedReportPdfUrl(
+  path: string,
+  seconds = 120,
+  download?: boolean | string
+): Promise<string | null> {
   const supabase = await createClient();
-  const { data } = await supabase.storage.from("report-pdfs").createSignedUrl(path, seconds);
+  const { data } = await supabase.storage
+    .from("report-pdfs")
+    .createSignedUrl(path, seconds, download === undefined ? undefined : { download });
   return data?.signedUrl ?? null;
 }

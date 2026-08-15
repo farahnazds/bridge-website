@@ -1,6 +1,7 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { useState } from "react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import {
   REPORT_SORT_OPTIONS,
@@ -34,6 +35,17 @@ export interface ReportFilterBarProps {
   totalCount: number;
   show?: { audience?: boolean; status?: boolean; scope?: boolean; combined?: boolean };
   searchPlaceholder?: string;
+  /** Put the select row behind a "More filters" disclosure, leaving search and
+   *  the type chips — the two controls reached for constantly — always
+   *  visible. Opt-in rather than the default so the athlete's My Reports keeps
+   *  the bar it has; that surface already hides three of the four selects, and
+   *  collapsing the one that remains would put a disclosure in front of a
+   *  single sort control.
+   *
+   *  A hidden control that is doing something is the one real hazard here, so
+   *  the toggle carries a count of the filters folded away and stays open once
+   *  opened. */
+  collapsible?: boolean;
 }
 
 const labelCls = "text-xs font-medium";
@@ -58,11 +70,26 @@ export default function ReportFilterBar({
   totalCount,
   show = {},
   searchPlaceholder = "Search athlete, type, or anything in the report text…",
+  collapsible = false,
 }: ReportFilterBarProps) {
   const showAudience = show.audience ?? true;
   const showStatus = show.status ?? true;
   const showScope = show.scope ?? true;
   const showCombined = show.combined ?? true;
+
+  const [open, setOpen] = useState(false);
+
+  // Counted from what is actually rendered, not from the whole filter state: a
+  // surface with `scope` turned off can never have an active author filter, and
+  // badging one would be a count of something the reader cannot see or clear.
+  const hiddenActive =
+    (showAudience && value.audience !== "all" ? 1 : 0) +
+    (showStatus && value.status !== "all" ? 1 : 0) +
+    (showScope && value.scope !== "all" ? 1 : 0) +
+    // Sort lives in the same drawer and is equally invisible when closed.
+    // It reorders rather than removes, but "why is this list oldest-first"
+    // is the same lost minute as a filter you forgot you set.
+    (value.sort !== "date_desc" ? 1 : 0);
 
   const set = <K extends keyof ReportFilterState>(key: K, v: ReportFilterState[K]) =>
     onChange({ ...value, [key]: v });
@@ -97,11 +124,13 @@ export default function ReportFilterBar({
 
       {/* Type chips. Multi-select, CONTAINS semantics — a combined report
           matches every domain it contains. See lib/reportSearch.ts. */}
-      {availableTypes.length > 0 && (
+      {(availableTypes.length > 0 || collapsible) && (
         <div className="flex flex-wrap items-center gap-2">
+          {availableTypes.length > 0 && (
           <span className={labelCls} style={{ color: "var(--text-muted)" }}>
             Type
           </span>
+          )}
           {availableTypes.map((t) => {
             const on = value.types.includes(t);
             return (
@@ -139,10 +168,48 @@ export default function ReportFilterBar({
               Combined only
             </button>
           )}
+
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              aria-controls="report-filter-drawer"
+              className={`${CHIP} ml-auto inline-flex items-center gap-1.5 transition-colors duration-150`}
+              style={{
+                backgroundColor: "var(--bg)",
+                color: hiddenActive > 0 ? "var(--brand-blue)" : "var(--text-muted)",
+                border: `1px solid ${hiddenActive > 0 ? "var(--brand-blue)" : "var(--border)"}`,
+              }}
+            >
+              <SlidersHorizontal size={12} aria-hidden="true" />
+              {open ? "Hide filters" : "More filters"}
+              {/* Only while closed: once the drawer is open the controls speak
+                  for themselves, and a count sitting above them reads as a
+                  second, separate thing to go and find. */}
+              {!open && hiddenActive > 0 && (
+                <span
+                  className="rounded-full px-1.5 font-medium"
+                  style={{ backgroundColor: "color-mix(in srgb, var(--brand-blue) 18%, transparent)" }}
+                >
+                  {hiddenActive}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-3">
+      {/* Class rather than the `hidden` ATTRIBUTE: the attribute's display:none
+          comes from the UA stylesheet, which any author-level `display:flex`
+          outranks — so `hidden` on a `flex` element does nothing at all. The
+          element stays mounted either way, which keeps aria-controls pointing
+          at something real and preserves each select's state across a
+          close/open. */}
+      <div
+        id="report-filter-drawer"
+        className={collapsible && !open ? "hidden" : "flex flex-wrap items-end gap-3"}
+      >
         {showAudience && (
           <Field label="Audience">
             <select

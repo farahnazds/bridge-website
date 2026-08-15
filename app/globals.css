@@ -53,6 +53,32 @@
   --warning: #f5a524;
   --success: #00b3a6;
 
+  /* REPORT TYPE RAMP — the dot that identifies a report's domain at a glance
+     in Report History.
+
+     Not invented here and not a new palette: this is the brand's own
+     teal->sky->blue progression, the same five stops the landing page already
+     uses for its report cards (app/page.tsx REPORTS) and the same five the
+     "Canvas-12" design file assigns to these exact report types. Naming them
+     is what stops the ramp being re-typed as raw hexes at each call site.
+
+     These are DECORATION, never the only carrier of meaning — every dot sits
+     beside its own text label, so the ramp is not required to survive colour
+     blindness on its own. Contrast against --surface-raised (#0a1026) is
+     3.4:1 or better, clearing the 3:1 WCAG floor for non-text indicators.
+
+     The last two stops sit outside the --brand-* tokens because five
+     distinguishable steps need more room than the three brand values bright
+     enough to read on #05091A; they interpolate the same gradient the brand
+     already ends on (#0057ff), lightened to stay legible on dark. */
+  --report-compliance: #4fd8ce;
+  --report-body-composition: #00b3a6;
+  --report-nutrition: #0091d6;
+  --report-performance: #4b86ff;
+  --report-injury: #8fb4ff;
+  /* A combined report covers 2-3 domains and belongs to none of them. */
+  --report-combined: #b8ccff;
+
   /* The identity gradient — logo, hero moments, progress meters. Ends dark on
      purpose, which is why it is NOT the button fill on a dark page. */
   --brand-gradient: linear-gradient(
@@ -138,6 +164,16 @@ h6 {
 .bx-modal[open] {
   animation: bx-modal-in 200ms ease-out;
 }
+/* Freeze the page behind an open modal.
+   BOTH elements, not just body: the dashboard scrolls on <html> (its
+   scrollingElement is documentElement), so locking body alone left the page
+   free to scroll underneath. Harmless anywhere it was already working, and it
+   is what stops a wheel event that overscrolls a modal's own content — most
+   visibly the PDF viewer's <iframe>, whose inner scroller the dialog's
+   overscroll-behavior cannot reach — from sliding the whole modal out of
+   view. Measured before the fix: the page ran to scrollTop 2000 while a modal
+   was open. */
+html:has(.bx-modal[open]),
 body:has(.bx-modal[open]) {
   overflow: hidden;
 }
