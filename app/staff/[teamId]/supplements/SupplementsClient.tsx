@@ -533,6 +533,7 @@ function ProtocolCard({
   const [open, setOpen] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [whyOverride, setWhyOverride] = useState<boolean | null>(null);
+  const [hovered, setHovered] = useState(false);
   const whyOpen = whyOverride ?? defaultWhyOpen;
   const [dose, setDose] = useState(row.dose);
   const [timing, setTiming] = useState(row.timing);
@@ -569,37 +570,29 @@ function ProtocolCard({
 
   const whyPeek = row.rationale ? `${row.rationale.split(/[.;]/)[0].slice(0, 64).trim()}…` : "";
 
+  // Hover: the whole frame brightens to a vivid version of whatever colour
+  // the left edge already carries — category, or a safety state, which this
+  // deliberately follows rather than overrides. Nothing happens to the fill
+  // or interior; the transition-colors on the card is the whole animation.
+  const hoverEdge = `color-mix(in srgb, ${edge} 82%, white)`;
+
   return (
     <div
       id={`protocol-${row.id}`}
-      className={`${PANEL} group relative flex flex-col gap-2.5 overflow-hidden p-4 transition-colors duration-200 ease-out`}
+      className={`${PANEL} flex flex-col gap-2.5 p-4 transition-colors duration-200 ease-out`}
       style={{
-        borderColor: "var(--border)",
+        borderColor: hovered ? hoverEdge : "var(--border)",
         borderLeftWidth: 2,
-        borderLeftColor: edge,
+        borderLeftColor: hovered ? hoverEdge : edge,
         backgroundColor: phase === "ended" ? "transparent" : "var(--surface)",
         opacity: phase === "ended" ? 0.7 : 1,
         // A card with its editor or alternatives open takes the whole grid
         // row — the forms need width, not a 330px column.
         gridColumn: open || showAlternatives ? "1 / -1" : undefined,
       }}
-      // The reference's cursor-following gradient, kept quiet: the handler
-      // writes two CSS vars straight onto the element (no React re-render
-      // per mousemove), and the overlay below fades in at 7% brand tint.
-      onPointerMove={(e) => {
-        const r = e.currentTarget.getBoundingClientRect();
-        e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
-        e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
-      }}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100"
-        style={{
-          background:
-            "radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, color-mix(in srgb, var(--brand-teal) 55%, var(--brand-sky)) 7%, transparent), transparent 70%)",
-        }}
-      />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
           <p
