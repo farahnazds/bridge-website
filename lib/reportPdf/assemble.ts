@@ -197,13 +197,29 @@ export async function assembleMeasured(
   if (periodStart) planQuery = planQuery.gte("date", periodStart);
   if (periodEnd) planQuery = planQuery.lte("date", periodEnd);
 
+  // Protocols scoped to rows OVERLAPPING the report period — the same
+  // containment rule the schema's exclusion constraint and every other
+  // protocol read use: start_date <= periodEnd AND (end_date IS NULL OR
+  // end_date >= periodStart), a standing row counting from its start onward.
+  //
+  // This query previously had NO date filter and returned every protocol row
+  // the athlete had ever been on, so superseded months-old prescriptions
+  // rendered in the report's supplement table beside the current stack. The
+  // interface even documented the field as "Active on the report date" — a
+  // filter that was claimed but never written. Same defect class, same fix
+  // and same fallback shape as the periodisation strip (commit 87273ae): the
+  // bounds apply when the report has them, and a period-less report stays
+  // unfiltered rather than empty.
+  let protQuery = supabase
+    .from("supplement_protocols")
+    .select("supplement_name, dose, timing, rationale, start_date, end_date")
+    .eq("athlete_id", athleteId);
+  if (periodEnd) protQuery = protQuery.lte("start_date", periodEnd);
+  if (periodStart) protQuery = protQuery.or(`end_date.is.null,end_date.gte.${periodStart}`);
+
   const [{ data: plans }, { data: prot }, assessments, compliance] = await Promise.all([
     planQuery.order("date", { ascending: true }).limit(30),
-    supabase
-      .from("supplement_protocols")
-      .select("supplement_name, dose, timing, rationale, start_date, end_date")
-      .eq("athlete_id", athleteId)
-      .order("start_date", { ascending: false }),
+    protQuery.order("start_date", { ascending: false }),
     loadAssessments(athleteId),
     getComplianceDetail(athleteId, windowFor(periodStart, periodEnd)),
   ]);
