@@ -31,6 +31,8 @@ import {
   loadPrescriptions,
   loadTrainingLoadDays,
 } from "@/lib/nutritionPlanData";
+import { checkCitations } from "@/lib/citationCheck";
+import { getAllClinicalLibraryEntries } from "@/lib/clinicalLibrary";
 import {
   NO_LIBRARY_MATCH,
   PLAN_RESPONSE_SCHEMA,
@@ -262,7 +264,7 @@ async function runGeneratePlan(
     return { error: "None of those athletes are on this team.", plan: null };
   }
 
-  const [contexts, library, extrasById, loadDaysById, citations] = await Promise.all([
+  const [contexts, library, extrasById, loadDaysById, citations, verifyLibrary] = await Promise.all([
     loadAthleteClinicalContext(athleteIds),
     loadSupplementLibrary(),
     loadAthletePlanningExtras(athleteIds, periodStart, periodEnd),
@@ -270,6 +272,10 @@ async function runGeneratePlan(
       ? loadTrainingLoadDays(teamId, athleteIds, periodStart, periodEnd)
       : Promise.resolve(new Map<string, never[]>()),
     loadNutritionCitations(),
+    // The WHOLE library, for post-generation citation verification — distinct
+    // from `citations` above, which is the nutrition-tagged slice the prompt
+    // is allowed to draw on.
+    getAllClinicalLibraryEntries(),
   ]);
 
   const prescriptions = await loadPrescriptions(
@@ -463,6 +469,39 @@ async function runGeneratePlan(
     if (result.ok) continue;
     safetyDropped.push(...result.findings);
     row.suggestions = row.suggestions.filter((_, i) => !result.unsafeIndexes.has(i));
+  }
+
+  // CITATION VERIFICATION on the narrative fields — the same structural
+  // discipline the report path enforces in assertReportSafe, applied to the
+  // planner's two prose surfaces: each suggestion's rationale (which the
+  // athlete reads on My Protocol once confirmed) and the period summary. The
+  // prompt's hard rule already forbids citing outside the Clinical + Research
+  // library; this verifies the output instead of trusting the instruction. A
+  // rationale citing something the library doesn't contain drops the
+  // suggestion — fail-safe, and the practitioner can always add the item by
+  // hand — and a tainted summary is withheld rather than shown.
+  for (const row of rows) {
+    if (row.periodSummary) {
+      const summaryCheck = checkCitations(row.periodSummary, verifyLibrary);
+      if (!summaryCheck.ok) {
+        discarded.push(
+          `${row.athleteName}: the period summary cited ${summaryCheck.findings
+            .map((f) => `“${f.excerpt}”`)
+            .join(", ")}, which matches nothing in the Clinical + Research library, and was withheld.`
+        );
+        row.periodSummary = "";
+      }
+    }
+    row.suggestions = row.suggestions.filter((s) => {
+      const rationaleCheck = checkCitations(s.rationale, verifyLibrary);
+      if (rationaleCheck.ok) return true;
+      discarded.push(
+        `${row.athleteName}: a "${s.supplementName}" suggestion's rationale cited ${rationaleCheck.findings
+          .map((f) => `“${f.excerpt}”`)
+          .join(", ")}, which matches nothing in the Clinical + Research library, and was dropped.`
+      );
+      return false;
+    });
   }
 
   return {

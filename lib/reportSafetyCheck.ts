@@ -1,5 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { getAllClinicalLibraryEntries } from "@/lib/clinicalLibrary";
+import { checkCitations } from "@/lib/citationCheck";
 import {
   checkReportSafety,
   type SafetyDeclaration,
@@ -18,6 +20,18 @@ import {
 // a contraindicated product surfacing there is doubly wrong and worth
 // catching rather than assuming it cannot happen.
 export async function assertReportSafe(athleteId: string, reportText: string): Promise<SafetyResult> {
+  // CITATION VERIFICATION runs first, and unconditionally — unlike the
+  // product check below it does not depend on declarations or an assigned
+  // brand, so it must sit above those early returns. The prompts' hard rule
+  // ("only cite from the Clinical + Research library") and the structurally
+  // DB-built Sources section already covered everything except the narrative
+  // itself; this closes that last gap. Same contract as the product check: a
+  // failure here means the report is never saved, listed or shared.
+  const citations = checkCitations(reportText, await getAllClinicalLibraryEntries());
+  if (!citations.ok) {
+    return { ok: false, findings: [], message: citations.message };
+  }
+
   const supabase = await createClient();
 
   const { data: athlete } = await supabase

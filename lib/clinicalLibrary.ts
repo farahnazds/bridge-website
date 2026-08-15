@@ -66,3 +66,29 @@ export async function getClinicalLibraryEntries(topicTag: string): Promise<Clini
     return [];
   }
 }
+
+/**
+ * The WHOLE library, for post-generation citation verification
+ * (lib/citationCheck.ts) — membership is checked against every entry, not the
+ * topic slice the prompt was shown, because citing a real entry from another
+ * topic is a prompt violation but not a fabrication.
+ *
+ * Returns [] on failure like the topic read above — with the OPPOSITE
+ * consequence, deliberately: an empty verification library means any
+ * citation-shaped string in the text flags as unverified and blocks the save.
+ * That is the fail-safe direction for a check whose false negative is an
+ * invented source in a clinical document; and when the prompt genuinely had
+ * no entries, a model that cited anything anyway deserves the block.
+ */
+export async function getAllClinicalLibraryEntries(): Promise<ClinicalLibraryEntry[]> {
+  try {
+    const supabase = serviceClient();
+    const { data, error } = await supabase
+      .from("clinical_research_library")
+      .select("title, year, source, clinical_note");
+    if (error) return [];
+    return (data ?? []) as ClinicalLibraryEntry[];
+  } catch {
+    return [];
+  }
+}
