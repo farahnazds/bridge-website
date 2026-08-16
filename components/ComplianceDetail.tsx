@@ -1,7 +1,8 @@
 import TrendSparkline from "@/components/TrendSparkline";
 import EmptyState from "@/components/EmptyState";
-import { CARD } from "@/lib/ui";
+import { BADGE, CARD } from "@/lib/ui";
 import type { ComplianceDetailData } from "@/lib/complianceDetail";
+import { parseSupplements, SUPPLEMENT_STATES, type SupplementState } from "@/lib/checkin";
 
 // The compliance visualisation, extracted from the athlete's own page so the
 // athlete page, the team page and the Athlete Profile's modal all render the
@@ -20,6 +21,40 @@ const STATUS_STYLE: Record<string, { label: string; color: string }> = {
   completed: { label: "Completed", color: "var(--success)" },
   skipped: { label: "Skipped", color: "var(--danger)" },
 };
+
+// The same three-way state vocabulary the check-in form stores, in the page's
+// existing traffic-light tokens. Keyed by the parser's state values so a new
+// state would be a type error here, not a silently unstyled badge.
+const SUPPLEMENT_STATE_COLOR: Record<SupplementState, string> = {
+  taken: "var(--success)",
+  missed: "var(--danger)",
+  unsure: "var(--warning)",
+};
+
+/** One pill per supplement, colored by its state — a wrapped row reads at a
+ *  glance where the serialized "A: taken; B: missed" string had to be parsed
+ *  by eye. Anything parseSupplements() cannot recognise (free text typed
+ *  through the old form) falls back to the raw string rather than vanishing. */
+function SupplementBadges({ raw }: { raw: string }) {
+  const parsed = Object.entries(parseSupplements(raw));
+  if (parsed.length === 0) return <>{raw}</>;
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {parsed.map(([name, state]) => (
+        <span
+          key={name}
+          className={`${BADGE} whitespace-nowrap`}
+          style={{
+            backgroundColor: `color-mix(in srgb, ${SUPPLEMENT_STATE_COLOR[state]} 12%, transparent)`,
+            color: SUPPLEMENT_STATE_COLOR[state],
+          }}
+        >
+          {name}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -71,10 +106,15 @@ export default function ComplianceDetail({
    *  days, where an athlete who logged 3 of 30 must not read as 100%. */
   rateMode = "logged",
   emptyMessage = "No check-ins logged yet.",
+  /** Render the supplements column as colored state badges with a legend.
+   *  Opt-in and currently only the practitioner modal's — the athlete's own
+   *  page keeps the plain text it has always shown. */
+  supplementBadges = false,
 }: {
   data: ComplianceDetailData;
   rateMode?: "logged" | "calendar";
   emptyMessage?: string;
+  supplementBadges?: boolean;
 }) {
   if (data.rows.length === 0) return <EmptyState message={emptyMessage} />;
 
@@ -107,7 +147,24 @@ export default function ComplianceDetail({
         ))}
       </div>
 
-      <div className={`overflow-x-auto ${CARD}`}
+      <div className="flex flex-col gap-2">
+        {/* The key to the badge colors, sitting right above the column it
+            explains. Same dot idiom as the Status column's markers. */}
+        {supplementBadges && (
+          <div className="flex flex-wrap items-center gap-3 self-end text-xs" style={{ color: "var(--text-muted)" }}>
+            <span>Supplements:</span>
+            {SUPPLEMENT_STATES.map((s) => (
+              <span key={s.value} className="inline-flex items-center gap-1.5">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: SUPPLEMENT_STATE_COLOR[s.value] }}
+                />
+                {s.label}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className={`overflow-x-auto ${CARD}`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
         <table className="w-full min-w-[820px] text-left text-sm">
           <thead>
@@ -138,13 +195,16 @@ export default function ComplianceDetail({
                   <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{r.hydration ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{r.energy ?? "—"}</td>
                   <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>{r.sleep ?? "—"}</td>
-                  <td className="px-5 py-3" style={{ color: "var(--text)" }}>{r.supplements ?? "—"}</td>
+                  <td className="px-5 py-3" style={{ color: "var(--text)" }}>
+                    {r.supplements ? (supplementBadges ? <SupplementBadges raw={r.supplements} /> : r.supplements) : "—"}
+                  </td>
                   <td className="px-5 py-3" style={{ color: "var(--text-muted)" }}>{r.notes ?? "—"}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

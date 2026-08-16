@@ -115,7 +115,10 @@ function ComplianceModalBody({
   }, [athleteId]);
 
   return (
-    <DataModal title="Compliance" subtitle={`${athleteName} · last ${WINDOW_DAYS} days`} onClose={onClose}>
+    // `wide`, not the default 46rem: the history table is min-w-[820px] and at
+    // the default width every row horizontal-scrolled. Same variant the PDF
+    // viewer uses, same responsive cap on small viewports.
+    <DataModal title="Compliance" subtitle={`${athleteName} · last ${WINDOW_DAYS} days`} onClose={onClose} size="wide">
       {state.status === "loading" && (
         <p className={NOTICE_EMPTY} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
           Loading compliance history…
@@ -133,6 +136,7 @@ function ComplianceModalBody({
         <ComplianceDetail
           data={state.data}
           rateMode="calendar"
+          supplementBadges
           emptyMessage="This athlete hasn't logged any check-ins yet."
         />
       )}
