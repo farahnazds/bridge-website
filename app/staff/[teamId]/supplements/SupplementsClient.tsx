@@ -497,9 +497,15 @@ function ProductBadges({ p, codeLabels }: { p: CatalogueProductLite; codeLabels:
 }
 
 /**
- * The Alternatives panel: certified products sharing this row's clinical
+ * The Alternatives form: certified products sharing this row's clinical
  * entity. Switching keeps dose/timing/rationale (prefilled, editable) and
  * runs the shared safety gate server-side — see switchProtocolProduct.
+ *
+ * Rendered inside DataModal (the app's standard detail modal), never inline:
+ * the inline panel used to expand the card to the full grid row, which
+ * reflowed the grid and read as the page jumping away rather than a window
+ * opening. The modal chrome (title, subtitle, close) is DataModal's, so this
+ * is only the body.
  */
 function AlternativesPanel({
   teamId,
@@ -507,14 +513,12 @@ function AlternativesPanel({
   alternatives,
   clinical,
   allergenLabels,
-  onClose,
 }: {
   teamId: string;
   row: ProtocolRow;
   alternatives: CatalogueProductLite[];
   clinical: AthleteClinicalContext | null;
   allergenLabels: Record<string, string>;
-  onClose: () => void;
 }) {
   const [state, action] = useActionState(switchProtocolProduct, initialState);
   const [selected, setSelected] = useState<string>("");
@@ -533,22 +537,9 @@ function AlternativesPanel({
     selectedProduct && clinical ? productAllergenConflicts(selectedProduct.allergens, clinical) : [];
 
   return (
-    <form
-      action={action}
-      className={`${PANEL} mt-3 flex flex-col gap-3 p-3`}
-      style={{ borderColor: "var(--brand-blue)", backgroundColor: "var(--bg)" }}
-    >
+    <form action={action} className="flex flex-col gap-3">
       <input type="hidden" name="team_id" value={teamId} />
       <input type="hidden" name="protocol_id" value={row.id} />
-
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium" style={{ color: "var(--text)" }}>
-          Certified alternatives — same supplement, different product
-        </p>
-        <button type="button" onClick={onClose} className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-          Close
-        </button>
-      </div>
 
       <div className="flex flex-col gap-1.5">
         {alternatives.map((p) => (
@@ -625,30 +616,30 @@ function AlternativesPanel({
   );
 }
 
-/** One protocol, with its editor and alternatives. */
+/** One protocol, with its inline editor. Alternatives open in the page-level
+ *  DataModal via onOpenAlternatives — the card only carries the button. */
 function ProtocolCard({
   teamId,
   row,
   phase,
   today,
   canEdit,
-  alternatives,
-  clinical,
-  allergenLabels,
+  altCount,
+  onOpenAlternatives,
   categoryGroup,
   defaultWhyOpen,
   conflictLabels,
   agendaOpenNonce,
-  agendaOpenPanel,
 }: {
   teamId: string;
   row: ProtocolRow;
   phase: ProtocolPhase;
   today: string;
   canEdit: boolean;
-  alternatives: CatalogueProductLite[];
-  clinical: AthleteClinicalContext | null;
-  allergenLabels: Record<string, string>;
+  /** How many certified alternatives exist for this row's entity — the button
+   *  count; the products themselves live with the modal at the page level. */
+  altCount: number;
+  onOpenAlternatives: () => void;
   /** The row's broad docs/13 category group, resolved from its clinical
    *  entity — null for planner-written rows with no library entry. */
   categoryGroup: string | null;
@@ -660,25 +651,23 @@ function ProtocolCard({
    *  here on the affected row itself. Empty = nothing flagged. */
   conflictLabels: string[];
   /** Set (with a fresh nonce) when the week agenda asks this card to open its
-   *  editor or alternatives — the agenda holds no forms of its own. */
+   *  editor — the agenda holds no forms of its own. (Alternatives no longer
+   *  route through the card at all: they open the page-level modal directly.) */
   agendaOpenNonce?: number;
-  agendaOpenPanel?: "edit" | "alternatives";
 }) {
-  // Which panel is open is DERIVED, not synced: the user's last explicit
-  // choice (recorded with the agenda nonce it was made under) wins until the
-  // agenda sends a NEW nonce, at which point the agenda's requested panel
+  // Whether the editor is open is DERIVED, not synced: the user's last
+  // explicit choice (recorded with the agenda nonce it was made under) wins
+  // until the agenda sends a NEW nonce, at which point the agenda's request
   // wins until the next click. No effect, no state mirroring.
   const [manualPanel, setManualPanel] = useState<{
-    panel: "edit" | "alternatives" | null;
+    panel: "edit" | null;
     asOfNonce: number | undefined;
   }>({ panel: null, asOfNonce: undefined });
-  const activePanel =
+  const open =
     agendaOpenNonce !== undefined && manualPanel.asOfNonce !== agendaOpenNonce
-      ? agendaOpenPanel ?? "edit"
-      : manualPanel.panel;
-  const open = activePanel === "edit";
-  const showAlternatives = activePanel === "alternatives";
-  const choosePanel = (panel: "edit" | "alternatives" | null) =>
+      ? true
+      : manualPanel.panel === "edit";
+  const choosePanel = (panel: "edit" | null) =>
     setManualPanel({ panel, asOfNonce: agendaOpenNonce });
 
   const [whyOverride, setWhyOverride] = useState<boolean | null>(null);
@@ -735,9 +724,9 @@ function ProtocolCard({
         borderLeftColor: hovered ? hoverEdge : edge,
         backgroundColor: phase === "ended" ? "transparent" : "var(--surface)",
         opacity: phase === "ended" ? 0.7 : 1,
-        // A card with its editor or alternatives open takes the whole grid
-        // row — the forms need width, not a 330px column.
-        gridColumn: open || showAlternatives ? "1 / -1" : undefined,
+        // A card with its editor open takes the whole grid row — the form
+        // needs width, not a 330px column.
+        gridColumn: open ? "1 / -1" : undefined,
       }}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
@@ -818,19 +807,19 @@ function ProtocolCard({
         {/* Only meaningful on rows the catalogue has instances of, and only
             while the row is live — an ended prescription's product is
             history, not something to switch. */}
-        {canEdit && alternatives.length > 0 && phase !== "ended" && (
+        {canEdit && altCount > 0 && phase !== "ended" && (
           <button
             type="button"
-            onClick={() => choosePanel(showAlternatives ? null : "alternatives")}
+            onClick={onOpenAlternatives}
             className="text-xs font-medium underline-offset-2 hover:underline"
             style={{ color: "var(--brand-blue)" }}
           >
-            {showAlternatives ? "Close alternatives" : `Alternatives (${alternatives.length})`}
+            Alternatives ({altCount})
           </button>
         )}
       </div>
 
-      {row.rationale && !open && !showAlternatives && (
+      {row.rationale && !open && (
         whyOpen ? (
           <p
             className={`${PANEL} m-0 cursor-pointer px-3 py-2.5 text-xs leading-relaxed`}
@@ -849,17 +838,6 @@ function ProtocolCard({
             Why this — {whyPeek}
           </button>
         )
-      )}
-
-      {showAlternatives && canEdit && (
-        <AlternativesPanel
-          teamId={teamId}
-          row={row}
-          alternatives={alternatives}
-          clinical={clinical}
-          allergenLabels={allergenLabels}
-          onClose={() => choosePanel(null)}
-        />
       )}
 
       {open && canEdit && (
@@ -1492,22 +1470,29 @@ export default function SupplementsClient({
     }, 60);
   };
 
-  /** An agenda line's Edit/Alternatives: the row's range card is the single
-   *  home of those flows, so signal it open, make sure no phase filter hides
-   *  it, and bring it into view. */
+  /** An agenda line's Edit: the row's range card is the single home of the
+   *  edit form, so signal it open, make sure no phase filter hides it, and
+   *  bring it into view. Alternatives deliberately do NOT come through here —
+   *  they open the DataModal below, in place, with no scrolling. */
   const [agendaTarget, setAgendaTarget] = useState<{
     rowId: string;
-    panel: "edit" | "alternatives";
     nonce: number;
   } | null>(null);
   const agendaNonceRef = useRef(0);
-  const openFromAgenda = (rowId: string, panel: "edit" | "alternatives") => {
+  const openFromAgenda = (rowId: string) => {
     setPhaseFilter("all");
-    setAgendaTarget({ rowId, panel, nonce: ++agendaNonceRef.current });
+    setAgendaTarget({ rowId, nonce: ++agendaNonceRef.current });
     setTimeout(() => {
       document.getElementById(`protocol-${rowId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 80);
   };
+
+  /** The row whose certified alternatives are open in the DataModal — the
+   *  app's standard window, same pattern as the agenda detail below. Opened
+   *  from a card's "Alternatives (N)" or the agenda detail's button; the row
+   *  is re-derived from props each render so a successful switch shows the
+   *  refreshed product list, not a snapshot. */
+  const [altTarget, setAltTarget] = useState<{ rowId: string; athleteId: string } | null>(null);
 
   /** The occurrence a clicked agenda line opens in DataModal. */
   const [agendaDetail, setAgendaDetail] = useState<{
@@ -1737,16 +1722,14 @@ export default function SupplementsClient({
             phase={phase}
             today={today}
             canEdit={canEdit}
-            alternatives={alternativesFor(p)}
-            clinical={a.clinical}
-            allergenLabels={allergenLabels}
+            altCount={alternativesFor(p).length}
+            onOpenAlternatives={() => setAltTarget({ rowId: p.id, athleteId: a.athleteId })}
             categoryGroup={
               p.supplementLibraryId ? groupByLibraryId.get(p.supplementLibraryId) ?? null : null
             }
             defaultWhyOpen={allWhy}
             conflictLabels={conflictsByRow.get(p.id) ?? []}
             agendaOpenNonce={agendaTarget?.rowId === p.id ? agendaTarget.nonce : undefined}
-            agendaOpenPanel={agendaTarget?.rowId === p.id ? agendaTarget.panel : undefined}
           />
         );
         const grid = (items: { p: ProtocolRow; phase: ProtocolPhase }[]) => (
@@ -1853,8 +1836,9 @@ export default function SupplementsClient({
 
       {/* An agenda occurrence, opened in the app's standard detail modal
           (DataModal — the athlete profile's data-row pattern). Read-only
-          detail for any viewer; the Edit/Alternatives actions hand off to
-          the row's range card, the single home of those flows. */}
+          detail for any viewer; Edit hands off to the row's range card (the
+          single home of the edit form) and Alternatives opens the modal
+          below. */}
       {agendaDetail &&
         (() => {
           const { item, date, athleteId } = agendaDetail;
@@ -1940,7 +1924,7 @@ export default function SupplementsClient({
                       type="button"
                       onClick={() => {
                         setAgendaDetail(null);
-                        openFromAgenda(row.id, "edit");
+                        openFromAgenda(row.id);
                       }}
                       className={BTN_PRIMARY}
                       style={{ backgroundImage: "var(--brand-gradient-action)" }}
@@ -1952,7 +1936,7 @@ export default function SupplementsClient({
                         type="button"
                         onClick={() => {
                           setAgendaDetail(null);
-                          openFromAgenda(row.id, "alternatives");
+                          setAltTarget({ rowId: row.id, athleteId });
                         }}
                         className={BTN_SECONDARY}
                         style={{ borderColor: "var(--border)", color: "var(--text)" }}
@@ -1963,6 +1947,33 @@ export default function SupplementsClient({
                   </div>
                 )}
               </div>
+            </DataModal>
+          );
+        })()}
+
+      {/* Certified alternatives, in the same standard modal — never an inline
+          panel, and never a scroll: the form opens over whatever the user was
+          looking at. Row and product list are derived fresh from props, so a
+          successful switch (which revalidates the page) is reflected here. */}
+      {altTarget &&
+        canEdit &&
+        (() => {
+          const athlete = data.find((x) => x.athleteId === altTarget.athleteId) ?? null;
+          const row = athlete?.protocols.find((p) => p.id === altTarget.rowId) ?? null;
+          if (!athlete || !row) return null;
+          return (
+            <DataModal
+              title={`Alternatives — ${row.supplementName}`}
+              subtitle={`${athlete.name} · certified products of the same supplement, ${row.dose}, ${row.timing}`}
+              onClose={() => setAltTarget(null)}
+            >
+              <AlternativesPanel
+                teamId={teamId}
+                row={row}
+                alternatives={alternativesFor(row)}
+                clinical={athlete.clinical}
+                allergenLabels={allergenLabels}
+              />
             </DataModal>
           );
         })()}
