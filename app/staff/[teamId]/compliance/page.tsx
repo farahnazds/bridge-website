@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import TrendSparkline from "@/components/TrendSparkline";
 import EmptyState from "@/components/EmptyState";
+import { ComplianceNameButton } from "@/components/ComplianceDetailModal";
 import { getComplianceDetail, windowDayCount } from "@/lib/complianceDetail";
 import { BADGE, BTN_SECONDARY, CARD, INPUT, INPUT_STYLE } from "@/lib/ui";
 
@@ -224,11 +225,14 @@ export default async function TeamCompliancePage({
                   style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-3">
-                      <Link href={`/staff/${teamId}/athletes/${athlete.id}`}
-                        className="text-sm font-semibold underline-offset-2 hover:underline"
-                        style={{ color: "var(--text)" }}>
-                        {athlete.first_name} {athlete.last_name}
-                      </Link>
+                      {/* Opens the shared compliance-history modal in place
+                          rather than navigating to the profile — reviewing a
+                          team, the practitioner wants the history without
+                          losing their spot in the worst-first list. */}
+                      <ComplianceNameButton
+                        athleteId={athlete.id}
+                        athleteName={`${athlete.first_name} ${athlete.last_name}`}
+                      />
                       <span className="text-xs" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                         {athlete.code}
                       </span>

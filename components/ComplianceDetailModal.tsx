@@ -61,6 +61,37 @@ export default function ComplianceDetailModal({
   );
 }
 
+// The team Compliance page's variant: the athlete's NAME is the trigger, and
+// the modal it opens is the same ComplianceModalBody as above — one fetch
+// path, one view, two doors. Styled like the Link it replaced on that page so
+// the row reads the same; only the destination changed (a modal in place,
+// not a navigation to the profile).
+export function ComplianceNameButton({
+  athleteId,
+  athleteName,
+}: {
+  athleteId: string;
+  athleteName: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-sm font-semibold underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand-blue)]"
+        style={{ color: "var(--text)" }}
+      >
+        {athleteName}
+      </button>
+      {open && (
+        <ComplianceModalBody athleteId={athleteId} athleteName={athleteName} onClose={() => setOpen(false)} />
+      )}
+    </>
+  );
+}
+
 function ComplianceModalBody({
   athleteId, athleteName, onClose,
 }: {
