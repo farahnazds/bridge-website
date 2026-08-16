@@ -67,12 +67,10 @@ const legacyRunKey = (teamId: string) => `bridgetx.nutritionPlanRun.${teamId}`;
 export default function NutritionPlannerClient({
   teamId,
   athletes,
-  defaultLanguage,
   preselectedAthleteId,
 }: {
   teamId: string;
   athletes: PlannerAthlete[];
-  defaultLanguage: string;
   preselectedAthleteId: string | null;
 }) {
   const [planState, planAction] = useActionState(generateNutritionPlan, initialPlan);
@@ -299,7 +297,6 @@ export default function NutritionPlannerClient({
       key={runKey}
       teamId={teamId}
       athletes={athletes}
-      defaultLanguage={defaultLanguage}
       preselectedAthleteId={preselectedAthleteId}
       formAction={planAction}
       error={planState.error}

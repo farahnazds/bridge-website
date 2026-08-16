@@ -214,6 +214,12 @@ async function runGeneratePlan(
   }
 
   const teamId = String(formData.get("team_id") ?? "").trim();
+  // The form always submits day_specific since the mode selector left the UI
+  // (owner's direction, 2026-08-16) — the planner's identity is planning
+  // against real Training Load Plan entries. The general branch below stays:
+  // PlanMode is shared with the Nutrition report generator, which still
+  // offers both modes, and a tolerant action beats one that 500s on an old
+  // cached form.
   const mode = String(formData.get("mode") ?? "day_specific").trim() as PlanMode;
   const requestedAthleteIds = formData.getAll("athlete_ids").map((v) => String(v).trim()).filter(Boolean);
   const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
@@ -305,7 +311,7 @@ async function runGeneratePlan(
       const who =
         athleteIds.length === 1 ? "this athlete" : "any of the selected athletes";
       return {
-        error: `No Training Load Plan entries exist for ${who} between ${periodStart} and ${periodEnd}, so there are no sessions for a day-specific plan to read. Add the period's sessions first — Load & Periodization → Training Load Plan — then generate, or use General / standing mode for a baseline protocol that doesn't need them.`,
+        error: `No Training Load Plan entries exist for ${who} between ${periodStart} and ${periodEnd}, so there are no sessions for the plan to read. Add the period's sessions first — Load & Periodization → Training Load Plan — then generate.`,
         plan: null,
       };
     }
@@ -363,7 +369,7 @@ async function runGeneratePlan(
     if (noLoadAthletes.has(athleteId)) {
       return {
         ...shell,
-        error: `No Training Load Plan entries exist for ${athleteName} in this period, so nothing was generated for them. Add their sessions first — Load & Periodization → Training Load Plan — or use General / standing mode.`,
+        error: `No Training Load Plan entries exist for ${athleteName} in this period, so nothing was generated for them. Add their sessions first — Load & Periodization → Training Load Plan — then generate again.`,
       };
     }
 

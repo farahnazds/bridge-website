@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { clubDefaultLanguage, clubIdForTeam } from "@/lib/reportLanguage";
 import { CARD } from "@/lib/ui";
 import NutritionPlannerClient from "./NutritionPlannerClient";
 import type { PlannerAthlete } from "./SelectionStep";
@@ -42,8 +41,6 @@ export default async function NutritionPlannerPage({
   const { teamId } = await params;
   const { athlete: athleteParam } = await searchParams;
   const supabase = await createClient();
-
-  const defaultLanguage = await clubDefaultLanguage(await clubIdForTeam(teamId));
 
   const { data: rosterRows } = await supabase
     .from("athlete_teams")
@@ -112,7 +109,6 @@ export default async function NutritionPlannerPage({
         <NutritionPlannerClient
           teamId={teamId}
           athletes={athletes}
-          defaultLanguage={defaultLanguage}
           preselectedAthleteId={preselectedAthleteId}
         />
       ) : (

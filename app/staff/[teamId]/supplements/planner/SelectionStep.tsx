@@ -4,7 +4,23 @@ import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
 import { MAX_PLAN_DAYS, daysBetween } from "@/lib/supplementPlan";
-import type { PlanMode } from "@/lib/supplementPlan";
+
+// THE FORM IS DELIBERATELY BARE — athletes, a date range, generate. The
+// owner's direction (2026-08-16): everything else that used to sit here is
+// gone from the planner's UI.
+//
+// - Plan mode: the planner always runs DAY-SPECIFIC — its whole identity is
+//   planning against the week's real Training Load Plan entries. The
+//   general/standing machinery still exists server-side (lib/supplementPlan's
+//   PlanMode, the actions' general branch, the prompt's standing sentinel)
+//   because the Nutrition REPORT form still offers both modes; this form just
+//   always submits day_specific.
+// - Language: the rationale text follows the club's default report language,
+//   resolved server-side by resolveReportLanguage(null, teamId) — no per-run
+//   selector. A Club Manager changes it under club settings.
+// - Audience: removed earlier the same day — a plan's rationale is always
+//   athlete-visible, so the system prompt fixes the register.
+// - Additional instructions: removed; the report forms keep theirs.
 
 export interface PlannerAthlete {
   id: string;
@@ -19,7 +35,7 @@ function isoOffset(days: number): string {
   return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 }
 
-function SubmitButton({ athleteCount, dayCount, mode }: { athleteCount: number; dayCount: number; mode: PlanMode }) {
+function SubmitButton({ athleteCount, dayCount }: { athleteCount: number; dayCount: number }) {
   const { pending } = useFormStatus();
   // The scope is stated up front, not just after the fact: it is the thing a
   // practitioner planning for a whole roster most needs to know before pressing
@@ -27,11 +43,9 @@ function SubmitButton({ athleteCount, dayCount, mode }: { athleteCount: number; 
   const scope =
     athleteCount === 0
       ? ""
-      : ` · ${athleteCount} athlete${athleteCount === 1 ? "" : "s"}${
-          mode === "day_specific"
-            ? `, ${dayCount} day${dayCount === 1 ? "" : "s"}${athleteCount === 1 ? "" : " each"}`
-            : ""
-        }`;
+      : ` · ${athleteCount} athlete${athleteCount === 1 ? "" : "s"}, ${dayCount} day${
+          dayCount === 1 ? "" : "s"
+        }${athleteCount === 1 ? "" : " each"}`;
   return (
     <button
       type="submit"
@@ -49,19 +63,16 @@ function SubmitButton({ athleteCount, dayCount, mode }: { athleteCount: number; 
 export default function SelectionStep({
   teamId,
   athletes,
-  defaultLanguage,
   preselectedAthleteId,
   formAction,
   error,
 }: {
   teamId: string;
   athletes: PlannerAthlete[];
-  defaultLanguage: string;
   preselectedAthleteId: string | null;
   formAction: (formData: FormData) => void;
   error: string | null;
 }) {
-  const [mode, setMode] = useState<PlanMode>("day_specific");
   const [selected, setSelected] = useState<string[]>(
     preselectedAthleteId ? [preselectedAthleteId] : athletes.map((a) => a.id)
   );
@@ -69,18 +80,17 @@ export default function SelectionStep({
   const [end, setEnd] = useState(isoOffset(7));
 
   const dayCount = useMemo(() => {
-    if (mode === "general") return 0;
     if (!start || !end || end < start) return 0;
     return daysBetween(start, end);
-  }, [mode, start, end]);
+  }, [start, end]);
 
-  const rangeInvalid = mode === "day_specific" && (end < start || dayCount > MAX_PLAN_DAYS);
+  const rangeInvalid = end < start || dayCount > MAX_PLAN_DAYS;
   const allSelected = selected.length === athletes.length;
 
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
       <input type="hidden" name="team_id" value={teamId} />
-      <input type="hidden" name="mode" value={mode} />
+      <input type="hidden" name="mode" value="day_specific" />
       {selected.map((id) => (
         <input key={id} type="hidden" name="athlete_ids" value={id} />
       ))}
@@ -136,48 +146,8 @@ export default function SelectionStep({
         </div>
       </div>
 
-      {/* ---- Mode ---- */}
-      <fieldset className="flex flex-col gap-2">
-        <legend className={labelClass} style={{ color: "var(--text)" }}>
-          Plan mode
-        </legend>
-        <label className="flex items-start gap-2 text-sm" style={{ color: "var(--text)" }}>
-          <input
-            type="radio"
-            name="_mode_ui"
-            checked={mode === "day_specific"}
-            onChange={() => setMode("day_specific")}
-            className="mt-1"
-          />
-          <span>
-            <strong>Day-specific</strong>
-            <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
-              Uses each day&apos;s real Training Load Plan entry — RPE, intensity, session type. A day with no
-              entry gets a baseline suggestion that says so plainly; nothing is invented. An athlete with no
-              entries at all in the period is blocked until training load is added.
-            </span>
-          </span>
-        </label>
-        <label className="flex items-start gap-2 text-sm" style={{ color: "var(--text)" }}>
-          <input
-            type="radio"
-            name="_mode_ui"
-            checked={mode === "general"}
-            onChange={() => setMode("general")}
-            className="mt-1"
-          />
-          <span>
-            <strong>General / standing</strong>
-            <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
-              One baseline recommendation per athlete, not anchored to any day. No RPE required.
-            </span>
-          </span>
-        </label>
-      </fieldset>
-
       {/* ---- Range ---- */}
-      {mode === "day_specific" && (
-        <div className={`${PANEL} p-4`} style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)" }}>
+      <div className={`${PANEL} p-4`} style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)" }}>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="period_start" className={labelClass} style={{ color: "var(--text)" }}>
@@ -217,50 +187,9 @@ export default function SelectionStep({
               ? "The end date is before the start date."
               : dayCount > MAX_PLAN_DAYS
                 ? `${dayCount} days — the maximum is ${MAX_PLAN_DAYS}.`
-                : `${dayCount} day${dayCount === 1 ? "" : "s"}. A single day up to ${MAX_PLAN_DAYS} days.`}
+                : `${dayCount} day${dayCount === 1 ? "" : "s"}. A single day up to ${MAX_PLAN_DAYS} days. Each day plans against its real Training Load Plan entry; a day with no entry gets a baseline suggestion that says so plainly, and an athlete with no entries at all in the period is blocked until training load is added.`}
           </p>
         </div>
-      )}
-
-      {/* ---- Rationale language ----
-          Not a report setting: it sets the language the model writes each
-          suggestion's rationale and the period summary in — text that is
-          stored on the protocol row and read by the athlete on My Protocol.
-          The Audience selector that sat beside it is gone: it was a leftover
-          from when confirming also generated reports, and the planner's
-          system prompt already fixes the register (the rationale is always
-          athlete-visible, so it is written for both readers). The "Include
-          performance signals" checkbox left earlier for the same reason —
-          both live on the report forms now, the one place they do something. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="planner_language" className={labelClass} style={{ color: "var(--text)" }}>
-            Rationale language
-          </label>
-          <select id="planner_language" name="language" defaultValue={defaultLanguage} className={INPUT} style={INPUT_STYLE}>
-            <option value="english">English</option>
-            <option value="arabic">Arabic</option>
-          </select>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            The language each suggestion&apos;s &quot;why&quot; is written in — the athlete reads it on My
-            Protocol. Defaults to your club&apos;s setting.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="planner_instructions" className={labelClass} style={{ color: "var(--text)" }}>
-          Additional instructions (optional)
-        </label>
-        <textarea
-          id="planner_instructions"
-          name="additional_instructions"
-          rows={3}
-          placeholder="Anything specific to focus on across this period…"
-          className={INPUT}
-          style={INPUT_STYLE}
-        />
-      </div>
 
       {error && (
         <p
@@ -276,7 +205,7 @@ export default function SelectionStep({
         </p>
       )}
 
-      <SubmitButton athleteCount={rangeInvalid ? 0 : selected.length} dayCount={dayCount} mode={mode} />
+      <SubmitButton athleteCount={rangeInvalid ? 0 : selected.length} dayCount={dayCount} />
     </form>
   );
 }

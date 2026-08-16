@@ -278,19 +278,17 @@ not generalise to a range: one unplanned Tuesday in a fortnight would have
 refused the whole batch for every athlete, which is a far worse outcome than
 planning the thirteen days that *are* logged.
 
-**One narrow gate remains (added 2026-08-16): complete absence.** In
-day-specific mode, an athlete with **not a single Training Load Plan entry
-in the whole selected period** is blocked before their model call, per
-athlete — the same stance as the Nutrition report's confirmed-plan gate,
-with the same shape of message (what's missing, where to add it — Load &
-Periodization → Training Load Plan — and the General-mode alternative). A
-period with zero entries gives a day-specific plan nothing to read; every
-day would be the stated-gap baseline, which is General mode wearing a
-costume. If *every* selected athlete is empty the whole run is refused on
-the selection screen; if only some are, the empty ones get a per-athlete
-error row and the rest generate normally. Any athlete with at least one
-entry generates, with the empty days degrading per day exactly as below —
-only total absence blocks. General mode is ungated, as ever.
+**One narrow gate remains (added 2026-08-16): complete absence.** An
+athlete with **not a single Training Load Plan entry in the whole selected
+period** is blocked before their model call, per athlete — the same stance
+as the Nutrition report's confirmed-plan gate, with the same shape of
+message (what's missing, where to add it — Load & Periodization → Training
+Load Plan). A period with zero entries gives the plan nothing to read;
+every day would be the stated-gap baseline. If *every* selected athlete is
+empty the whole run is refused on the selection screen; if only some are,
+the empty ones get a per-athlete error row and the rest generate normally.
+Any athlete with at least one entry generates, with the empty days
+degrading per day exactly as below — only total absence blocks.
 
 **What replaces the old per-day gate.** Graceful, *explicit* degradation,
 per day:
@@ -311,9 +309,26 @@ the practitioner can see exactly which days were planned without load data.
 the athlete-specific one governs** — unchanged; the more specific plan is the
 one that applies to that athlete.
 
-**"General" mode is unchanged** and still requires no RPE: a standing
-prescription has no single session for an RPE value to attach to. It is now
-reached through the same planner rather than through a separate form.
+**"General" mode left the planner's UI on 2026-08-16** (owner's direction;
+the whole selector did — see below). The planner always runs day-specific:
+its identity is planning against the week's real sessions. General mode
+still exists where it still has a job — the **Nutrition report** form
+(Reports → Generate → Nutrition) keeps its day-specific/general mode
+select, and the server-side machinery (`PlanMode`, the standing-date
+sentinel, the actions' general branch) is shared and unchanged, so the
+planner's action stays tolerant of a `general` submission rather than
+erroring on an old cached form.
+
+**The planner's selection form is deliberately bare (2026-08-16):**
+athletes, a date range, generate. By the owner's direction the Plan mode
+selector, the language selector, the Audience selector and the Additional
+instructions field were all removed from the planner. Rationale language
+now silently follows the club's default report language
+(`resolveReportLanguage(null, teamId)` server-side); audience was already
+gone (the plan rationale's register is fixed — always athlete-visible);
+mode is hard-coded day-specific. The five report forms keep all of these
+fields — they are report concerns, and that is now the only place they
+appear.
 
 ## Nutrition Planner and the Nutrition report — two independent acts
 (restructured 2026-08-15)
