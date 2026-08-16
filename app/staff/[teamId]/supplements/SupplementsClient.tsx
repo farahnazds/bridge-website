@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useRef, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import DataModal from "@/components/DataModal";
 import { BADGE, BTN_PRIMARY, BTN_SECONDARY, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
@@ -616,63 +616,22 @@ function AlternativesPanel({
   );
 }
 
-/** One protocol, with its inline editor. Alternatives open in the page-level
- *  DataModal via onOpenAlternatives — the card only carries the button. */
-function ProtocolCard({
+/**
+ * The protocol editor — the SAME update / end-today / cancel forms the card
+ * used to expand inline, moved unchanged into the page-level DataModal (the
+ * app's standard window, same pattern as Alternatives and the agenda detail).
+ * The inline expansion used to hijack the grid row and scroll the page to the
+ * card; the modal opens over whatever the user was looking at instead.
+ */
+function ProtocolEditForm({
   teamId,
   row,
   phase,
-  today,
-  canEdit,
-  altCount,
-  onOpenAlternatives,
-  categoryGroup,
-  defaultWhyOpen,
-  conflictLabels,
-  agendaOpenNonce,
 }: {
   teamId: string;
   row: ProtocolRow;
   phase: ProtocolPhase;
-  today: string;
-  canEdit: boolean;
-  /** How many certified alternatives exist for this row's entity — the button
-   *  count; the products themselves live with the modal at the page level. */
-  altCount: number;
-  onOpenAlternatives: () => void;
-  /** The row's broad docs/13 category group, resolved from its clinical
-   *  entity — null for planner-written rows with no library entry. */
-  categoryGroup: string | null;
-  /** The page-level "Show rationale" toggle; a card's own peek click overrides it. */
-  defaultWhyOpen: boolean;
-  /** Conflict labels from the page-level live safety recomputation — the same
-   *  shared checks the server gates run, re-evaluated against CURRENT
-   *  declarations, so a declaration that changed after prescribing surfaces
-   *  here on the affected row itself. Empty = nothing flagged. */
-  conflictLabels: string[];
-  /** Set (with a fresh nonce) when the week agenda asks this card to open its
-   *  editor — the agenda holds no forms of its own. (Alternatives no longer
-   *  route through the card at all: they open the page-level modal directly.) */
-  agendaOpenNonce?: number;
 }) {
-  // Whether the editor is open is DERIVED, not synced: the user's last
-  // explicit choice (recorded with the agenda nonce it was made under) wins
-  // until the agenda sends a NEW nonce, at which point the agenda's request
-  // wins until the next click. No effect, no state mirroring.
-  const [manualPanel, setManualPanel] = useState<{
-    panel: "edit" | null;
-    asOfNonce: number | undefined;
-  }>({ panel: null, asOfNonce: undefined });
-  const open =
-    agendaOpenNonce !== undefined && manualPanel.asOfNonce !== agendaOpenNonce
-      ? true
-      : manualPanel.panel === "edit";
-  const choosePanel = (panel: "edit" | null) =>
-    setManualPanel({ panel, asOfNonce: agendaOpenNonce });
-
-  const [whyOverride, setWhyOverride] = useState<boolean | null>(null);
-  const [hovered, setHovered] = useState(false);
-  const whyOpen = whyOverride ?? defaultWhyOpen;
   const [dose, setDose] = useState(row.dose);
   const [timing, setTiming] = useState(row.timing);
   const [startDate, setStartDate] = useState(row.startDate);
@@ -690,158 +649,8 @@ function ProtocolCard({
     dose !== row.dose || timing !== row.timing || startDate !== row.startDate || (endDate || null) !== row.endDate;
   const rationaleStale = (dose !== row.dose || timing !== row.timing) && rationale === row.rationale;
 
-  // The left accent edge, in priority order: a live SAFETY state always beats
-  // the category colour — a conflict edge is danger red and a
-  // no-library-entry edge is warning amber, which is exactly why the
-  // --category-* palette contains neither hue. Category tone next; a
-  // library-linked row with NO group (Sodium Bicarbonate) gets a neutral
-  // muted edge, deliberately NOT the phase tone — the scheduled phase blue
-  // is the same hue as the Protein category token, and an uncategorised row
-  // must not masquerade as a categorised one.
-  const categoryTone = categoryGroup ? CATEGORY_TONE[categoryGroup] : undefined;
-  const edge =
-    conflictLabels.length > 0
-      ? "var(--danger)"
-      : row.supplementLibraryId === null
-        ? "var(--warning)"
-        : categoryTone ?? "var(--text-muted)";
-
-  const whyPeek = row.rationale ? `${row.rationale.split(/[.;]/)[0].slice(0, 64).trim()}…` : "";
-
-  // Hover: the whole frame brightens to a vivid version of whatever colour
-  // the left edge already carries — category, or a safety state, which this
-  // deliberately follows rather than overrides. Nothing happens to the fill
-  // or interior; the transition-colors on the card is the whole animation.
-  const hoverEdge = `color-mix(in srgb, ${edge} 82%, white)`;
-
   return (
-    <div
-      id={`protocol-${row.id}`}
-      className={`${PANEL} flex flex-col gap-2.5 p-4 transition-colors duration-200 ease-out`}
-      style={{
-        borderColor: hovered ? hoverEdge : "var(--border)",
-        borderLeftWidth: 2,
-        borderLeftColor: hovered ? hoverEdge : edge,
-        backgroundColor: phase === "ended" ? "transparent" : "var(--surface)",
-        opacity: phase === "ended" ? 0.7 : 1,
-        // A card with its editor open takes the whole grid row — the form
-        // needs width, not a 330px column.
-        gridColumn: open ? "1 / -1" : undefined,
-      }}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <p
-            className="text-sm font-semibold"
-            style={{ fontFamily: "var(--font-heading)", color: "var(--text)", letterSpacing: "-0.01em" }}
-          >
-            {row.supplementName}
-          </p>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span
-              className={BADGE}
-              style={{
-                backgroundColor: `color-mix(in srgb, ${PHASE_TONE[phase]} 12%, transparent)`,
-                color: PHASE_TONE[phase],
-              }}
-            >
-              {PHASE_LABEL[phase]}
-            </span>
-            {row.supplementLibraryId === null && (
-              <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--warning) 10%, transparent)", color: "var(--warning)" }}>
-                Not in library
-              </span>
-            )}
-            {conflictLabels.length > 0 && (
-              <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}>
-                Conflicts with declared {conflictLabels.join(", ")}
-              </span>
-            )}
-          </div>
-        </div>
-        {canEdit && (
-          <button
-            type="button"
-            onClick={() => choosePanel(open ? null : "edit")}
-            className={`${PANEL} shrink-0 px-3 py-1 text-xs font-medium transition-colors duration-150 ease-out hover:border-white/25`}
-            style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-          >
-            {open ? "Close" : "Edit"}
-          </button>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-0.5">
-        <p
-          className="text-base font-semibold"
-          style={{ fontFamily: "var(--font-heading)", color: "var(--text)", letterSpacing: "-0.01em" }}
-        >
-          {row.dose}
-        </p>
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          {row.timing}
-        </p>
-      </div>
-
-      {phase === "scheduled" && (
-        <ScheduleBar
-          startDate={row.startDate}
-          endDate={row.endDate}
-          today={today}
-          tone={categoryTone ?? "var(--brand-blue)"}
-        />
-      )}
-
-      <div
-        className="flex flex-wrap items-center justify-between gap-2 border-t pt-2.5"
-        style={{ borderColor: "var(--border)" }}
-      >
-        <p
-          className="text-[11px]"
-          style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}
-        >
-          {protocolWindowLabel(asCoverage(row), today)}
-        </p>
-        {/* Only meaningful on rows the catalogue has instances of, and only
-            while the row is live — an ended prescription's product is
-            history, not something to switch. */}
-        {canEdit && altCount > 0 && phase !== "ended" && (
-          <button
-            type="button"
-            onClick={onOpenAlternatives}
-            className="text-xs font-medium underline-offset-2 hover:underline"
-            style={{ color: "var(--brand-blue)" }}
-          >
-            Alternatives ({altCount})
-          </button>
-        )}
-      </div>
-
-      {row.rationale && !open && (
-        whyOpen ? (
-          <p
-            className={`${PANEL} m-0 cursor-pointer px-3 py-2.5 text-xs leading-relaxed`}
-            style={{ borderColor: "var(--border)", backgroundColor: "color-mix(in srgb, var(--text) 3%, transparent)", color: "var(--text-muted)" }}
-            onClick={() => setWhyOverride(false)}
-          >
-            {row.rationale}
-          </p>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setWhyOverride(true)}
-            className="self-start text-left text-xs transition-colors duration-150 ease-out"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Why this — {whyPeek}
-          </button>
-        )
-      )}
-
-      {open && canEdit && (
-        <div className="mt-4 flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
           <form action={updateAction} className="flex flex-col gap-3">
             <input type="hidden" name="team_id" value={teamId} />
             <input type="hidden" name="protocol_id" value={row.id} />
@@ -944,7 +753,354 @@ function ProtocolCard({
               </div>
             </form>
           )}
+    </div>
+  );
+}
+
+/** Shared by the card and the list row: the accent colour, in priority order.
+ *  A live SAFETY state always beats the category colour — a conflict is
+ *  danger red and a no-library-entry is warning amber, which is exactly why
+ *  the --category-* palette contains neither hue. Category tone next; a
+ *  library-linked row with NO group (Sodium Bicarbonate) gets a neutral
+ *  muted accent, deliberately NOT the phase tone — the scheduled phase blue
+ *  is the same hue as the Protein category token, and an uncategorised row
+ *  must not masquerade as a categorised one. */
+function accentFor(row: ProtocolRow, categoryGroup: string | null, conflictLabels: string[]) {
+  const categoryTone = categoryGroup ? CATEGORY_TONE[categoryGroup] : undefined;
+  return {
+    categoryTone,
+    edge:
+      conflictLabels.length > 0
+        ? "var(--danger)"
+        : row.supplementLibraryId === null
+          ? "var(--warning)"
+          : categoryTone ?? "var(--text-muted)",
+  };
+}
+
+const whyPeekOf = (rationale: string) =>
+  rationale ? `${rationale.split(/[.;]/)[0].slice(0, 64).trim()}…` : "";
+
+/** One protocol as a card — now only the ENDED section's shape (the live
+ *  sections list rows below). Editing opens the page-level modal via onEdit;
+ *  the card holds no forms of its own any more. */
+function ProtocolCard({
+  row,
+  phase,
+  today,
+  canEdit,
+  altCount,
+  onOpenAlternatives,
+  onEdit,
+  categoryGroup,
+  defaultWhyOpen,
+  conflictLabels,
+}: {
+  row: ProtocolRow;
+  phase: ProtocolPhase;
+  today: string;
+  canEdit: boolean;
+  /** How many certified alternatives exist for this row's entity — the button
+   *  count; the products themselves live with the modal at the page level. */
+  altCount: number;
+  onOpenAlternatives: () => void;
+  onEdit: () => void;
+  /** The row's broad docs/13 category group, resolved from its clinical
+   *  entity — null for planner-written rows with no library entry. */
+  categoryGroup: string | null;
+  /** The page-level "Show rationale" toggle; a card's own peek click overrides it. */
+  defaultWhyOpen: boolean;
+  /** Conflict labels from the page-level live safety recomputation — the same
+   *  shared checks the server gates run, re-evaluated against CURRENT
+   *  declarations, so a declaration that changed after prescribing surfaces
+   *  here on the affected row itself. Empty = nothing flagged. */
+  conflictLabels: string[];
+}) {
+  const [whyOverride, setWhyOverride] = useState<boolean | null>(null);
+  const [hovered, setHovered] = useState(false);
+  const whyOpen = whyOverride ?? defaultWhyOpen;
+
+  const { categoryTone, edge } = accentFor(row, categoryGroup, conflictLabels);
+  const whyPeek = whyPeekOf(row.rationale);
+
+  // Hover: the whole frame brightens to a vivid version of whatever colour
+  // the left edge already carries — category, or a safety state, which this
+  // deliberately follows rather than overrides. Nothing happens to the fill
+  // or interior; the transition-colors on the card is the whole animation.
+  const hoverEdge = `color-mix(in srgb, ${edge} 82%, white)`;
+
+  return (
+    <div
+      id={`protocol-${row.id}`}
+      className={`${PANEL} flex flex-col gap-2.5 p-4 transition-colors duration-200 ease-out`}
+      style={{
+        borderColor: hovered ? hoverEdge : "var(--border)",
+        borderLeftWidth: 2,
+        borderLeftColor: hovered ? hoverEdge : edge,
+        backgroundColor: phase === "ended" ? "transparent" : "var(--surface)",
+        opacity: phase === "ended" ? 0.7 : 1,
+      }}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <p
+            className="text-sm font-semibold"
+            style={{ fontFamily: "var(--font-heading)", color: "var(--text)", letterSpacing: "-0.01em" }}
+          >
+            {row.supplementName}
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span
+              className={BADGE}
+              style={{
+                backgroundColor: `color-mix(in srgb, ${PHASE_TONE[phase]} 12%, transparent)`,
+                color: PHASE_TONE[phase],
+              }}
+            >
+              {PHASE_LABEL[phase]}
+            </span>
+            {row.supplementLibraryId === null && (
+              <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--warning) 10%, transparent)", color: "var(--warning)" }}>
+                Not in library
+              </span>
+            )}
+            {conflictLabels.length > 0 && (
+              <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}>
+                Conflicts with declared {conflictLabels.join(", ")}
+              </span>
+            )}
+          </div>
         </div>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className={`${PANEL} shrink-0 px-3 py-1 text-xs font-medium transition-colors duration-150 ease-out hover:border-white/25`}
+            style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+          >
+            Edit
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-0.5">
+        <p
+          className="text-base font-semibold"
+          style={{ fontFamily: "var(--font-heading)", color: "var(--text)", letterSpacing: "-0.01em" }}
+        >
+          {row.dose}
+        </p>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {row.timing}
+        </p>
+      </div>
+
+      {phase === "scheduled" && (
+        <ScheduleBar
+          startDate={row.startDate}
+          endDate={row.endDate}
+          today={today}
+          tone={categoryTone ?? "var(--brand-blue)"}
+        />
+      )}
+
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 border-t pt-2.5"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <p
+          className="text-[11px]"
+          style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}
+        >
+          {protocolWindowLabel(asCoverage(row), today)}
+        </p>
+        {/* Only meaningful on rows the catalogue has instances of, and only
+            while the row is live — an ended prescription's product is
+            history, not something to switch. */}
+        {canEdit && altCount > 0 && phase !== "ended" && (
+          <button
+            type="button"
+            onClick={onOpenAlternatives}
+            className="text-xs font-medium underline-offset-2 hover:underline"
+            style={{ color: "var(--brand-blue)" }}
+          >
+            Alternatives ({altCount})
+          </button>
+        )}
+      </div>
+
+      {row.rationale && (
+        whyOpen ? (
+          <p
+            className={`${PANEL} m-0 cursor-pointer px-3 py-2.5 text-xs leading-relaxed`}
+            style={{ borderColor: "var(--border)", backgroundColor: "color-mix(in srgb, var(--text) 3%, transparent)", color: "var(--text-muted)" }}
+            onClick={() => setWhyOverride(false)}
+          >
+            {row.rationale}
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setWhyOverride(true)}
+            className="self-start text-left text-xs transition-colors duration-150 ease-out"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Why this — {whyPeek}
+          </button>
+        )
+      )}
+    </div>
+  );
+}
+
+/**
+ * One protocol as a compact list row — the Taking Now / Scheduled sections'
+ * replacement for the old two-column card grid, following the week agenda's
+ * row pattern above (same dot, column rhythm and hairline dividers) so the
+ * two lists read as one visual language. Everything the card carried is
+ * condensed in, not dropped: name, safety/library badges, dose, timing, the
+ * window, Alternatives and Edit, and the "Why this" rationale as a second
+ * line. The WHEN cell is what separates the phases inside the shared shape:
+ * an active row carries the brand-gradient "Now" pill; a scheduled row shows
+ * its plain lead-in ("starts in N days") instead.
+ */
+function ProtocolListRow({
+  row,
+  phase,
+  today,
+  canEdit,
+  altCount,
+  onOpenAlternatives,
+  onEdit,
+  categoryGroup,
+  defaultWhyOpen,
+  conflictLabels,
+  last,
+}: {
+  row: ProtocolRow;
+  phase: ProtocolPhase;
+  today: string;
+  canEdit: boolean;
+  altCount: number;
+  onOpenAlternatives: () => void;
+  onEdit: () => void;
+  categoryGroup: string | null;
+  defaultWhyOpen: boolean;
+  conflictLabels: string[];
+  last: boolean;
+}) {
+  const [whyOverride, setWhyOverride] = useState<boolean | null>(null);
+  const whyOpen = whyOverride ?? defaultWhyOpen;
+  const { edge } = accentFor(row, categoryGroup, conflictLabels);
+  const whyPeek = whyPeekOf(row.rationale);
+  const lead = Math.max(1, Math.round((Date.parse(row.startDate) - Date.parse(today)) / 86400000));
+
+  return (
+    <div
+      id={`protocol-${row.id}`}
+      className="flex flex-col gap-1.5 px-3.5 py-2.5"
+      style={{
+        borderBottom: last ? undefined : "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
+      }}
+    >
+      <div
+        className="grid w-full items-center gap-x-3"
+        style={{
+          // The agenda's fixed-template discipline: doses and timings start at
+          // the same x down the whole list, whatever their digit count.
+          gridTemplateColumns: "12px minmax(0, 1.5fr) minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 1.05fr) auto",
+        }}
+      >
+        <span className="h-[5px] w-[5px] rounded-full" style={{ backgroundColor: edge }} />
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="truncate text-[13px] font-semibold" style={{ color: "var(--text)" }}>
+            {row.supplementName}
+          </span>
+          {row.supplementLibraryId === null && (
+            <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--warning) 10%, transparent)", color: "var(--warning)" }}>
+              Not in library
+            </span>
+          )}
+          {conflictLabels.length > 0 && (
+            <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}>
+              Conflicts with declared {conflictLabels.join(", ")}
+            </span>
+          )}
+        </span>
+        <span className="text-xs" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+          {row.dose}
+        </span>
+        <span
+          className="text-[9.5px]"
+          style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}
+        >
+          {row.timing}
+        </span>
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          {phase === "active" ? (
+            // The highlighted treatment active rows alone get: the brand
+            // action gradient (the primary-button surface), never a flat tint.
+            <span className={`${BADGE} font-semibold`} style={{ backgroundImage: "var(--brand-gradient-action)", color: "#FFFFFF" }}>
+              Now
+            </span>
+          ) : (
+            <span className="text-[10px]" style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.06em", color: "var(--text)" }}>
+              starts in {lead} day{lead === 1 ? "" : "s"}
+            </span>
+          )}
+          <span
+            className="text-[10px]"
+            style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}
+          >
+            {protocolWindowLabel(asCoverage(row), today)}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2.5">
+          {canEdit && altCount > 0 && (
+            <button
+              type="button"
+              onClick={onOpenAlternatives}
+              className="text-xs font-medium underline-offset-2 hover:underline"
+              style={{ color: "var(--brand-blue)" }}
+            >
+              Alternatives ({altCount})
+            </button>
+          )}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className={`${PANEL} px-3 py-1 text-xs font-medium transition-colors duration-150 ease-out hover:border-white/25`}
+              style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+            >
+              Edit
+            </button>
+          )}
+        </span>
+      </div>
+      {/* The rationale, condensed to the row's second line — same peek/expand
+          behaviour the cards had, indented past the dot column. */}
+      {row.rationale && (
+        whyOpen ? (
+          <p
+            className="m-0 cursor-pointer pl-[25px] text-xs leading-relaxed"
+            style={{ color: "var(--text-muted)" }}
+            onClick={() => setWhyOverride(false)}
+          >
+            {row.rationale}
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setWhyOverride(true)}
+            className="self-start pl-[25px] text-left text-xs transition-colors duration-150 ease-out"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Why this — {whyPeek}
+          </button>
+        )
       )}
     </div>
   );
@@ -1470,22 +1626,12 @@ export default function SupplementsClient({
     }, 60);
   };
 
-  /** An agenda line's Edit: the row's range card is the single home of the
-   *  edit form, so signal it open, make sure no phase filter hides it, and
-   *  bring it into view. Alternatives deliberately do NOT come through here —
-   *  they open the DataModal below, in place, with no scrolling. */
-  const [agendaTarget, setAgendaTarget] = useState<{
-    rowId: string;
-    nonce: number;
-  } | null>(null);
-  const agendaNonceRef = useRef(0);
-  const openFromAgenda = (rowId: string) => {
-    setPhaseFilter("all");
-    setAgendaTarget({ rowId, nonce: ++agendaNonceRef.current });
-    setTimeout(() => {
-      document.getElementById(`protocol-${rowId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 80);
-  };
+  /** The row whose editor is open in the page-level DataModal — the single
+   *  home of the edit form since it left the cards. Reached from a row's or
+   *  card's Edit button and from the agenda detail's "Edit protocol"; the row
+   *  is re-derived from props each render, so a successful save (which
+   *  revalidates the page) is reflected while the modal stays open. */
+  const [editTarget, setEditTarget] = useState<{ rowId: string; athleteId: string } | null>(null);
 
   /** The row whose certified alternatives are open in the DataModal — the
    *  app's standard window, same pattern as the agenda detail below. Opened
@@ -1717,24 +1863,47 @@ export default function SupplementsClient({
         const card = ({ p, phase }: { p: ProtocolRow; phase: ProtocolPhase }) => (
           <ProtocolCard
             key={p.id}
-            teamId={teamId}
             row={p}
             phase={phase}
             today={today}
             canEdit={canEdit}
             altCount={alternativesFor(p).length}
             onOpenAlternatives={() => setAltTarget({ rowId: p.id, athleteId: a.athleteId })}
+            onEdit={() => setEditTarget({ rowId: p.id, athleteId: a.athleteId })}
             categoryGroup={
               p.supplementLibraryId ? groupByLibraryId.get(p.supplementLibraryId) ?? null : null
             }
             defaultWhyOpen={allWhy}
             conflictLabels={conflictsByRow.get(p.id) ?? []}
-            agendaOpenNonce={agendaTarget?.rowId === p.id ? agendaTarget.nonce : undefined}
           />
         );
         const grid = (items: { p: ProtocolRow; phase: ProtocolPhase }[]) => (
           <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))" }}>
             {items.map(card)}
+          </div>
+        );
+        // The live sections' shape since 2026-08-16: the agenda's row pattern,
+        // not a card grid — one panel, one hairline per row.
+        const rows = (items: { p: ProtocolRow; phase: ProtocolPhase }[]) => (
+          <div className={`${PANEL} overflow-hidden`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+            {items.map(({ p, phase }, i) => (
+              <ProtocolListRow
+                key={p.id}
+                row={p}
+                phase={phase}
+                today={today}
+                canEdit={canEdit}
+                altCount={alternativesFor(p).length}
+                onOpenAlternatives={() => setAltTarget({ rowId: p.id, athleteId: a.athleteId })}
+                onEdit={() => setEditTarget({ rowId: p.id, athleteId: a.athleteId })}
+                categoryGroup={
+                  p.supplementLibraryId ? groupByLibraryId.get(p.supplementLibraryId) ?? null : null
+                }
+                defaultWhyOpen={allWhy}
+                conflictLabels={conflictsByRow.get(p.id) ?? []}
+                last={i === items.length - 1}
+              />
+            ))}
           </div>
         );
 
@@ -1796,14 +1965,14 @@ export default function SupplementsClient({
             {showActive && (
               <div className="flex flex-col gap-2.5">
                 <SectionHead tone="var(--success)" label="TAKING NOW" />
-                {grid(active)}
+                {rows(active)}
               </div>
             )}
 
             {showScheduled && (
               <div className="flex flex-col gap-2.5">
                 <SectionHead tone="var(--text-muted)" outlined label="SCHEDULED" />
-                {grid(scheduled)}
+                {rows(scheduled)}
               </div>
             )}
 
@@ -1836,9 +2005,8 @@ export default function SupplementsClient({
 
       {/* An agenda occurrence, opened in the app's standard detail modal
           (DataModal — the athlete profile's data-row pattern). Read-only
-          detail for any viewer; Edit hands off to the row's range card (the
-          single home of the edit form) and Alternatives opens the modal
-          below. */}
+          detail for any viewer; Edit opens the edit modal below (the single
+          home of the edit form) and Alternatives opens its own modal. */}
       {agendaDetail &&
         (() => {
           const { item, date, athleteId } = agendaDetail;
@@ -1924,7 +2092,7 @@ export default function SupplementsClient({
                       type="button"
                       onClick={() => {
                         setAgendaDetail(null);
-                        openFromAgenda(row.id);
+                        setEditTarget({ rowId: row.id, athleteId });
                       }}
                       className={BTN_PRIMARY}
                       style={{ backgroundImage: "var(--brand-gradient-action)" }}
@@ -1973,6 +2141,32 @@ export default function SupplementsClient({
                 alternatives={alternativesFor(row)}
                 clinical={athlete.clinical}
                 allergenLabels={allergenLabels}
+              />
+            </DataModal>
+          );
+        })()}
+
+      {/* The protocol editor, in the same standard modal — the SAME update /
+          end-today / cancel forms the cards used to expand inline, unchanged
+          (see ProtocolEditForm). Keyed by row id so switching rows remounts
+          the form initialised from that row's values. */}
+      {editTarget &&
+        canEdit &&
+        (() => {
+          const athlete = data.find((x) => x.athleteId === editTarget.athleteId) ?? null;
+          const row = athlete?.protocols.find((p) => p.id === editTarget.rowId) ?? null;
+          if (!athlete || !row) return null;
+          return (
+            <DataModal
+              title={`Edit — ${row.supplementName}`}
+              subtitle={`${athlete.name} · ${protocolWindowLabel(asCoverage(row), today)}`}
+              onClose={() => setEditTarget(null)}
+            >
+              <ProtocolEditForm
+                key={row.id}
+                teamId={teamId}
+                row={row}
+                phase={protocolPhase(asCoverage(row), today)}
               />
             </DataModal>
           );
