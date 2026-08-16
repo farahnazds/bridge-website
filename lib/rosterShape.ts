@@ -48,8 +48,7 @@ export interface RosterRow {
   /** Any injury still open (injuries.status != 'cleared'), no time limit. */
   hasActiveInjury: boolean;
   /** A check-in within the last RECENT_DAYS recording a supplement as
-   *  "missed" — the one stored state that means it was not taken ("not sure"
-   *  is a distinct state and deliberately does not count). */
+   *  "missed" or "unsure" — anything short of a confirmed "taken". */
   hasMissedSupplement: boolean;
 }
 

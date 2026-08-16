@@ -194,8 +194,12 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
     // injury and the athlete stays on the filter until Injury Log clears it.
     const recent = mine.filter((c) => recentWindow.has(c.date));
     const hasRecentNote = recent.some((c) => (c.notes ?? "").trim() !== "");
+    // "missed" OR "unsure": an athlete who doesn't remember taking a dose is
+    // as much a follow-up case as one who skipped it. Only "taken" is clear.
     const hasMissedSupplement = recent.some((c) =>
-      Object.values(parseSupplements(c.supplements_taken)).includes("missed")
+      Object.values(parseSupplements(c.supplements_taken)).some(
+        (s) => s === "missed" || s === "unsure"
+      )
     );
 
     return {
