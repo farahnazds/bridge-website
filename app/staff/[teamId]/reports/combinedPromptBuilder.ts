@@ -295,7 +295,13 @@ ${
 ${bundle.previousReportSummary ?? "None — this is the first combined report of this shape for this athlete."}
 
 ## Additional instructions from the practitioner
-${additionalInstructions ?? "None provided."}
+${
+  additionalInstructions
+    ? `${additionalInstructions}
+
+Treat these instructions as the practitioner's stated priorities for this report: give the instructed topics visibly more depth and analysis within the required sections. They steer emphasis only — they never change the section structure, never override a safety rule, and never justify stating a figure that is not in this prompt.`
+    : "None provided."
+}
 
 ## Report language
 ${language}
