@@ -93,14 +93,21 @@ export function prescriberBlocks(identity: ReportIdentity): Block[] {
  */
 export function narrativeTail(
   narrative: Narrative,
-  interpretationTitle = "Interpretation"
+  interpretationTitle = "Interpretation",
+  opts?: {
+    /** Nutrition drops its Recommendations section per the 2026-08-16 design
+     *  feedback — the plan's actions live in the plan itself. The other four
+     *  types keep theirs, so this is opt-out, not a default change. */
+    includeRecommendations?: boolean;
+  }
 ): Block[] {
+  const includeRecommendations = opts?.includeRecommendations ?? true;
   const out: Block[] = [];
   if (narrative.interps.length > 0) {
     out.push(sectionTitle(interpretationTitle));
     for (const n of narrative.interps) out.push(interp(n.title, n.body, n.tone));
   }
-  if (narrative.recommendations.length > 0) {
+  if (includeRecommendations && narrative.recommendations.length > 0) {
     out.push(sectionTitle("Recommendations"));
     narrative.recommendations.forEach((r, i) => out.push(recItem(i + 1, r)));
   }

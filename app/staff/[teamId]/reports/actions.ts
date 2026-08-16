@@ -294,6 +294,7 @@ export async function generateComplianceReport(
   const pdf = await generateAndStoreReportPdf({
     reportId: insertedReport.id,
     athleteId,
+    teamId,
     markdown: reportText,
     reportTypeLabel: REPORT_TYPE_LABELS["compliance"] ?? "Report",
     reportType: "compliance",
@@ -542,6 +543,7 @@ export async function generateBodyCompositionReport(
   const pdf = await generateAndStoreReportPdf({
     reportId: insertedReport.id,
     athleteId,
+    teamId,
     markdown: reportText,
     reportTypeLabel: REPORT_TYPE_LABELS["body_composition"] ?? "Report",
     reportType: "body_composition",
@@ -1057,6 +1059,7 @@ export async function generatePerformanceReport(
   const pdf = await generateAndStoreReportPdf({
     reportId: inserted.id,
     athleteId,
+    teamId,
     markdown: reportText,
     reportTypeLabel: REPORT_TYPE_LABELS["performance"] ?? "Report",
     reportType: "performance",
@@ -1250,6 +1253,7 @@ export async function generateInjuryReport(
   const pdf = await generateAndStoreReportPdf({
     reportId: inserted.id,
     athleteId,
+    teamId,
     markdown: reportText,
     reportTypeLabel: REPORT_TYPE_LABELS["injury"] ?? "Report",
     reportType: "injury",
@@ -1386,6 +1390,7 @@ export async function generateCombinedReport(
   const pdf = await generateAndStoreReportPdf({
     reportId: insertedReport.id,
     athleteId,
+    teamId,
     markdown: reportText,
     reportTypeLabel: types.map((t) => REPORT_TYPE_LABELS[t] ?? t).join(" + "),
     athleteName: `${bundle.athlete.first_name} ${bundle.athlete.last_name}`,

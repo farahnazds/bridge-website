@@ -60,6 +60,9 @@ export interface ReportIdentity {
    */
   audience: ReportAudience;
   audienceLabel: string;
+  /** Header metadata, e.g. "Day-Specific Plan" for a nutrition report's plan
+   *  mode. Null for report types with no mode concept. */
+  modeLabel: string | null;
   periodStart: string | null;
   periodEnd: string | null;
   /** Validated hex from club_branding.report_color_hex, or the brand default. */

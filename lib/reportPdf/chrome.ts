@@ -12,6 +12,7 @@ import {
   px,
 } from "./theme";
 import { drawLine, drawRule, drawText, lineHeight, measureText, type TextStyle } from "./primitives";
+import { BRIDGETX_LOGO_PNG_BASE64 } from "./brandLogo";
 
 // Fixed page chrome: the gradient header band and the footer rule.
 //
@@ -34,13 +35,21 @@ export interface ReportChrome {
   clubName: string;
   /** PNG or JPEG bytes, already downscaled by the caller. */
   clubLogo: Uint8Array | null;
+  /** Shown under the club name in the brand row; null renders nothing. */
+  teamName: string | null;
+  /** Small-caps caption under club/team, e.g. "Performance Nutrition". */
+  brandTagline: string | null;
   athleteName: string;
   /** e.g. "COMPLIANCE", shown top-right. */
   reportLabel: string;
   /** e.g. "ATHLETE REPORT", the small caps line under it. */
   audienceLabel: string;
-  /** e.g. "1 Aug 2026 – 14 Aug 2026", or null when the type has no period. */
-  period: string | null;
+  /** Athlete vitals under the name — "Height 178 cm · Body mass 72 kg ·
+   *  Basketball · Guard · Age 22". Null renders nothing. */
+  bioLine: string | null;
+  /** Consolidated report metadata — "17 Aug – 19 Aug 2026 (3 days) ·
+   *  Day-Specific Plan · Prepared for Athlete". Null renders nothing. */
+  metaLine: string | null;
   /** The confidentiality line along the foot. */
   footerNote: string;
 }
@@ -50,16 +59,21 @@ const HEADER_DIM = "#B9C4E4";
 
 /** Height of the header band. Measured once per document, not per page. */
 function headerHeight(doc: PDFKit.PDFDocument, chrome: ReportChrome, width: number): number {
-  const brandRow = Math.max(px(32), lineHeight(doc, { size: SIZE.headerMeta }));
+  // Tall enough for the three-line club stack on the right and the logo box.
+  const brandRow = Math.max(px(34), lineHeight(doc, { size: SIZE.headerMeta }));
   const h1 = measureText(doc, chrome.athleteName, width * 0.6, {
     size: SIZE.h1,
     font: FONT.bold,
   });
-  const meta = chrome.period
-    ? px(3) + measureText(doc, chrome.period, width * 0.6, { size: SIZE.headerMeta })
+  const metaStyle: TextStyle = { size: SIZE.headerMeta };
+  const bio = chrome.bioLine
+    ? px(3) + measureText(doc, chrome.bioLine, width * 0.6, metaStyle)
+    : 0;
+  const meta = chrome.metaLine
+    ? px(3) + measureText(doc, chrome.metaLine, width * 0.6, metaStyle)
     : 0;
   const subhead = px(9) + px(8) + lineHeight(doc, { size: SIZE.subhead });
-  return HEADER_PAD.top + brandRow + px(11) + px(12) + h1 + meta + subhead + HEADER_PAD.bottom;
+  return HEADER_PAD.top + brandRow + px(11) + px(12) + h1 + bio + meta + subhead + HEADER_PAD.bottom;
 }
 
 function footerHeight(doc: PDFKit.PDFDocument): number {
@@ -112,6 +126,25 @@ export function createPageMachine(
     return logoHandle;
   };
 
+  // The Bridgetx mark, same open-once discipline. Rasterised from the brand
+  // SVG at print resolution (see ./brandLogo.ts) — the previous header set
+  // "BRIDGETX" in Helvetica, which is kept only as the fallback for the
+  // never-expected case of pdfkit failing to decode our own asset.
+  let brandHandle: unknown | null = null;
+  let brandOpened = false;
+  const openBrandLogo = (): unknown | null => {
+    if (brandOpened) return brandHandle;
+    brandOpened = true;
+    try {
+      brandHandle = (doc as unknown as { openImage(src: Buffer): unknown }).openImage(
+        Buffer.from(BRIDGETX_LOGO_PNG_BASE64, "base64")
+      );
+    } catch {
+      brandHandle = null;
+    }
+    return brandHandle;
+  };
+
   const drawHeader = (): number => {
     const w = PAGE.width;
 
@@ -126,13 +159,31 @@ export function createPageMachine(
 
     // ---- brandbar ----
     const brandTop = HEADER_PAD.top;
-    drawLine(doc, "BRIDGETX", left, brandTop + px(6), px(120), {
-      size: px(12),
-      font: FONT.bold,
-      color: HEADER_TEXT,
-      tracking: px(1),
-    });
-
+    // The real horizontal mark, drawn at a fixed height so the crispness comes
+    // from the asset's resolution, never from pdfkit upscaling.
+    const BRAND_H = px(24);
+    const brand = openBrandLogo();
+    if (brand) {
+      try {
+        doc.image(brand as Parameters<typeof doc.image>[0], left, brandTop + px(2), {
+          height: BRAND_H,
+        });
+      } catch {
+        drawLine(doc, "BRIDGETX", left, brandTop + px(6), px(120), {
+          size: px(12),
+          font: FONT.bold,
+          color: HEADER_TEXT,
+          tracking: px(1),
+        });
+      }
+    } else {
+      drawLine(doc, "BRIDGETX", left, brandTop + px(6), px(120), {
+        size: px(12),
+        font: FONT.bold,
+        color: HEADER_TEXT,
+        tracking: px(1),
+      });
+    }
     const LOGO = px(32);
     const logoX = right - LOGO;
     doc.roundedRect(logoX, brandTop, LOGO, LOGO, px(6)).fillOpacity(0.14).fill(HEADER_TEXT);
@@ -147,18 +198,34 @@ export function createPageMachine(
         // Unreadable logo falls back to the wordmark below — never a failed report.
       }
     }
-    const nameW = px(150);
-    drawLine(doc, chrome.clubName, logoX - px(9) - nameW, brandTop + px(4), nameW, {
+    // Club identity stack, right-aligned beside the logo box: club name, team,
+    // then the small-caps tagline — the design's "Performance Nutrition" line.
+    const nameW = px(170);
+    const stackX = logoX - px(9) - nameW;
+    let stackY = brandTop + px(1);
+    drawLine(doc, chrome.clubName, stackX, stackY, nameW, {
       size: px(11),
       font: FONT.bold,
       color: HEADER_TEXT,
       align: "right",
     });
-    drawLine(doc, "Club", logoX - px(9) - nameW, brandTop + px(18), nameW, {
-      size: SIZE.subhead,
-      color: HEADER_DIM,
-      align: "right",
-    });
+    stackY += px(13);
+    if (chrome.teamName) {
+      drawLine(doc, chrome.teamName, stackX, stackY, nameW, {
+        size: SIZE.subhead,
+        color: HEADER_DIM,
+        align: "right",
+      });
+      stackY += px(11);
+    }
+    if (chrome.brandTagline) {
+      drawLine(doc, chrome.brandTagline.toUpperCase(), stackX, stackY, nameW, {
+        size: px(6.5),
+        color: HEADER_DIM,
+        align: "right",
+        tracking: px(1),
+      });
+    }
 
     const barY = brandTop + Math.max(LOGO, px(24)) + px(11);
     doc.rect(left, barY, inner, 0.5).fillOpacity(0.16).fill(HEADER_TEXT);
@@ -172,9 +239,19 @@ export function createPageMachine(
       font: FONT.bold,
       color: HEADER_TEXT,
     });
-    if (chrome.period) {
+    // Vitals first, then the consolidated metadata line — Height/Mass/Sport/
+    // Position/Age, then Period · plan mode · prepared-for. Both are data the
+    // server held; content still cannot move anything.
+    if (chrome.bioLine) {
       y += px(3);
-      y += drawText(doc, chrome.period, left, y, titleW, {
+      y += drawText(doc, chrome.bioLine, left, y, titleW, {
+        size: SIZE.headerMeta,
+        color: HEADER_TEXT,
+      });
+    }
+    if (chrome.metaLine) {
+      y += px(3);
+      y += drawText(doc, chrome.metaLine, left, y, titleW, {
         size: SIZE.headerMeta,
         color: HEADER_DIM,
       });

@@ -361,36 +361,35 @@ export function rxStrip(opts: { name: string; detail: string; right?: string; co
     font: FONT.mono,
     color: COLOR.ink,
     tracking: px(0.3),
-    align: "right",
   };
   const SYM_W = px(20);
+
+  // Per the approved design's ordering: name, then credentials below it, then
+  // the board registration below that — one left-hand stack. Only the
+  // issued/review dates stay on the right.
+  const leftHeight = (ctx: RenderCtx, leftW: number): number => {
+    let h =
+      measureText(ctx.doc, opts.name, leftW, nameStyle) +
+      px(1) +
+      measureText(ctx.doc, opts.detail, leftW, detailStyle);
+    if (opts.code) h += px(2) + measureText(ctx.doc, opts.code, leftW, codeStyle);
+    return h;
+  };
 
   return {
     kind: "rx",
     gapAfter: GAP.rx,
     measure: (ctx) => {
       const leftW = ctx.width * 0.6 - PAD.rx.x - SYM_W;
-      const left =
-        measureText(ctx.doc, opts.name, leftW, nameStyle) +
-        px(1) +
-        measureText(ctx.doc, opts.detail, leftW, detailStyle);
       const rightW = ctx.width * 0.4 - PAD.rx.x;
-      let right = 0;
-      if (opts.code) right += measureText(ctx.doc, opts.code, rightW, codeStyle);
-      if (opts.right) right += measureText(ctx.doc, opts.right, rightW, rightStyle);
-      return Math.max(left, right) + PAD.rx.y * 2;
+      const right = opts.right ? measureText(ctx.doc, opts.right, rightW, rightStyle) : 0;
+      return Math.max(leftHeight(ctx, leftW), right) + PAD.rx.y * 2;
     },
     draw: (ctx, y) => {
       const leftW = ctx.width * 0.6 - PAD.rx.x - SYM_W;
       const rightW = ctx.width * 0.4 - PAD.rx.x;
-      const left =
-        measureText(ctx.doc, opts.name, leftW, nameStyle) +
-        px(1) +
-        measureText(ctx.doc, opts.detail, leftW, detailStyle);
-      let right = 0;
-      if (opts.code) right += measureText(ctx.doc, opts.code, rightW, codeStyle);
-      if (opts.right) right += measureText(ctx.doc, opts.right, rightW, rightStyle);
-      const h = Math.max(left, right) + PAD.rx.y * 2;
+      const right = opts.right ? measureText(ctx.doc, opts.right, rightW, rightStyle) : 0;
+      const h = Math.max(leftHeight(ctx, leftW), right) + PAD.rx.y * 2;
 
       drawBox(ctx.doc, ctx.x, y, ctx.width, h, {
         gradient: [COLOR.surface0, COLOR.white],
@@ -407,12 +406,16 @@ export function rxStrip(opts: { name: string; detail: string; right?: string; co
       });
       let iy = y + PAD.rx.y;
       iy += drawText(ctx.doc, opts.name, ix + SYM_W, iy, leftW, nameStyle) + px(1);
-      drawText(ctx.doc, opts.detail, ix + SYM_W, iy, leftW, detailStyle);
+      iy += drawText(ctx.doc, opts.detail, ix + SYM_W, iy, leftW, detailStyle);
+      if (opts.code) {
+        iy += px(2);
+        drawText(ctx.doc, opts.code, ix + SYM_W, iy, leftW, codeStyle);
+      }
 
-      const rx = ctx.x + ctx.width - PAD.rx.x - rightW;
-      let ry = y + PAD.rx.y;
-      if (opts.code) ry += drawText(ctx.doc, opts.code, rx, ry, rightW, codeStyle);
-      if (opts.right) drawText(ctx.doc, opts.right, rx, ry, rightW, rightStyle);
+      if (opts.right) {
+        const rx = ctx.x + ctx.width - PAD.rx.x - rightW;
+        drawText(ctx.doc, opts.right, rx, y + PAD.rx.y, rightW, rightStyle);
+      }
     },
   };
 }
@@ -542,6 +545,12 @@ export interface DayCell {
   caption?: string;
 }
 
+/** Days per row. Two rows of four beats seven crushed cells across A4: the
+ *  wider cells stay legible and leave room for the per-day energy and macro
+ *  figures the periodisation grid is growing next — the owner's explicit
+ *  ruling (2026-08-16): legibility over compactness. */
+const STRIP_PER_ROW = 4;
+
 export function weekStrip(days: DayCell[]): Block {
   const nameStyle: TextStyle = {
     size: SIZE.dayName,
@@ -555,30 +564,39 @@ export function weekStrip(days: DayCell[]): Block {
   const valueStyle: TextStyle = { size: SIZE.dayValue, font: FONT.bold, color: COLOR.ink, align: "center" };
   const capStyle: TextStyle = { size: SIZE.dayCaption, color: COLOR.muted2, align: "center" };
 
-  const heightOf = (ctx: RenderCtx): number => {
+  const rowCount = Math.max(1, Math.ceil(days.length / STRIP_PER_ROW));
+
+  const cellHeight = (ctx: RenderCtx): number => {
     const lh = (s: TextStyle) => lineHeight(ctx.doc, s);
     return (
       PAD.day.y * 2 + lh(nameStyle) + px(4) + lh(tagStyle) + px(4) + px(5) + lh(valueStyle) +
       (days.some((d) => d.caption) ? px(1) + lh(capStyle) : 0)
     );
   };
+  const heightOf = (ctx: RenderCtx): number =>
+    rowCount * cellHeight(ctx) + (rowCount - 1) * GAP.dayGap;
 
   return {
     kind: "weekstrip",
     gapAfter: GAP.weekstrip,
     measure: (ctx) => heightOf(ctx),
     draw: (ctx, y) => {
-      const h = heightOf(ctx);
-      const ws = columns(ctx.width, days.length, GAP.dayGap);
+      const cellH = cellHeight(ctx);
+      // Every row uses the same column grid, so a 3-cell last row aligns with
+      // the 4-cell row above it instead of stretching to fill.
+      const ws = columns(ctx.width, Math.min(STRIP_PER_ROW, days.length), GAP.dayGap);
       days.forEach((d, i) => {
-        const x = columnX(ctx.x, ws, GAP.dayGap, i);
-        const w = ws[i];
-        drawBox(ctx.doc, x, y, w, h, {
+        const row = Math.floor(i / STRIP_PER_ROW);
+        const col = i % STRIP_PER_ROW;
+        const x = columnX(ctx.x, ws, GAP.dayGap, col);
+        const w = ws[col];
+        const cy = y + row * (cellH + GAP.dayGap);
+        drawBox(ctx.doc, x, cy, w, cellH, {
           gradient: [COLOR.white, COLOR.surface1],
           border: COLOR.border,
           radius: RADIUS.md,
         });
-        let iy = y + PAD.day.y;
+        let iy = cy + PAD.day.y;
         iy += drawText(ctx.doc, d.name, x, iy, w, nameStyle) + px(4);
         const [bg, fg] = DAY_TAG[d.tag] ?? DAY_TAG.rest;
         const tagH = lineHeight(ctx.doc, tagStyle) + px(4);

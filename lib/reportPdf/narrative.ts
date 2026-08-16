@@ -185,7 +185,22 @@ function looksLikeProse(s: string): boolean {
 
 interface Section {
   title: string;
+  level: number;
   blocks: MdBlock[];
+}
+
+/**
+ * A document-title section, not a content section.
+ *
+ * Models open their markdown with `# Nutrition Report — <Athlete>` followed by
+ * a subtitle line ("Report type: … | Period: …"). Treated as a section, that
+ * used to surface as an interpretation panel restating what the page header
+ * already says — the duplicate title box in the 2026-08-16 layout feedback.
+ * The match is deliberately narrow: level 1, contains "report", and maps to no
+ * known slot — so a model that wrote a real section as an H1 keeps it.
+ */
+function isTitleSection(s: Section): boolean {
+  return s.level === 1 && /\breport\b/i.test(s.title) && slotFor(s.title) === "interp";
 }
 
 /** Splits parsed markdown into heading-led sections, ignoring any preamble. */
@@ -196,10 +211,7 @@ function sectionise(blocks: MdBlock[]): { preamble: MdBlock[]; sections: Section
 
   for (const b of blocks) {
     if (b.kind === "heading") {
-      // A level-1 heading is the document title in most generated reports, not
-      // a section — but treating it as one costs nothing, because its content
-      // is empty and empty sections are dropped below.
-      current = { title: inlineText(b.inlines).trim(), blocks: [] };
+      current = { title: inlineText(b.inlines).trim(), level: b.level, blocks: [] };
       sections.push(current);
     } else if (current) {
       current.blocks.push(b);
@@ -230,6 +242,7 @@ export function parseNarrative(markdown: string | null | undefined): Narrative {
     const recommendations: string[] = [];
 
     for (const section of sections) {
+      if (isTitleSection(section)) continue;
       const slot = slotFor(section.title);
       if (slot === "recommendations") {
         recommendations.push(...itemsOf(section.blocks));

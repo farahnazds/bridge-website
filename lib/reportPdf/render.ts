@@ -140,15 +140,38 @@ export async function renderReportDocument(input: RenderReportInput): Promise<Ui
     doc.on("error", reject);
   });
 
+  // The vitals line under the athlete's name. Height and body mass are
+  // measured values and appear only when the type's assembled data carries
+  // them (nutrition today); everything else comes from the athlete row.
+  // Unknown parts are skipped, never dashed — the header states facts only.
+  const n = input.measured.nutrition;
+  const bioParts: string[] = [];
+  if (n?.heightCm != null) bioParts.push(`Height ${Math.round(n.heightCm)} cm`);
+  if (n?.bodyMassKg != null) bioParts.push(`Body mass ${Math.round(n.bodyMassKg)} kg`);
+  if (identity.sport) bioParts.push(identity.sport);
+  if (identity.position) bioParts.push(identity.position);
+  if (identity.ageYears !== null) bioParts.push(`Age ${identity.ageYears}`);
+
+  // Period · plan mode · prepared-for, consolidated into one line per the
+  // approved design rather than scattered across the band.
+  const metaParts: string[] = [];
+  const period = periodLabel(identity.periodStart, identity.periodEnd);
+  if (period) metaParts.push(period);
+  if (identity.modeLabel) metaParts.push(identity.modeLabel);
+  metaParts.push(`Prepared for ${identity.audience === "athlete" ? "Athlete" : "Practitioner"}`);
+
   const pages = createPageMachine(
     doc,
     {
       clubName: identity.clubName,
       clubLogo: identity.clubLogo,
+      teamName: identity.teamName,
+      brandTagline: input.reportType === "nutrition" ? "Performance Nutrition" : null,
       athleteName: identity.athleteName,
       reportLabel: identity.reportLabel,
       audienceLabel: identity.audienceLabel,
-      period: periodLabel(identity.periodStart, identity.periodEnd),
+      bioLine: bioParts.length > 0 ? bioParts.join(" · ") : null,
+      metaLine: metaParts.join(" · "),
       footerNote: input.footerNote,
     },
     identity.accentHex

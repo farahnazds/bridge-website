@@ -244,6 +244,8 @@ export async function generateAndSaveNutritionReport(
   const pdf = await generateAndStoreReportPdf({
     reportId: inserted.id,
     athleteId: req.athleteId,
+    teamId: req.teamId,
+    modeLabel: req.mode === "day_specific" ? "Day-Specific Plan" : "General Plan",
     markdown: reportText,
     reportTypeLabel: REPORT_TYPE_LABELS["nutrition"] ?? "Report",
     reportType: "nutrition",

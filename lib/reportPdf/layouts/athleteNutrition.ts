@@ -300,11 +300,8 @@ export function athleteNutritionBlocks(
       };
     });
     blocks.push(weekStrip(cells));
-    blocks.push(
-      callout(
-        "Carbohydrate and energy are periodised to the training and match schedule your practitioner has set; protein holds roughly constant. Fluid scales with session sweat loss and is set session by session."
-      )
-    );
+    // No explanatory callout under the grid — the 2026-08-16 feedback: the
+    // grid itself is the explanation, and will carry per-day figures next.
   }
 
   // ---- Meal timing / food examples (PRESCRIBED) ----
@@ -361,7 +358,9 @@ export function athleteNutritionBlocks(
   // ---- Anti-doping (STANDING — never conditional) ----
   blocks.push(precisionBox("Anti-doping", ANTI_DOPING));
 
-  blocks.push(...narrativeTail(narrative, "Performance interpretation"));
+  blocks.push(
+    ...narrativeTail(narrative, "Performance interpretation", { includeRecommendations: false })
+  );
 
   // ---- Summary (MEASURED) ----
   const a = data.latestAssessment;

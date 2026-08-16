@@ -101,6 +101,12 @@ export interface StoreReportPdfInput {
   reportType?: ReportType;
   /** Register only — see lib/reportPdf/render.ts. Defaults to practitioner. */
   audience?: ReportAudience;
+  /** Resolves the team name shown in the header's club stack. Optional so no
+   *  existing call site could break; omitted means no team line. */
+  teamId?: string;
+  /** Header metadata, e.g. "Day-Specific Plan". Nutrition passes it; types
+   *  with no mode concept omit it. */
+  modeLabel?: string;
 }
 
 /**
@@ -235,11 +241,22 @@ export async function generateAndStoreReportPdf(
         input.periodStart,
         input.periodEnd
       );
+      // Header line only — a lookup failure degrades to no team line, never a
+      // failed render.
+      let teamName: string | null = null;
+      if (input.teamId) {
+        const { data: team } = await supabase
+          .from("teams")
+          .select("name")
+          .eq("id", input.teamId)
+          .maybeSingle();
+        teamName = ((team?.name as string | undefined) ?? "").trim() || null;
+      }
       const audience: ReportAudience = input.audience ?? FALLBACK_AUDIENCE;
       const identity: ReportIdentity = {
         clubName,
         clubLogo: rawLogo ? await downscaleHeaderLogo(rawLogo) : null,
-        teamName: null,
+        teamName,
         athleteName: input.athleteName,
         sport: (athlete?.sport as string | null) ?? "",
         position: (athlete?.position as string | null) ?? null,
@@ -249,6 +266,7 @@ export async function generateAndStoreReportPdf(
         reportLabel: input.reportTypeLabel,
         audience,
         audienceLabel: audience === "athlete" ? "Athlete Report" : "Practitioner Report",
+        modeLabel: input.modeLabel ?? null,
         periodStart: input.periodStart,
         periodEnd: input.periodEnd,
         accentHex: safeAccent(brandingRow?.report_color_hex as string | null),
