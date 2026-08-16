@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 // Persistent context switcher for the dark sidebars/headers — the "which club
@@ -45,6 +46,7 @@ export default function ContextSwitcher({
   label,
   emptyLabel = "Select…",
   collapseSingle = true,
+  collapsedHref,
 }: {
   /** Null when the current page isn't scoped to one (e.g. a list page). */
   currentId: string | null;
@@ -62,6 +64,14 @@ export default function ContextSwitcher({
    * pass false.
    */
   collapseSingle?: boolean;
+  /**
+   * Makes the COLLAPSED single-option card a link to this destination instead
+   * of a static div — for callers where the card names a parent context that
+   * is itself a place (the manager's club card above the team switcher, which
+   * navigates to the club view just like the "← club view" link below it).
+   * Only affects the collapsed branch; a real switcher ignores it.
+   */
+  collapsedHref?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -148,35 +158,53 @@ export default function ContextSwitcher({
     // when the switcher lived in the header but reads as an orphaned heading
     // now that it sits at the top of the sidebar where every other dashboard
     // shows a bordered card.
-    return (
-      <div className="px-2">
-        <div
-          className="flex items-center gap-2.5 rounded-[11px] border px-3 py-2.5"
-          style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }}
-        >
-          {current && (
+    //
+    // With collapsedHref the same card becomes a Link — the hover border is
+    // the only visual difference, so a navigable card and a static one stay
+    // one design.
+    const cardBody = (
+      <>
+        {current && (
+          <span
+            aria-hidden="true"
+            className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg text-[10px] font-medium text-white"
+            style={{ fontFamily: "var(--font-mono)", backgroundImage: "var(--brand-gradient-action)" }}
+          >
+            {initialsOf(current.label)}
+          </span>
+        )}
+        <span className="min-w-0">
+          <span className="block truncate text-[13.5px] font-semibold text-white">
+            {current?.label ?? emptyLabel}
+          </span>
+          {current?.sublabel && (
             <span
-              aria-hidden="true"
-              className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-lg text-[10px] font-medium text-white"
-              style={{ fontFamily: "var(--font-mono)", backgroundImage: "var(--brand-gradient-action)" }}
+              className="block truncate uppercase"
+              style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, letterSpacing: ".12em", color: "var(--text-muted)" }}
             >
-              {initialsOf(current.label)}
+              {current.sublabel}
             </span>
           )}
-          <span className="min-w-0">
-            <span className="block truncate text-[13.5px] font-semibold text-white">
-              {current?.label ?? emptyLabel}
-            </span>
-            {current?.sublabel && (
-              <span
-                className="block truncate uppercase"
-                style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, letterSpacing: ".12em", color: "var(--text-muted)" }}
-              >
-                {current.sublabel}
-              </span>
-            )}
-          </span>
-        </div>
+        </span>
+      </>
+    );
+    const cardStyle = { borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" };
+    return (
+      <div className="px-2">
+        {collapsedHref ? (
+          <Link
+            href={collapsedHref}
+            aria-label={label}
+            className="flex items-center gap-2.5 rounded-[11px] border px-3 py-2.5 transition-colors duration-200 hover:border-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+            style={cardStyle}
+          >
+            {cardBody}
+          </Link>
+        ) : (
+          <div className="flex items-center gap-2.5 rounded-[11px] border px-3 py-2.5" style={cardStyle}>
+            {cardBody}
+          </div>
+        )}
       </div>
     );
   }

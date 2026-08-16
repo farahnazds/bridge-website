@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { after } from "next/server";
 import { cookies } from "next/headers";
 import { recordLastUsedContext } from "@/lib/lastUsedContext";
-import { Activity, CalendarRange, CircleCheckBig, ClipboardList, CreditCard, FileText, HeartPulse, LayoutDashboard, MessageSquare, Newspaper, Scale, Settings, ShoppingCart, Trophy, Users, UsersRound, Zap } from "lucide-react";
+import { CalendarRange, CreditCard, LayoutDashboard, Newspaper, Settings, ShoppingCart, Trophy, Users, UsersRound } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import Link from "next/link";
@@ -101,20 +101,20 @@ export default async function ClubLayout({
   const jumpTeams = ((teamRows ?? []) as { id: string; name: string; category: string | null }[]).map(
     (t) => ({ id: t.id, label: t.name, sublabel: t.category ? t.category.replaceAll("_", " ") : null })
   );
+  // Trimmed 2026-08-17 (owner ruling, following the navigation-parity work):
+  // Reports, Messenger and the whole ATHLETE DATA group left this sidebar —
+  // those surfaces correctly live ONE LEVEL DOWN, in the team workspace the
+  // "Jump to team" switcher above opens, where they carry the full
+  // practitioner feature set and the manager's write parity. The club level
+  // keeps what is genuinely club-scoped: roster-wide identity, teams/staff,
+  // planning, and administration. The /club/* pages for the removed items
+  // still exist and stay reachable by URL; they are simply no longer offered
+  // as club-level navigation.
   const navGroups = [
   { label: null, items: [
     { label: "Overview", href: `/club/${clubId}`, icon: LayoutDashboard },
     { label: "Athletes", href: `/club/${clubId}/athletes`, icon: Users },
-    { label: "Reports", href: `/club/${clubId}/reports`, icon: FileText },
-    { label: "Messenger", href: `/club/${clubId}/messenger`, icon: MessageSquare },
-  ] },
-  { label: "ATHLETE DATA", items: [
-    { label: "Assessments", href: `/club/${clubId}/assessments`, icon: ClipboardList },
-    { label: "Compliance", href: `/club/${clubId}/compliance`, icon: CircleCheckBig },
-    { label: "Body Composition", href: `/club/${clubId}/body-composition`, icon: Scale },
-    { label: "GPS/Performance", href: `/club/${clubId}/gps-performance`, icon: Activity },
-    { label: "VALD", href: `/club/${clubId}/vald`, icon: Zap },
-    { label: "Injuries", href: `/club/${clubId}/injuries`, icon: HeartPulse },
+    { label: "Teams & Staff", href: `/club/${clubId}/teams-staff`, icon: UsersRound },
   ] },
   { label: "PLANNING", items: [
     { label: "Season Phases", href: `/club/${clubId}/periodization`, icon: CalendarRange },
@@ -122,7 +122,6 @@ export default async function ClubLayout({
     { label: "Content", href: `/club/${clubId}/content`, icon: Newspaper },
   ] },
   { label: "ADMIN", items: [
-    { label: "Teams & Staff", href: `/club/${clubId}/teams-staff`, icon: UsersRound },
     { label: "Product Requests", href: `/club/${clubId}/product-requests`, icon: ShoppingCart },
     { label: "Settings", href: `/club/${clubId}/settings`, icon: Settings },
     { label: "Billing", href: `/club/${clubId}/billing`, icon: CreditCard },

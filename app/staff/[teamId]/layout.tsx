@@ -160,7 +160,11 @@ export default async function TeamLayout({
               currentId={team.club_id}
               options={[{ id: team.club_id, label: clubName, sublabel: "Club" }]}
               fallbackBase="/club"
-              label="Club"
+              label={`${clubName} — club view`}
+              // The card itself navigates to the club view — the same
+              // destination as the "← club view" link below. Two intuitive
+              // ways up, deliberately redundant (owner ruling 2026-08-17).
+              collapsedHref={`/club/${team.club_id}`}
             />
           )}
           <ContextSwitcher
