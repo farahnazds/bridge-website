@@ -242,7 +242,6 @@ export default function ReviewStep({
       periodStart: plan.periodStart,
       periodEnd: plan.periodEnd,
       language: plan.language,
-      audience: plan.audience,
       additionalInstructions: plan.additionalInstructions,
       items,
     });

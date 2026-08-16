@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { createAnthropicClient, REPORT_MODEL, REPORT_EFFORT, REPORT_MAX_TOKENS } from "@/lib/anthropic";
 import { resolveReportLanguage } from "@/lib/reportLanguage";
-import { resolveReportAudience, type ReportAudience } from "@/lib/reportAudience";
 import {
   MAX_PLAN_DAYS,
   dateRange,
@@ -143,7 +142,6 @@ export interface GeneratedPlan {
   periodEnd: string;
   dates: string[];
   language: string;
-  audience: ReportAudience;
   additionalInstructions: string | null;
   athletes: AthletePlanRow[];
   /** Surfaced in the UI so the cost model is visible rather than asserted:
@@ -219,12 +217,15 @@ async function runGeneratePlan(
   const mode = String(formData.get("mode") ?? "day_specific").trim() as PlanMode;
   const requestedAthleteIds = formData.getAll("athlete_ids").map((v) => String(v).trim()).filter(Boolean);
   const additionalInstructions = String(formData.get("additional_instructions") ?? "").trim() || null;
-  // The old include_performance_signals checkbox is gone from this form: the
-  // plan prompt never read it — it only seeded the report jobs confirm used to
-  // hand back. The toggle lives on the Nutrition report form now, the one
-  // place it does something.
+  // The old include_performance_signals checkbox and the Audience selector are
+  // both gone from this form: the checkbox never influenced the suggestions,
+  // and audience only seeded the report jobs confirm used to hand back. The
+  // planner's system prompt fixes its own register — the rationale is always
+  // athlete-visible on My Protocol, so it is written for both readers — and a
+  // practitioner/athlete toggle only contradicted that. Both live on the
+  // report forms now, the one place they do something. Language stays: it sets
+  // the language the rationale text itself is written in.
   const language = await resolveReportLanguage(formData.get("language") as string | null, teamId);
-  const audience = resolveReportAudience(formData.get("audience") as string | null);
 
   if (!teamId) return { error: "Team is required.", plan: null };
   if (mode !== "day_specific" && mode !== "general") return { error: "Invalid plan mode.", plan: null };
@@ -286,6 +287,30 @@ async function runGeneratePlan(
     }))
   );
 
+  // ---- THE TRAINING-LOAD GATE ----
+  // Same stance as the Nutrition report's confirmed-plan gate: a day-specific
+  // plan READS the Training Load Plan, and an athlete with not a single entry
+  // in the whole period gives it nothing to read — every day would be the
+  // stated-gap baseline, which is General mode wearing a costume. A period
+  // with SOME entries still generates, with the empty days stated plainly per
+  // day, exactly as before — only a complete absence blocks. Checked per
+  // athlete so one athlete's empty plan doesn't hold up the rest of the batch;
+  // blocked athletes never reach the model.
+  const noLoadAthletes = new Set<string>();
+  if (mode === "day_specific") {
+    for (const id of athleteIds) {
+      if (!(loadDaysById.get(id) ?? []).some((d) => d.load !== null)) noLoadAthletes.add(id);
+    }
+    if (noLoadAthletes.size === athleteIds.length) {
+      const who =
+        athleteIds.length === 1 ? "this athlete" : "any of the selected athletes";
+      return {
+        error: `No Training Load Plan entries exist for ${who} between ${periodStart} and ${periodEnd}, so there are no sessions for a day-specific plan to read. Add the period's sessions first — Load & Periodization → Training Load Plan — then generate, or use General / standing mode for a baseline protocol that doesn't need them.`,
+        plan: null,
+      };
+    }
+  }
+
   const dates = mode === "day_specific" ? dateRange(periodStart, periodEnd) : [];
   const allowedDates = new Set(dates);
   const libraryIds = new Set(library.map((s) => s.id));
@@ -333,6 +358,15 @@ async function runGeneratePlan(
       error: null,
     };
 
+    // Gated above when EVERY athlete is empty; here the same check blocks the
+    // empty athletes individually while the rest of the batch generates.
+    if (noLoadAthletes.has(athleteId)) {
+      return {
+        ...shell,
+        error: `No Training Load Plan entries exist for ${athleteName} in this period, so nothing was generated for them. Add their sessions first — Load & Periodization → Training Load Plan — or use General / standing mode.`,
+      };
+    }
+
     const userPrompt = buildPlanPrompt({
       mode,
       clinical,
@@ -368,7 +402,7 @@ async function runGeneratePlan(
             effort: REPORT_EFFORT,
             format: { type: "json_schema", schema: PLAN_RESPONSE_SCHEMA },
           },
-          system: planSystemPrompt(audience, mode),
+          system: planSystemPrompt(mode),
           messages: [{ role: "user", content: userPrompt }],
         })
         .finalMessage();
@@ -513,7 +547,6 @@ async function runGeneratePlan(
       periodEnd,
       dates,
       language,
-      audience,
       additionalInstructions,
       athletes: rows,
       // One per athlete whose generation was attempted — the number the UI
@@ -535,7 +568,6 @@ interface ConfirmPayload {
   periodStart: string;
   periodEnd: string;
   language: string;
-  audience: string;
   additionalInstructions: string | null;
   items: ConfirmedItem[];
 }
@@ -614,10 +646,10 @@ async function runConfirm(
     return { ...empty, error: "That plan is missing its team or mode. Generate it again." };
   }
 
-  // Language and audience used to be re-resolved here to seed the report jobs
-  // this action handed back. Confirming no longer produces reports, so nothing
-  // in this action reads either — the nutrition report generator resolves both
-  // server-side itself, from its own form.
+  // Language used to be re-resolved here (with an audience) to seed the report
+  // jobs this action handed back. Confirming no longer produces reports, so
+  // nothing in this action reads it — the nutrition report generator resolves
+  // its own settings server-side, from its own form.
   const supabase = await createClient();
 
   // Re-derive the roster. An item for an athlete not on this team is dropped

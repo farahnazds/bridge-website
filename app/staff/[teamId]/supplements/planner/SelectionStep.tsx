@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { BTN_PRIMARY_FULL, CARD, INPUT, INPUT_STYLE, NOTICE, PANEL } from "@/lib/ui";
-import AudienceField from "@/components/AudienceField";
 import { MAX_PLAN_DAYS, daysBetween } from "@/lib/supplementPlan";
 import type { PlanMode } from "@/lib/supplementPlan";
 
@@ -154,7 +153,8 @@ export default function SelectionStep({
             <strong>Day-specific</strong>
             <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
               Uses each day&apos;s real Training Load Plan entry — RPE, intensity, session type. A day with no
-              entry gets a baseline suggestion that says so plainly; nothing is invented.
+              entry gets a baseline suggestion that says so plainly; nothing is invented. An athlete with no
+              entries at all in the period is blocked until training load is added.
             </span>
           </span>
         </label>
@@ -222,27 +222,31 @@ export default function SelectionStep({
         </div>
       )}
 
-      {/* ---- Report settings ---- */}
+      {/* ---- Rationale language ----
+          Not a report setting: it sets the language the model writes each
+          suggestion's rationale and the period summary in — text that is
+          stored on the protocol row and read by the athlete on My Protocol.
+          The Audience selector that sat beside it is gone: it was a leftover
+          from when confirming also generated reports, and the planner's
+          system prompt already fixes the register (the rationale is always
+          athlete-visible, so it is written for both readers). The "Include
+          performance signals" checkbox left earlier for the same reason —
+          both live on the report forms now, the one place they do something. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="planner_language" className={labelClass} style={{ color: "var(--text)" }}>
-            Report language
+            Rationale language
           </label>
           <select id="planner_language" name="language" defaultValue={defaultLanguage} className={INPUT} style={INPUT_STYLE}>
             <option value="english">English</option>
             <option value="arabic">Arabic</option>
           </select>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Defaults to your club&apos;s setting.
+            The language each suggestion&apos;s &quot;why&quot; is written in — the athlete reads it on My
+            Protocol. Defaults to your club&apos;s setting.
           </p>
         </div>
-        <AudienceField idPrefix="NutritionPlanner" />
       </div>
-
-      {/* The "Include performance signals" checkbox that sat here is gone with
-          the planner/report split: it never influenced the supplement
-          suggestions (its own hint said so), only the reports confirm used to
-          generate. It lives on the Nutrition report form now. */}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="planner_instructions" className={labelClass} style={{ color: "var(--text)" }}>

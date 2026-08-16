@@ -59,6 +59,15 @@ Resolution happens **server-side** in every report action
 is independently addressable, so a request that omits the field or sends
 junk still produces a correctly labelled report at the clinical register.
 
+The **Nutrition Planner deliberately has no Audience selector** (removed
+2026-08-16; it was a leftover from when confirming a plan also generated
+reports). A plan's rationale has exactly one destination — the protocol
+row, always athlete-visible on My Protocol — so the planner's system
+prompt fixes its register ("write it so both practitioner and athlete
+can read it") rather than offering a per-run choice that could push
+toward unglossed jargon the athlete would read anyway. Audience remains
+a *report* concept.
+
 ### The safety-block architecture
 
 This is the part worth understanding before editing any prompt builder.
@@ -253,23 +262,38 @@ athlete's assigned brand(s) fulfills that category — club assignment
 takes priority for hybrid athletes. If nothing fits, the clinical
 recommendation stays in the report without a product link.
 
-## RPE and the Nutrition Planner (revised 2026-08-13)
+## RPE and the Nutrition Planner (revised 2026-08-13; zero-data gate added 2026-08-16)
 
-RPE is optional at day-to-day data-entry time everywhere, and it is **no
-longer a blocking input for Nutrition generation**. This section previously
-described a hard gate: generation in "next day plan" mode refused to run if
-the Training Load Plan entry for the target date was missing or had no RPE.
-That gate is gone, along with the single-athlete/single-day form it belonged
-to.
+RPE is optional at day-to-day data-entry time everywhere, and a **partially
+logged period is never a blocking input for Nutrition generation**. This
+section previously described a hard gate: generation in "next day plan" mode
+refused to run if the Training Load Plan entry for the target date was
+missing or had no RPE. That per-day gate is gone, along with the
+single-athlete/single-day form it belonged to.
 
 **Why it changed.** Supplement planning is now the bulk **Nutrition
 Planner** (`/staff/[teamId]/supplements/planner`), which plans a range of up
-to 14 days for any number of athletes at once. A blocking gate does not
-generalise to a range: one unplanned Tuesday in a fortnight would have
+to 14 days for any number of athletes at once. A per-day blocking gate does
+not generalise to a range: one unplanned Tuesday in a fortnight would have
 refused the whole batch for every athlete, which is a far worse outcome than
 planning the thirteen days that *are* logged.
 
-**What replaces it.** Graceful, *explicit* degradation, per day:
+**One narrow gate remains (added 2026-08-16): complete absence.** In
+day-specific mode, an athlete with **not a single Training Load Plan entry
+in the whole selected period** is blocked before their model call, per
+athlete — the same stance as the Nutrition report's confirmed-plan gate,
+with the same shape of message (what's missing, where to add it — Load &
+Periodization → Training Load Plan — and the General-mode alternative). A
+period with zero entries gives a day-specific plan nothing to read; every
+day would be the stated-gap baseline, which is General mode wearing a
+costume. If *every* selected athlete is empty the whole run is refused on
+the selection screen; if only some are, the empty ones get a per-athlete
+error row and the rest generate normally. Any athlete with at least one
+entry generates, with the empty days degrading per day exactly as below —
+only total absence blocks. General mode is ungated, as ever.
+
+**What replaces the old per-day gate.** Graceful, *explicit* degradation,
+per day:
 
 | Day-specific mode | Behaviour |
 |---|---|

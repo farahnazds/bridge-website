@@ -1,4 +1,3 @@
-import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
 import { SESSION_TYPES, SESSION_DURATION_BANDS, RTP_PHASES, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
 import { ageInYears, weekdayOf } from "@/app/staff/[teamId]/reports/nutritionPromptBuilder";
@@ -127,10 +126,13 @@ export const PLAN_RESPONSE_SCHEMA = {
   },
 } as const;
 
-export function planSystemPrompt(audience: ReportAudience, mode: PlanMode): string {
+// No audience parameter, deliberately: the report builders take one because a
+// report's register is chosen per document, but a plan's rationale has exactly
+// one destination — the protocol row, athlete-visible on My Protocol — so the
+// register is fixed by the WHO READS THE RATIONALE paragraph below and is not
+// a per-run choice.
+export function planSystemPrompt(mode: PlanMode): string {
   return `You are the clinical supplement-planning engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are producing a STRUCTURED supplement plan that a qualified practitioner will review, edit and confirm before any of it reaches the athlete.
-
-${audienceDirective(audience)}
 
 OUTPUT CONTRACT — you return structured data, not a report. Do not write a document, headings, or markdown. Every field you emit is data that will be rendered in a review grid and, once confirmed, written to the athlete's protocol.
 
