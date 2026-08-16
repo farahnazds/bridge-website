@@ -13,6 +13,7 @@ import {
 } from "./theme";
 import { drawLine, drawRule, drawText, lineHeight, measureText, type TextStyle } from "./primitives";
 import { BRIDGETX_LOGO_PNG_BASE64 } from "./brandLogo";
+import { CLUB_LOGO_BOX_SIZE, drawClubLogoBox } from "./clubLogoBox";
 
 // Fixed page chrome: the gradient header band and the footer rule.
 //
@@ -188,41 +189,11 @@ export function createPageMachine(
     // uploaded logo when one exists, otherwise an empty bordered placeholder
     // reading "Club logo" (owner's 2026-08-16 rule). The Bridgetx mark never
     // appears here — it lives on the left, and nothing falls back to it.
-    const LOGO = px(32);
+    // Drawn by the ONE shared implementation (./clubLogoBox.ts) the legacy
+    // renderer also uses, so the rule cannot drift between the two paths.
+    const LOGO = CLUB_LOGO_BOX_SIZE;
     const logoX = right - LOGO;
-    const drawClubPlaceholder = () => {
-      doc
-        .roundedRect(logoX + 0.5, brandTop + 0.5, LOGO - 1, LOGO - 1, px(6))
-        .lineWidth(0.75)
-        .strokeOpacity(0.5)
-        .strokeColor(HEADER_DIM)
-        .stroke();
-      doc.strokeOpacity(1);
-      drawLine(doc, "Club", logoX, brandTop + px(9), LOGO, {
-        size: px(6.5),
-        color: HEADER_DIM,
-        align: "center",
-      });
-      drawLine(doc, "logo", logoX, brandTop + px(17.5), LOGO, {
-        size: px(6.5),
-        color: HEADER_DIM,
-        align: "center",
-      });
-    };
-    const logo = openLogo();
-    if (logo) {
-      doc.roundedRect(logoX, brandTop, LOGO, LOGO, px(6)).fillOpacity(0.14).fill(HEADER_TEXT);
-      doc.fillOpacity(1);
-      try {
-        doc.image(logo as Parameters<typeof doc.image>[0], logoX + px(2), brandTop + px(2), {
-          fit: [LOGO - px(4), LOGO - px(4)],
-        });
-      } catch {
-        drawClubPlaceholder();
-      }
-    } else {
-      drawClubPlaceholder();
-    }
+    drawClubLogoBox(doc, openLogo(), logoX, brandTop, { onDark: true });
     // Club identity stack, right-aligned beside the logo box: club name, team,
     // then the small-caps tagline — the design's "Performance Nutrition" line.
     const nameW = px(170);

@@ -4,6 +4,7 @@ import "server-only";
 // works (font metrics vs. Buffer identity).
 import PDFDocument from "pdfkit";
 import { parseReportBlocks, inlineText, type Block, type Inline } from "@/lib/reportContent";
+import { CLUB_LOGO_BOX_SIZE, drawClubLogoBox } from "@/lib/reportPdf/clubLogoBox";
 
 // Renders a report to a branded PDF.
 //
@@ -105,35 +106,29 @@ function drawHeader(
 ) {
   const right = doc.page.width - PAGE.margin;
 
-  if (logoImage) {
-    try {
-      // `fit` constrains to the fixed box — an oversized logo scales down
-      // rather than pushing the header taller.
-      // No align/valign: drawing at an explicit x,y anchors it top-left in the
-      // fixed box, which is the placement we want and keeps it deterministic.
-      doc.image(logoImage as Parameters<typeof doc.image>[0], LOGO_BOX.x, LOGO_BOX.y, {
-        fit: [LOGO_BOX.w, LOGO_BOX.h],
-      });
-    } catch {
-      // Unsupported/corrupt image: fall through to the wordmark. A bad asset
-      // must never abort report delivery.
-      doc.font("Helvetica-Bold").fontSize(13).fillColor(INK)
-        .text(branding.clubName, LOGO_BOX.x, LOGO_BOX.y + 10, { width: LOGO_BOX.w * 2, lineBreak: false });
-    }
-  } else {
-    doc.font("Helvetica-Bold").fontSize(13).fillColor(INK)
-      .text(branding.clubName, LOGO_BOX.x, LOGO_BOX.y + 10, { width: LOGO_BOX.w * 2, lineBreak: false });
-  }
+  // The left slot is the club-name wordmark; the club's LOGO lives in the
+  // right-side box below, ported 2026-08-16 from the structured layouts so
+  // Combined matches them — one home for the logo, never both. (Before this,
+  // the image drew here with the wordmark only as its fallback.)
+  doc.font("Helvetica-Bold").fontSize(13).fillColor(INK)
+    .text(branding.clubName, LOGO_BOX.x, LOGO_BOX.y + 10, { width: LOGO_BOX.w * 2, lineBreak: false });
 
-  // Right-aligned title block, fixed position.
+  // The club logo box at the far right — the shared implementation
+  // (lib/reportPdf/clubLogoBox.ts) the structured chrome also draws with:
+  // the club's own uploaded logo, or the "Club logo" placeholder. Never the
+  // Bridgetx mark.
+  drawClubLogoBox(doc, logoImage, right - CLUB_LOGO_BOX_SIZE, LOGO_BOX.y, { onDark: false });
+
+  // Right-aligned title block, fixed position, ending clear of the logo box.
+  const textRight = right - CLUB_LOGO_BOX_SIZE - 10;
   doc.font("Helvetica-Bold").fontSize(11).fillColor(INK)
-    .text(meta.reportTypeLabel, right - 240, LOGO_BOX.y + 2, { width: 240, align: "right", lineBreak: false });
+    .text(meta.reportTypeLabel, textRight - 240, LOGO_BOX.y + 2, { width: 240, align: "right", lineBreak: false });
   doc.font("Helvetica").fontSize(8.5).fillColor(MUTED)
-    .text(meta.athleteName, right - 240, LOGO_BOX.y + 18, { width: 240, align: "right", lineBreak: false });
+    .text(meta.athleteName, textRight - 240, LOGO_BOX.y + 18, { width: 240, align: "right", lineBreak: false });
   const period =
     meta.periodStart && meta.periodEnd ? `${meta.periodStart} to ${meta.periodEnd}` : "";
   if (period) {
-    doc.text(period, right - 240, LOGO_BOX.y + 30, { width: 240, align: "right", lineBreak: false });
+    doc.text(period, textRight - 240, LOGO_BOX.y + 30, { width: 240, align: "right", lineBreak: false });
   }
 
   doc.rect(PAGE.margin, HEADER_H + 6, doc.page.width - PAGE.margin * 2, ACCENT_H).fill(accent);
