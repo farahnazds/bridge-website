@@ -17,7 +17,12 @@ import { SPARK_DAYS, TREND_DAYS, type RosterRow, type Availability } from "@/lib
 // Nothing in the mockup's sample data survives: every name, count, percentage
 // and bar is computed in lib/rosterOverview.ts from live rows.
 
-const FILTERS = ["All", "Pending", "Flagged", "Rehab"] as const;
+// The three right-hand chips surface things a practitioner should act on:
+// a note left on a recent check-in, an injury that has not been cleared, a
+// supplement recorded as missed. The two check-in-based ones look back
+// RECENT_DAYS (today-4 .. today) and drop off on their own; Active Injury
+// holds until the Injury Log marks the injury cleared.
+const FILTERS = ["All", "Flagged", "Check-In Notes", "Active Injury", "Missed Supplement"] as const;
 type Filter = (typeof FILTERS)[number];
 
 const SORTS = ["Name", "Compliance"] as const;
@@ -91,12 +96,13 @@ export default function RosterClient({ teamId, rows }: { teamId: string; rows: R
   const [filter, setFilter] = useState<Filter>("All");
   const [sort, setSort] = useState<Sort>("Name");
 
-  const counts = useMemo(
+  const counts = useMemo<Record<Filter, number>>(
     () => ({
       All: rows.length,
-      Pending: rows.filter((r) => r.todayStatus === null).length,
       Flagged: rows.filter((r) => r.flagged).length,
-      Rehab: rows.filter((r) => r.availability === "rehab").length,
+      "Check-In Notes": rows.filter((r) => r.hasRecentNote).length,
+      "Active Injury": rows.filter((r) => r.hasActiveInjury).length,
+      "Missed Supplement": rows.filter((r) => r.hasMissedSupplement).length,
     }),
     [rows]
   );
@@ -104,9 +110,10 @@ export default function RosterClient({ teamId, rows }: { teamId: string; rows: R
   const visible = useMemo(() => {
     const matches = (r: RosterRow) =>
       filter === "All" ||
-      (filter === "Pending" && r.todayStatus === null) ||
       (filter === "Flagged" && r.flagged) ||
-      (filter === "Rehab" && r.availability === "rehab");
+      (filter === "Check-In Notes" && r.hasRecentNote) ||
+      (filter === "Active Injury" && r.hasActiveInjury) ||
+      (filter === "Missed Supplement" && r.hasMissedSupplement);
 
     const list = rows.filter(matches);
     return sort === "Name"

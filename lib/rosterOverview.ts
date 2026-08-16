@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 export * from "@/lib/rosterShape";
 import {
+  RECENT_DAYS,
   SPARK_DAYS,
   TREND_DAYS,
   type Availability,
@@ -12,6 +13,7 @@ import {
   toDateStr,
   type CheckinDay,
 } from "@/lib/complianceThresholds";
+import { parseSupplements } from "@/lib/checkin";
 
 // Everything behind the team Roster page.
 //
@@ -81,7 +83,7 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
   const [checkinsRes, injuriesRes, settingsRes] = await Promise.all([
     supabase
       .from("checkins")
-      .select("athlete_id, date, status")
+      .select("athlete_id, date, status, notes, supplements_taken")
       .in("athlete_id", athleteIds)
       .gte("date", toDateStr(since))
       .lte("date", today),
@@ -99,7 +101,13 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
       : Promise.resolve({ data: null }),
   ]);
 
-  type CheckinRow = { athlete_id: string; date: string; status: string };
+  type CheckinRow = {
+    athlete_id: string;
+    date: string;
+    status: string;
+    notes: string | null;
+    supplements_taken: string | null;
+  };
   const byAthlete = new Map<string, CheckinRow[]>();
   for (const c of (checkinsRes.data ?? []) as CheckinRow[]) {
     const list = byAthlete.get(c.athlete_id);
@@ -136,6 +144,10 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
   const sparkDates = dayList(0, SPARK_DAYS);
   const currentWindow = new Set(dayList(0, TREND_DAYS));
   const priorWindow = new Set(dayList(TREND_DAYS, TREND_DAYS));
+  // Behind the Check-In Notes and Missed Supplement chips: today-4 .. today.
+  // Membership is recomputed on every load, so an athlete drops off those
+  // filters automatically once the triggering check-in ages past the window.
+  const recentWindow = new Set(dayList(0, RECENT_DAYS));
 
   let squadCurrentCompleted = 0, squadCurrentTotal = 0;
   let squadPriorCompleted = 0, squadPriorTotal = 0;
@@ -176,6 +188,16 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
       .map((c) => ({ date: c.date, status: c.status as CheckinDay["status"] }));
     const breaches = evaluateAthlete(history, thresholds, now);
 
+    // The three filter-chip facts. Notes and missed supplements look only at
+    // the RECENT_DAYS window; the injury fact has no window — the query above
+    // already excludes status='cleared', so any row here is a still-open
+    // injury and the athlete stays on the filter until Injury Log clears it.
+    const recent = mine.filter((c) => recentWindow.has(c.date));
+    const hasRecentNote = recent.some((c) => (c.notes ?? "").trim() !== "");
+    const hasMissedSupplement = recent.some((c) =>
+      Object.values(parseSupplements(c.supplements_taken)).includes("missed")
+    );
+
     return {
       id: a.id,
       firstName: a.first_name,
@@ -192,6 +214,9 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
           ? `${b.count} consecutive days without a completed check-in (club threshold ${b.threshold})`
           : `${b.count} skips this month (club limit ${b.threshold})`
       ),
+      hasRecentNote,
+      hasActiveInjury: open.length > 0,
+      hasMissedSupplement,
     };
   });
 

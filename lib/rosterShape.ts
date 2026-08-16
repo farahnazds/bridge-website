@@ -17,6 +17,12 @@ export const SPARK_DAYS = 14;
 /** The headline compliance window, and the span the delta compares against. */
 export const TREND_DAYS = 7;
 
+/** The recency window behind the Check-In Notes and Missed Supplement filter
+ *  chips: today minus 4 through today, inclusive. An athlete drops off those
+ *  filters automatically after the fifth day; the underlying check-in stays
+ *  in their history untouched. */
+export const RECENT_DAYS = 5;
+
 /** Derived from RTP phase, never stored — see the note in rosterOverview.ts. */
 export type Availability = "available" | "modified" | "rehab";
 
@@ -37,6 +43,14 @@ export interface RosterRow {
   flagged: boolean;
   /** Why it is flagged, for the row's tooltip. Empty when not flagged. */
   flagReasons: string[];
+  /** A check-in with a non-empty note within the last RECENT_DAYS. */
+  hasRecentNote: boolean;
+  /** Any injury still open (injuries.status != 'cleared'), no time limit. */
+  hasActiveInjury: boolean;
+  /** A check-in within the last RECENT_DAYS recording a supplement as
+   *  "missed" — the one stored state that means it was not taken ("not sure"
+   *  is a distinct state and deliberately does not count). */
+  hasMissedSupplement: boolean;
 }
 
 export interface RosterOverview {
