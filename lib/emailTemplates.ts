@@ -1,6 +1,13 @@
 // The Bridgetx transactional email templates — implemented 1:1 from the
 // design project's send-ready files (emails/report-shared.html,
-// compliance-alert.html, new-lead.html in "Bridgetx brand guidelines").
+// compliance-alert.html, new-lead.html in "Bridgetx Emails").
+//
+// 2026-08-16 refresh, from the updated design files: the header tagline is
+// HIGH PERFORMANCE INTELLIGENCE (was SPORTS NUTRITION INTELLIGENCE), the
+// footer ends at the why-line (the bridgetx.co/admin links line and the
+// outer Dubai block are gone), and new-lead is a compact variant — smaller
+// logo, tighter paddings, 25px heading — since it is an internal digest,
+// not a customer letter.
 //
 // EMAIL-CLIENT RULES the designs follow and this file must preserve:
 //   - tables and inline styles only — no flexbox, no grid, no external CSS
@@ -51,7 +58,9 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-const HEAD = (title: string) => `<!DOCTYPE html>
+/** mobileH1/mobileLh: the media-query h1 size — 25/32 for the standard
+ *  letters, 22/29 for the compact new-lead variant, per the design files. */
+const HEAD = (title: string, mobileH1 = 25, mobileLh = 32) => `<!DOCTYPE html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
 <meta charset="utf-8">
@@ -68,7 +77,7 @@ const HEAD = (title: string) => `<!DOCTYPE html>
   @media only screen and (max-width:620px) {
     .wrap { width:100% !important; }
     .pad { padding-left:22px !important; padding-right:22px !important; }
-    .h1 { font-size:25px !important; line-height:32px !important; }
+    .h1 { font-size:${mobileH1}px !important; line-height:${mobileLh}px !important; }
     .btn a { display:block !important; text-align:center !important; }
   }
 </style>
@@ -81,38 +90,39 @@ const GRADIENT_BAR = `<tr><td style="padding:0;font-size:0;line-height:0;border-
       <td width="150" height="3" bgcolor="#073CF4" style="width:150px;height:3px;line-height:3px;font-size:0;">&nbsp;</td>
     </tr></table></td></tr>`;
 
-const logoHeader = (rightLabel: string) => `<tr><td class="pad" style="padding:28px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr>
+/** compact: the new-lead variant — smaller logo, tighter top padding. */
+const logoHeader = (rightLabel: string, compact = false) => `<tr><td class="pad" style="padding:${compact ? 24 : 28}px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr>
     <td align="left" valign="middle" style="padding:0;">
-      <img src="${LOGO_URL}" width="150" height="44" alt="Bridgetx" style="display:block;border:0;width:150px;height:44px;">
+      <img src="${LOGO_URL}" width="${compact ? 123 : 150}" height="${compact ? 36 : 44}" alt="Bridgetx" style="display:block;border:0;width:${compact ? 123 : 150}px;height:${compact ? 36 : 44}px;">
     </td>
     <td align="right" valign="middle" style="padding:0;font-family:${FONT_BODY};font-size:10px;line-height:14px;mso-line-height-rule:exactly;letter-spacing:1.6px;color:#8A94AC;">${rightLabel}</td>
   </tr></table></td></tr>`;
 
-const eyebrow = (barColor: string, textColor: string, label: string) => `<tr><td class="pad" style="padding:30px 36px 0;">
+const eyebrow = (barColor: string, textColor: string, label: string, padTop = 30) => `<tr><td class="pad" style="padding:${padTop}px 36px 0;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>
       <td height="1" width="22" bgcolor="${barColor}" style="width:22px;height:2px;line-height:2px;font-size:0;background:${barColor};">&nbsp;</td>
       <td style="padding-left:11px;font-family:${FONT_BODY};font-size:11px;line-height:15px;mso-line-height-rule:exactly;letter-spacing:1.8px;font-weight:600;color:${textColor};text-transform:uppercase;">${label}</td>
     </tr></table>
   </td></tr>`;
 
-const h1 = (text: string, size = 29, lh = 36) => `<tr><td class="pad" style="padding:14px 36px 0;">
-    <h1 class="h1" style="margin:0;font-family:${FONT_HEAD};font-size:${size}px;line-height:${lh}px;mso-line-height-rule:exactly;letter-spacing:-0.7px;font-weight:700;color:#0D1B4C;">${text}</h1>
+const h1 = (text: string, size = 29, lh = 36, padTop = 14, tracking = "-0.7px") => `<tr><td class="pad" style="padding:${padTop}px 36px 0;">
+    <h1 class="h1" style="margin:0;font-family:${FONT_HEAD};font-size:${size}px;line-height:${lh}px;mso-line-height-rule:exactly;letter-spacing:${tracking};font-weight:700;color:#0D1B4C;">${text}</h1>
   </td></tr>`;
 
-const bodyPara = (html: string) => `<tr><td class="pad" style="padding:14px 36px 0;">
-    <p style="margin:0;font-family:${FONT_BODY};font-size:15px;line-height:24px;mso-line-height-rule:exactly;color:#4A5878;">${html}</p>
+const bodyPara = (html: string, padTop = 14, fontSize = 15, lh = 24) => `<tr><td class="pad" style="padding:${padTop}px 36px 0;">
+    <p style="margin:0;font-family:${FONT_BODY};font-size:${fontSize}px;line-height:${lh}px;mso-line-height-rule:exactly;color:#4A5878;">${html}</p>
   </td></tr>`;
 
-const factRow = (label: string, valueHtml: string, pos: "first" | "mid" | "last") => {
-  const padTop = pos === "first" ? 15 : 11;
-  const padBottom = pos === "last" ? 15 : 11;
+const factRow = (label: string, valueHtml: string, pos: "first" | "mid" | "last", compact = false) => {
+  const padTop = pos === "first" ? (compact ? 14 : 15) : compact ? 9 : 11;
+  const padBottom = pos === "last" ? (compact ? 14 : 15) : compact ? 9 : 11;
   return `<tr>
     <td width="150" valign="top" style="width:150px;padding:${padTop}px 8px ${padBottom}px 18px;font-family:${FONT_BODY};font-size:11px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:1.2px;color:#8A94AC;text-transform:uppercase;">${label}</td>
     <td valign="top" style="padding:${padTop}px 18px ${padBottom}px 8px;font-family:${FONT_BODY};font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#0D1B4C;font-weight:600;">${valueHtml}</td>
   </tr>`;
 };
 
-const factPanel = (rowsHtml: string) => `<tr><td class="pad" style="padding:22px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:#F4F6FB;border:1px solid #E3E8F2;border-radius:10px;">${rowsHtml}</table></td></tr>`;
+const factPanel = (rowsHtml: string, padTop = 22) => `<tr><td class="pad" style="padding:${padTop}px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:#F4F6FB;border:1px solid #E3E8F2;border-radius:10px;">${rowsHtml}</table></td></tr>`;
 
 /** The club identity card — names only: no club logo asset exists in the
  *  schema, and the design's dashed placeholder is preview-only. */
@@ -122,36 +132,26 @@ const clubCard = (clubName: string, subLine: string) => `<tr><td class="pad" sty
     </td>
   </tr></table></td></tr>`;
 
-const ctaButton = (href: string, label: string) => `<tr><td class="pad btn" align="left" style="padding:26px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>
+const ctaButton = (href: string, label: string, compact = false) => `<tr><td class="pad btn" align="left" style="padding:${compact ? 24 : 26}px 36px 0;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>
     <td align="center" bgcolor="#073CF4" style="border-radius:10px;background:#073CF4;background-image:linear-gradient(135deg,#08D9DE 0%,#08B7E8 34%,#087BF2 68%,#073CF4 100%);">
-      <a href="${href}" style="display:block;padding:15px 34px;font-family:${FONT_HEAD};font-size:15px;line-height:20px;mso-line-height-rule:exactly;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;">${label}</a>
+      <a href="${href}" style="display:block;padding:${compact ? "14px 30px" : "15px 34px"};font-family:${FONT_HEAD};font-size:${compact ? 14.5 : 15}px;line-height:20px;mso-line-height-rule:exactly;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;">${label}</a>
     </td>
   </tr></table></td></tr>`;
 
-const divider = `<tr><td class="pad" style="padding:28px 36px 0;">
+const divider = (padTop = 28) => `<tr><td class="pad" style="padding:${padTop}px 36px 0;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;"><tr>
       <td height="1" bgcolor="#E3E8F2" style="height:1px;line-height:1px;font-size:0;background:#E3E8F2;">&nbsp;</td>
     </tr></table>
   </td></tr>`;
 
+/** The card ends here, on the why-line alone — the 2026-08-16 design refresh
+ *  dropped the links line and the outer address block that used to follow. */
 const footerInsideCard = (whyLine: string) => `<tr><td class="pad" style="padding:18px 36px 30px;">
-    <p style="margin:0 0 10px;font-family:${FONT_BODY};font-size:11.5px;line-height:18px;mso-line-height-rule:exactly;color:#8A94AC;">${whyLine}</p>
-    <p style="margin:0;font-family:${FONT_BODY};font-size:11.5px;line-height:18px;mso-line-height-rule:exactly;color:#8A94AC;">
-      <a href="${SITE}" style="color:#8A94AC;text-decoration:underline;">bridgetx.co</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;<a href="mailto:admin@bridgetx.co" style="color:#8A94AC;text-decoration:underline;">admin@bridgetx.co</a>
-    </p>
+    <p style="margin:0;font-family:${FONT_BODY};font-size:11.5px;line-height:18px;mso-line-height-rule:exactly;color:#8A94AC;">${whyLine}</p>
   </td></tr>`;
 
-const OUTER_FOOTER = `<tr>
-  <td align="center" style="padding:18px 24px 0;">
-    <p style="margin:0;font-family:${FONT_BODY};font-size:11px;line-height:17px;mso-line-height-rule:exactly;color:#8A94AC;">
-      Bridgetx &middot; Sports Nutrition Intelligence Platform<br>
-      Dubai, United Arab Emirates
-    </p>
-  </td>
-</tr>`;
-
-function shell(title: string, preheader: string, cardRows: string): string {
-  return `${HEAD(title)}
+function shell(title: string, preheader: string, cardRows: string, mobileH1 = 25, mobileLh = 32): string {
+  return `${HEAD(title, mobileH1, mobileLh)}
 <body style="margin:0;padding:0;background:#EEF1F6;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
 <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;">${preheader}</span>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="page" style="width:100%;border-collapse:collapse;background:#EEF1F6;">
@@ -166,7 +166,6 @@ function shell(title: string, preheader: string, cardRows: string): string {
             </table>
           </td>
         </tr>
-        ${OUTER_FOOTER}
       </table>
     </td>
   </tr>
@@ -201,7 +200,7 @@ export function reportSharedEmail(params: {
     `${p.practitioner} shared a ${p.type} report with you`,
     `${p.practitioner} shared a ${p.type} report for ${p.athlete} — open it in Bridgetx.`,
     [
-      logoHeader("SPORTS&nbsp;NUTRITION<br>INTELLIGENCE"),
+      logoHeader("HIGH&nbsp;PERFORMANCE<br>INTELLIGENCE"),
       eyebrow("#08B7E8", "#0891C6", "Report shared"),
       h1("A new report is ready for you."),
       bodyPara(
@@ -215,7 +214,7 @@ export function reportSharedEmail(params: {
       ),
       clubCard(p.club, p.team),
       ctaButton(`${SITE}/login`, "Open the report"),
-      divider,
+      divider(),
       footerInsideCard(
         `You are receiving this because a practitioner at ${p.club} shared a report with your Bridgetx account.`
       ),
@@ -251,7 +250,7 @@ export function complianceAlertEmail(params: {
     `Compliance alert — ${p.athlete} (${p.club})`,
     p.summary,
     [
-      logoHeader("SPORTS&nbsp;NUTRITION<br>INTELLIGENCE"),
+      logoHeader("HIGH&nbsp;PERFORMANCE<br>INTELLIGENCE"),
       eyebrow("#F5A524", "#B8791A", "Compliance alert"),
       h1("An athlete has fallen below your check-in threshold."),
       bodyPara(
@@ -260,7 +259,7 @@ export function complianceAlertEmail(params: {
       breachPanel,
       clubCard(p.club, "Compliance alert recipient list"),
       ctaButton(`${SITE}/login`, "Review check-in history"),
-      divider,
+      divider(),
       footerInsideCard(
         `You are receiving this because your address is listed as a compliance-alert recipient for ${p.club}. Thresholds and recipients are managed by a Club Manager in Settings.`
       ),
@@ -309,31 +308,39 @@ export function newLeadEmail(params: {
   const intro = p.slot
     ? `Submitted ${p.when} via the landing page. Requested meeting time below — the booking page told them you'll confirm by email.`
     : `Submitted ${p.when} via the landing page. No meeting time requested yet.`;
+  // The compact internal variant throughout — smaller logo, tighter paddings,
+  // 25px heading at -0.5px tracking (22px on mobile) — per the refreshed
+  // design's new-lead.html.
   const html = shell(
     `New lead: ${p.name} from ${p.club}`,
-    `${p.name} (${p.role}, ${p.club}) — ${p.sport}, squad ${p.squad}, ${p.country}.`,
+    p.slot
+      ? `${p.name} (${p.role}, ${p.club}) requested ${p.slot} — ${p.sport}, squad ${p.squad}, ${p.country}.`
+      : `${p.name} (${p.role}, ${p.club}) — ${p.sport}, squad ${p.squad}, ${p.country}.`,
     [
-      logoHeader("INTERNAL&nbsp;&middot;&nbsp;LEADS"),
-      eyebrow("#08B7E8", "#0891C6", "New lead &middot; Book a Meeting form"),
-      h1(p.slot ? `Meeting time requested: ${p.name}` : `New lead: ${p.name} from ${p.club}`, 25, 32),
-      bodyPara(intro),
+      logoHeader("INTERNAL&nbsp;&middot;&nbsp;LEADS", true),
+      eyebrow("#08B7E8", "#0891C6", "New lead &middot; Book a Meeting form", 26),
+      h1(p.slot ? `Meeting time requested: ${p.name}` : `New lead: ${p.name} from ${p.club}`, 25, 32, 13, "-0.5px"),
+      bodyPara(intro, 10, 14, 22),
       factPanel(
-        factRow("Name", p.name, "first") +
-          factRow("Club / Company", p.club, "mid") +
-          factRow("Email", `<a href="mailto:${p.email}" style="color:#073CF4;text-decoration:none;">${p.email}</a>`, "mid") +
-          factRow("Phone", p.phone, "mid") +
-          factRow("Role", p.role, "mid") +
-          factRow("Country", p.country, "mid") +
-          factRow("Sport", p.sport, "mid") +
-          factRow("Squad size", p.squad, "last")
+        factRow("Name", p.name, "first", true) +
+          factRow("Club / Company", p.club, "mid", true) +
+          factRow("Email", `<a href="mailto:${p.email}" style="color:#073CF4;text-decoration:none;">${p.email}</a>`, "mid", true) +
+          factRow("Phone", p.phone, "mid", true) +
+          factRow("Role", p.role, "mid", true) +
+          factRow("Country", p.country, "mid", true) +
+          factRow("Sport", p.sport, "mid", true) +
+          factRow("Squad size", p.squad, "last", true),
+        20
       ),
       slotPanel,
-      ctaButton(`${SITE}/admin/leads`, "View in Leads Dashboard"),
-      divider,
+      ctaButton(`${SITE}/admin/leads`, "View in Leads Dashboard", true),
+      divider(26),
       `<tr><td class="pad" style="padding:16px 36px 26px;">
         <p style="margin:0;font-family:${FONT_BODY};font-size:11.5px;line-height:18px;mso-line-height-rule:exactly;color:#8A94AC;">Internal notification &mdash; sent whenever the Book a Meeting form is used on the landing page. Not customer-facing.</p>
       </td></tr>`,
-    ].join("\n")
+    ].join("\n"),
+    22,
+    29
   );
   return {
     subject: p.slot
