@@ -572,7 +572,12 @@ export interface ShareState {
 
 export async function shareReport(_prevState: ShareState, formData: FormData): Promise<ShareState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_practitioner") {
+  // club_manager admitted 2026-08-17 — the DELIBERATE owner reversal of the
+  // manager read-only boundary (write-parity phase 2; the six generators were
+  // already both-roles). The own-reports rule below is unchanged and applies
+  // to both roles equally: you share what YOU generated, backed by RLS
+  // ("generator manages own report").
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
     return { error: "You don't have permission to do this.", warning: null, success: false };
   }
 
