@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, isClubStaff } from "@/lib/auth";
 import { parseCsvText } from "@/lib/csv";
 import { matchRowsByAthleteCode, parseNum, parseInt10, type MatchedRow } from "@/lib/csvImport";
 
@@ -30,7 +30,7 @@ export interface GpsValues {
 
 async function requireStaff() {
   const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) return null;
+  if (!isClubStaff(profile)) return null;
   return profile;
 }
 

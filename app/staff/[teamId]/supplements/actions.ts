@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, isClubStaff } from "@/lib/auth";
 import { todayIso } from "@/lib/supplementProtocols";
 import type { ConfirmedItem } from "@/lib/supplementPlan";
 import {
@@ -41,13 +41,6 @@ export interface ProtocolActionState {
 }
 
 const EMPTY: ProtocolActionState = { error: null, safetyMessage: null };
-
-function canManage(role: string | undefined): boolean {
-  // Matches the Nutrition Planner rather than the Injury Log: both write to
-  // this same table, and a Club Manager who can confirm a protocol through the
-  // planner should not be locked out of correcting it here.
-  return role === "club_practitioner" || role === "club_manager";
-}
 
 /** Postgres exclusion_violation, translated for a reader who did not write the
  *  constraint. 23P01 is the code; the name check is a belt-and-braces fallback
@@ -141,7 +134,7 @@ export async function updateProtocol(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || !canManage(profile.role)) {
+  if (!isClubStaff(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 
@@ -281,7 +274,7 @@ export async function endProtocolToday(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || !canManage(profile.role)) {
+  if (!isClubStaff(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 
@@ -348,7 +341,7 @@ export async function cancelScheduledProtocol(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || !canManage(profile.role)) {
+  if (!isClubStaff(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 
@@ -420,7 +413,7 @@ export async function createProtocol(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || !canManage(profile.role)) {
+  if (!isClubStaff(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 
@@ -578,7 +571,7 @@ export async function switchProtocolProduct(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || !canManage(profile.role)) {
+  if (!isClubStaff(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 

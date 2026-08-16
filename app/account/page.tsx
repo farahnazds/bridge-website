@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAccountIdentity } from "./identity";
+import { isClubStaff } from "@/lib/auth";
 import NameForm from "./NameForm";
 import PasswordForm from "./PasswordForm";
 import { ROLE_LABELS, SPECIALTIES } from "@/lib/constants";
@@ -74,7 +75,7 @@ export default async function AccountPage() {
   const { profile, athlete } = identity;
   const roleLabel = ROLE_LABELS[profile.role] ?? "Account";
   const isAthlete = profile.role === "athlete";
-  const isClubStaff = profile.role === "club_practitioner" || profile.role === "club_manager";
+  const clubStaff = isClubStaff(profile);
 
   const specialtyLabel =
     SPECIALTIES.find((s) => s.value === profile.specialty)?.label ?? profile.specialty ?? "Not set";
@@ -138,7 +139,7 @@ export default async function AccountPage() {
           decide the default clinical-data tier (docs/02-roles-and-permissions.md,
           "Departments"), so they are set by whoever manages the staff record —
           never self-selected here. */}
-      {isClubStaff && (
+      {clubStaff && (
         <Section
           title="Staff record"
           hint="Set by your club, not here — your department decides your default clinical-data access."

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, isClubStaff } from "@/lib/auth";
 
 export interface ActionState {
   error: string | null;
@@ -18,7 +18,7 @@ export interface ActionState {
 // role check is just a fast, clear failure path, not the real boundary.
 export async function createComment(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { error: "You don't have permission to do this." };
   }
 

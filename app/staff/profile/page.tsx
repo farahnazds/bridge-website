@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, isClubStaff } from "@/lib/auth";
 import ComingSoon from "@/components/ComingSoon";
 
 export const metadata: Metadata = { title: "My Profile — Bridgetx" };
@@ -15,7 +15,7 @@ export default async function StaffProfilePage() {
   // layout has always admitted them, so blocking them from their own staff
   // profile was inconsistent with both. Oversight roles hold no club_staff
   // record and so have no staff profile to show.
-  if (profile.role !== "club_practitioner" && profile.role !== "club_manager") redirect("/");
+  if (!isClubStaff(profile)) redirect("/");
 
   return (
     <div className="min-h-screen px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>

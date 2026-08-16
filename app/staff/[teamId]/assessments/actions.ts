@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, isClubStaff } from "@/lib/auth";
 import { parseCsvText } from "@/lib/csv";
 import { matchRowsByAthleteCode, parseNum, type MatchedRow } from "@/lib/csvImport";
 import {
@@ -187,7 +187,7 @@ export async function logAssessment(_prevState: ActionState, formData: FormData)
   // RLS insert policy always permitted managers (is_assigned_to_athlete_
   // via_team's club-manager fallback); this gate was the only thing blocking
   // them, contradicting the validity_tier comment above.
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -251,7 +251,7 @@ export async function updateAssessment(_prevState: ActionState, formData: FormDa
   const profile = await getCurrentProfile();
   // club_manager admitted 2026-08-17 — same deliberate parity reversal as
   // logAssessment above; the 7-day RLS edit window applies to both roles.
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -461,7 +461,7 @@ export async function previewAssessmentCsv(
   formData: FormData
 ): Promise<PreviewState> {
   const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { error: "You don't have permission to do this.", rows: [] };
   }
 
@@ -499,7 +499,7 @@ export async function confirmAssessmentCsv(
   formData: FormData
 ): Promise<ConfirmState> {
   const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { error: "You don't have permission to do this.", savedCount: null };
   }
 

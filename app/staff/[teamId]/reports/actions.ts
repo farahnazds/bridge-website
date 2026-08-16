@@ -26,7 +26,7 @@ import {
   REPORT_MAX_TOKENS,
   reportResponseError,
 } from "@/lib/anthropic";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile, isClubStaff } from "@/lib/auth";
 import { sendReportSharedEmail } from "@/lib/resend";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
@@ -98,7 +98,7 @@ export async function generateComplianceReport(
   // Managers generate too — owner's ruling 2026-08-16, aligning the three
   // practitioner-only generators (this one, Body Composition, Combined) with
   // Nutrition/Performance/Injury, which always accepted club_manager.
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
@@ -320,7 +320,7 @@ export async function generateBodyCompositionReport(
 ): Promise<GenerateReportState> {
   const profile = await getCurrentProfile();
   // Managers generate too — see the note on generateComplianceReport.
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
@@ -577,7 +577,7 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
   // already both-roles). The own-reports rule below is unchanged and applies
   // to both roles equally: you share what YOU generated, backed by RLS
   // ("generator manages own report").
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { error: "You don't have permission to do this.", warning: null, success: false };
   }
 
@@ -747,7 +747,7 @@ export async function generateNutritionReport(
 ): Promise<GenerateReportState> {
   const base = { reportText: null, dataCheckNote: null, reportId: null };
   const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { ...base, error: "You don't have permission to do this." };
   }
 
@@ -906,7 +906,7 @@ export async function generatePerformanceReport(
 ): Promise<GenerateReportState> {
   const base = { reportText: null, dataCheckNote: null, reportId: null };
   const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { ...base, error: "You don't have permission to do this." };
   }
 
@@ -1098,7 +1098,7 @@ export async function generateInjuryReport(
 ): Promise<GenerateReportState> {
   const base = { reportText: null, dataCheckNote: null, reportId: null };
   const profile = await getCurrentProfile();
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { ...base, error: "You don't have permission to do this." };
   }
 
@@ -1300,7 +1300,7 @@ export async function generateCombinedReport(
 
   const profile = await getCurrentProfile();
   // Managers generate too — see the note on generateComplianceReport.
-  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
+  if (!isClubStaff(profile)) {
     return { ...base, error: "You don't have permission to do this." };
   }
 

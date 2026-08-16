@@ -93,6 +93,26 @@ export async function hasRole(...allowed: Role[]): Promise<boolean> {
   return role !== null && allowed.includes(role);
 }
 
+/**
+ * THE club-staff write gate: club_practitioner and club_manager, treated
+ * identically.
+ *
+ * Since 2026-08-17 the two roles hold FULL write parity across the team
+ * workspace — a DELIBERATE owner reversal of the earlier read-only Club
+ * Manager boundary, matching the RLS layer, which always admitted managers
+ * (is_assigned_to_athlete_via_team / is_assigned_to_team both carry an
+ * is_club_manager_for_club fallback). Every staff server action gates
+ * through here rather than repeating the two-role check inline, per
+ * CLAUDE.md's "access logic lives in one place" rule.
+ *
+ * NOT for asymmetric checks: manager-only powers (the comments page's
+ * reflect_in_ai toggle, athlete registration) and any gate that also admits
+ * admin/super_admin stay explicit at their call sites.
+ */
+export function isClubStaff(profile: Profile | null): profile is Profile {
+  return profile !== null && (profile.role === "club_practitioner" || profile.role === "club_manager");
+}
+
 // Calls the athlete_type() SQL function (database/schema.sql, Section 6) —
 // live-computed from relationships, never a stored label.
 export async function getAthleteType(athleteId: string): Promise<AthleteType> {
