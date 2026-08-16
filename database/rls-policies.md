@@ -1464,3 +1464,23 @@ anyone — including the Jackson-Pollock women's path migration 038 allowed, who
 coefficients are confirmed but whose site mapping is not. Clearing a block is an
 `update` on the reference row; clearing both for one sex is what makes that
 equation live.
+
+## No change: Club Manager write parity is an app-layer decision (2026-08-17)
+
+The owner ruled that Club Manager holds **full write parity** with Club
+Practitioner across the team workspace — a **deliberate reversal** of the
+earlier de-facto read-only manager behaviour, recorded here so it reads as a
+considered decision and not an accidental widening.
+
+**Zero RLS changes were needed**, and that is the point of this entry: the
+database layer always granted managers club-wide writes. Every data-table
+insert/update policy (assessments, gps_logs, vald_data, injuries, checkins,
+supplement_protocols, comments, training_load_plans) gates on
+`is_assigned_to_athlete_via_team()` or `is_assigned_to_team()`, and both
+helpers carry the `is_club_manager_for_club()` fallback (migrations 001/007).
+What blocked managers was a handful of practitioner-only role checks in server
+actions — app-layer gates sitting ABOVE always-permissive RLS. Those now route
+through the single `isClubStaff()` helper in `lib/auth.ts` (its doc block
+carries the ruling); manager-only powers (comments' reflect_in_ai toggle,
+athlete registration, club settings) remain separate explicit checks. See
+`docs/02-roles-and-permissions.md` § Club Manager.

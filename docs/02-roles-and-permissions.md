@@ -133,9 +133,25 @@ only, per `05-business-rules.md`).
 Full operational control of their own club. Can also personally hold a
 practitioner role. Creates teams, invites/assigns Club Practitioners,
 sets their fine-tuned permissions (within Super Admin's ceiling), adds
-athletes (one-by-one or CSV), sets compliance-notification thresholds,
-approves/denies independent-practitioner access requests, moderates
-(can un-flag from AI reflection, cannot delete) Official Comments.
+athletes (one-by-one — the CSV bulk-import flow was removed 2026-08-17),
+sets compliance-notification thresholds, approves/denies
+independent-practitioner access requests, moderates (can un-flag from AI
+reflection, cannot delete) Official Comments.
+
+**Full write parity with Club Practitioner (2026-08-17, deliberate).**
+The app layer now enforces what the role cascade above and the RLS layer
+always described: a Club Manager can add and edit data everywhere a
+practitioner can — assessments (all methods), injuries, GPS, VALD,
+training load, supplement protocols and the Nutrition Planner, comments,
+messenger, and report generation *and sharing* — club-wide rather than
+team-scoped. This is a **considered owner reversal** of the earlier
+de-facto read-only manager behaviour in the team workspace (several
+actions were practitioner-only at the app layer even though RLS
+permitted managers throughout), not an accidental widening. The single
+gate is `isClubStaff()` in `lib/auth.ts`; manager-only powers (comment
+AI-reflection toggle, athlete registration, club settings) remain
+separate explicit checks. Entries a manager makes are Club-Verified and
+attributed to them, same as a practitioner's (`05-business-rules.md`).
 
 ### Club Practitioner
 Read/write scoped to team(s) assigned, across however many clubs they
