@@ -1,16 +1,11 @@
-// Shared matching for DATA-ENTRY CSV imports (GPS, VALD, body composition…),
-// as distinct from the athlete-registration import in
-// app/club/[clubId]/athletes/import/.
+// Shared matching for DATA-ENTRY CSV imports (GPS, VALD, body composition…).
 //
-// The matching direction is INVERTED between the two, which is the main
-// thing to keep straight:
-//
-//   Registration import : a code that MATCHES an existing athlete is a
-//                         DUPLICATE and gets skipped. No match is the
-//                         normal, expected case.
-//   Data-entry import   : a code that MATCHES is the normal case — that's
-//                         the athlete the reading belongs to. NO match is
-//                         the error ("no match found", Flow 6 step 4).
+// (An athlete-REGISTRATION CSV import also existed until 2026-08-17, removed
+// by owner decision. Its matching direction was the INVERSE of this file's:
+// there, a code that matched an existing athlete was a DUPLICATE to skip.
+// Here, a code that MATCHES is the normal case — that's the athlete the
+// reading belongs to — and NO match is the error ("no match found",
+// Flow 6 step 4).)
 //
 // docs/04-user-flows.md Flow 6 step 3 describes this direction ("matches
 // each row to an athlete by athlete code (not name — names have

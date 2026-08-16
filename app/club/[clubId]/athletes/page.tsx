@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BTN_PRIMARY, BTN_SECONDARY, CARD, NOTICE } from "@/lib/ui";
+import { BTN_PRIMARY, CARD, NOTICE } from "@/lib/ui";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
@@ -41,22 +41,15 @@ export default async function ClubAthletesPage({
             Everyone registered to this club.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link
-            href={`/club/${clubId}/athletes/import`}
-            className={BTN_SECONDARY}
-            style={{ borderColor: "var(--border)", color: "var(--text)" }}
-          >
-            Import CSV
-          </Link>
-          <Link
-            href={`/club/${clubId}/athletes/new`}
-            className={BTN_PRIMARY}
-            style={{ backgroundImage: "var(--brand-gradient-action)" }}
-          >
-            + Register Athlete
-          </Link>
-        </div>
+        {/* CSV bulk-import removed 2026-08-17 (owner decision) — registration
+            is one athlete at a time through the form. */}
+        <Link
+          href={`/club/${clubId}/athletes/new`}
+          className={BTN_PRIMARY}
+          style={{ backgroundImage: "var(--brand-gradient-action)" }}
+        >
+          + Register Athlete
+        </Link>
       </div>
 
       {error && (

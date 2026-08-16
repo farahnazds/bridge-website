@@ -905,9 +905,10 @@ next reader needing to know the implicit-check rule.
 
 - **Club staff / Super Admin updating someone else's profile.** That is
   onboarding, already scoped by the `"club staff updates linked ..."` policies.
-  The four invite flows (`athletes/new`, `athletes/import`, `teams-staff`,
-  `clubs/new`) set `user_id` on a just-created profile whose `user_id` is still
-  null — `old.user_id is distinct from auth.uid()` is true for a null, so those
+  The invite flows (`athletes/new`, `teams-staff`, `clubs/new` — and
+  `athletes/import` until its 2026-08-17 removal) set `user_id` on a
+  just-created profile whose `user_id` is still null —
+  `old.user_id is distinct from auth.uid()` is true for a null, so those
   take the "someone else's row" branch and are unaffected.
 - **A Super Admin changing these columns on their own row.** They hold
   `"super admin full access"` over every other row already.

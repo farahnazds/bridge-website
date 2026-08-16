@@ -16,8 +16,13 @@ export default async function NewAthletePage({
   const { clubId } = await params;
   const supabase = await createClient();
 
-  const [{ data: teams }, { data: conditions }, { data: allergies }, { data: intolerances }] =
+  const [{ data: club }, { data: teams }, { data: conditions }, { data: allergies }, { data: intolerances }] =
     await Promise.all([
+      // The club's own sport (set by Super Admin at club creation) pre-fills
+      // the form's Sport field — editable, but saves re-entry per athlete.
+      // clubs has NO country column (only free-text location), so Country
+      // cannot be defaulted the same way yet.
+      supabase.from("clubs").select("sport").eq("id", clubId).maybeSingle(),
       supabase.from("teams").select("id, name, category").eq("club_id", clubId).order("name"),
       supabase.from("medical_conditions").select("code, label").order("label"),
       supabase.from("allergies").select("code, label").order("label"),
@@ -52,6 +57,7 @@ export default async function NewAthletePage({
       >
         <AthleteForm
           clubId={clubId}
+          clubSport={(club?.sport as string | undefined)?.trim() || null}
           teams={teams ?? []}
           conditions={conditions ?? []}
           allergies={allergies ?? []}

@@ -6,8 +6,9 @@ import { getCurrentProfile } from "@/lib/auth";
 import { TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 
 // The first real "edit athlete" surface in the product. Until now the only
-// athlete writes were /athletes/new and /athletes/import, plus two internal
-// post-insert updates (profile_id, profile_photo_url) — nothing user-facing.
+// athlete writes were /athletes/new (and, until its 2026-08-17 removal, the
+// /athletes/import CSV flow), plus two internal post-insert updates
+// (profile_id, profile_photo_url) — nothing user-facing.
 //
 // The database is the boundary, not this action. Migration 026 rewrote
 // "club staff access club athletes" so its USING clause is

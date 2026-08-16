@@ -37,7 +37,6 @@ export async function registerAthlete(
   const ethnicity = String(formData.get("ethnicity") ?? "").trim() || null;
   const weightKg = parseNumeric(formData.get("weight_kg"));
   const heightCm = parseNumeric(formData.get("height_cm"));
-  const bodyFatPct = parseNumeric(formData.get("body_fat_pct"));
   const dietPreference = String(formData.get("diet_preference") ?? "none").trim();
   const sport = String(formData.get("sport") ?? "").trim();
   const position = String(formData.get("position") ?? "").trim() || null;
@@ -77,9 +76,6 @@ export async function registerAthlete(
   const supabase = await createClient();
   const adminClient = createAdminClient();
 
-  const leanMassKg =
-    weightKg !== null && bodyFatPct !== null ? weightKg * (1 - bodyFatPct / 100) : null;
-
   const { data: athlete, error: athleteError } = await supabase
     .from("athletes")
     .insert({
@@ -95,10 +91,11 @@ export async function registerAthlete(
       position,
       tier,
       diet_preference: dietPreference,
+      // body_fat_pct / lean_mass_kg deliberately not written since
+      // 2026-08-17 — composition lives in assessments (the four measurement
+      // methods); nothing anywhere read these registration-time columns.
       weight_kg: weightKg,
       height_cm: heightCm,
-      body_fat_pct: bodyFatPct,
-      lean_mass_kg: leanMassKg,
       menstrual_status: menstrualStatus,
       iron_status: ironStatus,
     })

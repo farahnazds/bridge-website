@@ -104,12 +104,16 @@ function ChecklistField({
 
 export default function AthleteForm({
   clubId,
+  clubSport,
   teams,
   conditions,
   allergies,
   intolerances,
 }: {
   clubId: string;
+  /** The club's own sport, pre-filling the Sport field (editable). Null when
+   *  the club row couldn't be read. */
+  clubSport: string | null;
   teams: { id: string; name: string; category: string | null }[];
   conditions: { code: string; label: string }[];
   allergies: { code: string; label: string }[];
@@ -117,10 +121,17 @@ export default function AthleteForm({
 }) {
   const [state, formAction] = useActionState(registerAthlete, initialState);
 
+  // clubs.sport is an open list (free text at club creation), so it may or
+  // may not be one of the SPORTS options: a listed sport pre-selects it, an
+  // unlisted one starts the field in free-text mode pre-filled with it.
+  const clubSportListed = clubSport !== null && (SPORTS as readonly string[]).includes(clubSport);
+
   const [lastName, setLastName] = useState("");
   const [code, setCode] = useState(() => generateAthleteCode(""));
   const [codeTouched, setCodeTouched] = useState(false);
-  const [sportMode, setSportMode] = useState<"select" | "other">("select");
+  const [sportMode, setSportMode] = useState<"select" | "other">(
+    clubSport && !clubSportListed ? "other" : "select"
+  );
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   function handleLastNameChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -300,7 +311,11 @@ export default function AthleteForm({
       {/* ---- Body composition ---- */}
       <section className="flex flex-col gap-5">
         <SectionHeading>Body composition</SectionHeading>
-        <div className="grid grid-cols-3 gap-4">
+        {/* Body fat was removed 2026-08-17: composition is measured through
+            the Assessments page's four real methods (Tanita / InBody /
+            Skinfold / DEXA), and nothing ever read the registration-time
+            value. Weight and height stay as basic intake facts. */}
+        <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="weight_kg" className={labelClass} style={{ color: "var(--text)" }}>
               Weight (kg)
@@ -329,24 +344,10 @@ export default function AthleteForm({
               style={INPUT_STYLE}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="body_fat_pct" className={labelClass} style={{ color: "var(--text)" }}>
-              Body fat %
-            </label>
-            <input
-              id="body_fat_pct"
-              name="body_fat_pct"
-              type="number"
-              step="0.1"
-              min="0"
-              max="100"
-              className={INPUT}
-              style={INPUT_STYLE}
-            />
-          </div>
         </div>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Lean mass is auto-calculated from weight × (1 − body fat %) once both are entered.
+          Body fat and lean mass are recorded through Assessments (Tanita, InBody, Skinfold, DEXA),
+          not at registration.
         </p>
       </section>
 
@@ -454,7 +455,7 @@ export default function AthleteForm({
                 id="sport"
                 name="sport"
                 required
-                defaultValue=""
+                defaultValue={clubSportListed ? (clubSport as string) : ""}
                 onChange={(e) => {
                   if (e.target.value === OTHER_SPORT) setSportMode("other");
                 }}
@@ -478,7 +479,7 @@ export default function AthleteForm({
                   name="sport"
                   type="text"
                   required
-                  autoFocus
+                  defaultValue={clubSport && !clubSportListed ? clubSport : ""}
                   placeholder="Enter sport name"
                   className={INPUT}
                   style={INPUT_STYLE}

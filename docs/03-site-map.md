@@ -66,7 +66,9 @@ Admin only).
 
 - Overview, Teams & Staff (create teams, assign practitioners, set
   fine-tuned permissions within Super Admin's ceiling)
-- Athletes (register, CSV import, profile with Activity/History tab)
+- Athletes (register, profile with Activity/History tab — the CSV
+  bulk-import flow was removed 2026-08-17 by owner decision; registration
+  is one athlete at a time)
 - Assessments, GPS/Performance, Body Composition, VALD, Compliance
 - Injury Log / Return to Play
 - Season Phases (`/club/[club-id]/periodization`) — club-level season and

@@ -12,11 +12,14 @@ Admin-editable — additive, no schema change needed to extend them.
 - Gender
 - Ethnicity (see `05-business-rules.md` — legal-review flag attached)
 
-## Body composition (initial + ongoing via assessments)
+## Body composition
 
-- Weight (kg), Height (cm), Body Fat %
-- Lean mass (auto-calculated from weight × (1 − bf%), manually
-  overridable)
+- At registration: Weight (kg) and Height (cm) only.
+- Body fat % and lean mass are recorded exclusively through Assessments
+  (Tanita / InBody / Skinfold / DEXA). The registration-time Body Fat %
+  field (and its auto-calculated lean mass) was removed 2026-08-17 —
+  nothing ever read the registration-time values; every body-composition
+  read comes from the assessments table.
 
 ## Diet / clinical profile
 
