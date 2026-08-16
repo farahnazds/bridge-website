@@ -47,12 +47,19 @@ export const REPORT_EFFORT = "high" as const;
  * sessions, VALD tests and an injury with a clinical description. It arrives
  * with success, not at deploy time.
  *
- * 16000 clears it today. 24000 is chosen instead because the input grows for
- * the life of every athlete, and the margin is what stops this recurring
+ * 16000 clears it today. 24000 was chosen because the input grows for the
+ * life of every athlete, and the margin is what stops this recurring
  * silently. One constant, so no report type can drift back — the same reason
  * REPORT_MODEL exists above.
+ *
+ * RAISED TO 32000 on 2026-08-16: the redesigned nutrition contract (two
+ * daily-targets tables, a day-type fuel map, one six-column meal table per
+ * day type) emits substantially more table output, and the first live run
+ * under it hit the 24000 ceiling with thinking consuming the budget before
+ * any text. Verified failing at 24000 and passing at 32000 on the same
+ * request. max_tokens is a cap, not a spend — an unused budget costs nothing.
  */
-export const REPORT_MAX_TOKENS = 24000;
+export const REPORT_MAX_TOKENS = 32000;
 
 /**
  * Interprets a finished report response, returning a user-facing error or null

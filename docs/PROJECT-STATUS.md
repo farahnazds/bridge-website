@@ -622,6 +622,17 @@ are listed.
 
 **Raised today, not yet documented elsewhere:**
 
+- **Rx block on report PDFs has no data source (tracked 2026-08-16, its own
+  task — deliberately NOT folded into the report-design Phase 2).** The
+  layout (`rxStrip`, ordering fixed per the approved design) exists but never
+  renders: delivery wires `prescriber: null` because `profiles` carries only
+  `title`/`specialty` — no credentials, no board-registration number, and
+  nothing models an Rx code or issue/review dates (docs/12 requires all of
+  them). Needs: a migration adding `credentials` + `registration_no` to
+  profiles (shared prod DB — owner go-ahead required), a My Profile edit
+  surface, delivery wiring, and a decision on Rx-code/issue-date semantics.
+  Until then the strip stays dark rather than rendering a name-only block.
+
 - **Perceived 1–1.5s click latency** on both domains. Suspected Vercel
   Hobby cold starts given low traffic, but **never investigated** — the
   investigation was requested and then superseded. No Speed Insights or

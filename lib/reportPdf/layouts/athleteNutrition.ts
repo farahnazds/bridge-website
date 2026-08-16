@@ -237,6 +237,52 @@ function capSentences(text: string, max: number): string {
 /** How many strip cells fit across the content width before they crowd. */
 const MAX_STRIP_DAYS = 7;
 
+/**
+ * Joins a day square to its row in the plan's "Day type fuel map" table.
+ *
+ * The map's Day type column uses the fixed vocabulary the prompt mandates
+ * (High/Moderate/Low Intensity, Match Day, Rest Day, Baseline), so the
+ * strip's own tag is the join key; an unlogged day (tag label "—") takes the
+ * baseline row. A day whose type has no row shows no figures — the tag and
+ * RPE are still real, and the layout never estimates a number.
+ */
+function fuelForDay(
+  fuelMap: PrescribedTable | undefined,
+  tag: keyof typeof DAY_TAG,
+  label: string
+): { kcal: string; macros: string } | undefined {
+  if (!fuelMap) return undefined;
+  const wantBaseline = label === "—";
+  const row = fuelMap.rows.find((r) => {
+    const t = (r[0] ?? "").toLowerCase();
+    if (wantBaseline) return /baseline|no load/.test(t);
+    if (/baseline|no load/.test(t)) return false;
+    switch (tag) {
+      case "high":
+        return /high/.test(t);
+      case "mod":
+        return /moderate|\bmod\b/.test(t);
+      case "low":
+        return /\blow\b/.test(t);
+      case "match":
+        return /match/.test(t);
+      case "rest":
+        return /rest/.test(t);
+      default:
+        return false;
+    }
+  });
+  if (!row) return undefined;
+  const kcal = (row[1] ?? "").trim();
+  if (!kcal) return undefined;
+  const cho = (row[2] ?? "").trim();
+  const pro = (row[3] ?? "").trim();
+  const macros = [cho ? `C ${cho}` : null, pro ? `P ${pro}` : null]
+    .filter((v): v is string => v !== null)
+    .join(" · ");
+  return { kcal: /kcal/i.test(kcal) ? kcal : `${kcal} kcal`, macros };
+}
+
 export function athleteNutritionBlocks(
   data: NutritionData,
   identity: ReportIdentity,
@@ -251,35 +297,52 @@ export function athleteNutritionBlocks(
 
   // ---- Daily targets (PRESCRIBED) ----
   // Rendered ONLY when the narrative carries a targets table; otherwise the
-  // section is omitted entirely. It used to render a prominent "not
-  // confirmed" note at the top of page 1 — the 2026-08-15 feedback's rule is
-  // the right one: hero numbers up front or nothing, never an empty box. The
-  // prompt now derives the table from recorded assessment data (and itself
-  // omits the section when no assessment exists), so absence here means
-  // "nothing honest to show" and the page simply starts with the summary.
-  const targets = prescribed.find((p) => /target|daily|macro/i.test(p.title));
-  if (targets && targets.rows.length > 0) {
-    blocks.push(sectionTitle("Daily targets — standard training day"));
-    // A targets table is rendered as the dark panel the template uses: first
-    // column is the label, second the value.
-    blocks.push(
-      darkPanel(
-        targets.rows.slice(0, 4).map((r) => ({
-          label: r[0] ?? "",
-          value: r[1] ?? "—",
-          sub: r[2] ?? undefined,
-        }))
-      )
+  // section is omitted entirely — hero numbers up front or nothing, never an
+  // empty box (2026-08-15 feedback). The 2026-08-16 contract produces TWO
+  // tables — "Daily targets — training day" and "— match day" — and older
+  // stored reports still carry the single-table shape, so the training panel
+  // falls back to any non-match targets table and the match panel simply
+  // omits when absent.
+  const targetsTraining =
+    prescribed.find((p) => /daily targets/i.test(p.title) && /training/i.test(p.title)) ??
+    prescribed.find((p) => /target|daily|macro/i.test(p.title) && !/match|fuel/i.test(p.title));
+  const targetsMatch = prescribed.find(
+    (p) => /daily targets/i.test(p.title) && /match/i.test(p.title)
+  );
+  // The fuel map is DATA for the periodisation grid, never rendered as its
+  // own visible table — see the join below.
+  const fuelMap = prescribed.find((p) => /fuel map/i.test(p.title));
+
+  const targetPanel = (t: PrescribedTable) =>
+    darkPanel(
+      t.rows.slice(0, 4).map((r) => ({
+        label: r[0] ?? "",
+        value: r[1] ?? "—",
+        sub: r[2] ?? undefined,
+      }))
     );
+  if (targetsTraining && targetsTraining.rows.length > 0) {
+    blocks.push(sectionTitle("Daily targets — standard training day"));
+    blocks.push(targetPanel(targetsTraining));
+  }
+  if (targetsMatch && targetsMatch.rows.length > 0) {
+    blocks.push(sectionTitle("Daily targets — match day"));
+    blocks.push(targetPanel(targetsMatch));
   }
 
-  // Hard-capped at three sentences — the prompt asks for three, and this
-  // enforces it against an overrunning model rather than trusting one.
+  // Hard-capped at four sentences — the prompt asks for four (2026-08-16
+  // feedback raised the cap from three), and this enforces it against an
+  // overrunning model rather than trusting one.
   if (narrative.meansBox) {
-    blocks.push(meansBox(summaryHeading(identity), capSentences(narrative.meansBox, 3)));
+    blocks.push(meansBox(summaryHeading(identity), capSentences(narrative.meansBox, 4)));
   }
 
-  // ---- Weekly periodisation (MEASURED) ----
+  // ---- Weekly periodisation (MEASURED days × PRESCRIBED fuel) ----
+  // The day squares are measured (training_load_plans); the kcal/macros
+  // inside each square join against the plan's "Day type fuel map" table by
+  // day type. The join is by the fixed type vocabulary the prompt mandates;
+  // a day whose type has no fuel row simply shows no figures — the tag and
+  // RPE are still real, and nothing is estimated in the layout.
   blocks.push(sectionTitle("Weekly periodisation"));
   const days = data.days.slice(0, MAX_STRIP_DAYS);
   if (days.length === 0) {
@@ -297,15 +360,18 @@ export function athleteNutritionBlocks(
         tagLabel: label,
         value: d.rpe === null ? "—" : `RPE ${d.rpe}`,
         caption: shortDate(d.date),
+        fuel: fuelForDay(fuelMap, tag, label),
       };
     });
     blocks.push(weekStrip(cells));
     // No explanatory callout under the grid — the 2026-08-16 feedback: the
-    // grid itself is the explanation, and will carry per-day figures next.
+    // grid itself is the explanation, and now carries the per-day figures.
   }
 
   // ---- Meal timing / food examples (PRESCRIBED) ----
-  const meals = prescribed.filter((p) => p !== targets);
+  const meals = prescribed.filter(
+    (p) => p !== targetsTraining && p !== targetsMatch && p !== fuelMap
+  );
   if (meals.length > 0) {
     blocks.push(sectionTitle("Meal timing and portions"));
     for (const m of meals) {
@@ -315,6 +381,11 @@ export function athleteNutritionBlocks(
           meta: m.meta ?? undefined,
           head: m.head,
           rows: m.rows,
+          // The 2026-08-16 six-column shape (window · kcal · macros · foods ·
+          // supplements · notes) gets proportioned widths; older three-column
+          // tables keep even columns.
+          // kcal gets enough width for its own header not to wrap.
+          weights: m.head.length === 6 ? [1.3, 0.7, 0.95, 1.95, 1.5, 1.25] : undefined,
           // Right-align nothing by default: these are portions and timings, not
           // measured quantities, and a right-aligned "2 h pre" reads oddly.
           note: m.note ?? undefined,
@@ -358,8 +429,23 @@ export function athleteNutritionBlocks(
   // ---- Anti-doping (STANDING — never conditional) ----
   blocks.push(precisionBox("Anti-doping", ANTI_DOPING));
 
+  // Each of the three named interpretation subsections hard-capped at three
+  // sentences — the prompt mandates the cap and the fixed titles; the clamp
+  // holds against an overrunning model. Deliberately matched by title: when a
+  // model merges the three under one heading (seen live — it used bold labels
+  // instead of headings), clamping the merged body would silently discard two
+  // thirds of the interpretation, which is worse than an over-long panel.
+  const INTERP_SUB = /^(where you are now|performance goal|energy availability)/i;
+  const clampedNarrative: Narrative = {
+    ...narrative,
+    interps: narrative.interps.map((n) =>
+      INTERP_SUB.test(n.title.trim()) ? { ...n, body: capSentences(n.body, 3) } : n
+    ),
+  };
   blocks.push(
-    ...narrativeTail(narrative, "Performance interpretation", { includeRecommendations: false })
+    ...narrativeTail(clampedNarrative, "Performance interpretation", {
+      includeRecommendations: false,
+    })
   );
 
   // ---- Summary (MEASURED) ----

@@ -543,6 +543,10 @@ export interface DayCell {
   tagLabel: string;
   value: string;
   caption?: string;
+  /** Per-day energy and macros from the plan's fuel map, shown inside the
+   *  cell — e.g. kcal "3,400", macros "C 500 · P 132". Omitted when the plan
+   *  carries no fuel map (older reports, general mode). */
+  fuel?: { kcal: string; macros: string };
 }
 
 /** Days per row. Two rows of four beats seven crushed cells across A4: the
@@ -564,12 +568,17 @@ export function weekStrip(days: DayCell[]): Block {
   const valueStyle: TextStyle = { size: SIZE.dayValue, font: FONT.bold, color: COLOR.ink, align: "center" };
   const capStyle: TextStyle = { size: SIZE.dayCaption, color: COLOR.muted2, align: "center" };
 
+  const fuelKcalStyle: TextStyle = { size: SIZE.dayValue, font: FONT.bold, color: COLOR.ink, align: "center" };
+  const fuelMacroStyle: TextStyle = { size: SIZE.dayCaption, color: COLOR.muted, align: "center" };
+
   const rowCount = Math.max(1, Math.ceil(days.length / STRIP_PER_ROW));
+  const hasFuel = days.some((d) => d.fuel);
 
   const cellHeight = (ctx: RenderCtx): number => {
     const lh = (s: TextStyle) => lineHeight(ctx.doc, s);
     return (
       PAD.day.y * 2 + lh(nameStyle) + px(4) + lh(tagStyle) + px(4) + px(5) + lh(valueStyle) +
+      (hasFuel ? px(4) + lh(fuelKcalStyle) + px(1) + lh(fuelMacroStyle) : 0) +
       (days.some((d) => d.caption) ? px(1) + lh(capStyle) : 0)
     );
   };
@@ -604,6 +613,12 @@ export function weekStrip(days: DayCell[]): Block {
         drawText(ctx.doc, d.tagLabel, x, iy + px(2), w, { ...tagStyle, color: fg });
         iy += tagH + px(5);
         iy += drawText(ctx.doc, d.value, x, iy, w, valueStyle);
+        if (d.fuel) {
+          iy += px(4);
+          iy += drawText(ctx.doc, d.fuel.kcal, x, iy, w, fuelKcalStyle);
+          iy += px(1);
+          iy += drawText(ctx.doc, d.fuel.macros, x, iy, w, fuelMacroStyle);
+        }
         if (d.caption) drawText(ctx.doc, d.caption, x, iy + px(1), w, capStyle);
       });
     },
