@@ -86,6 +86,21 @@ export default async function ClubLayout({
       .map((m) => ({ id: m.club_id, label: m.clubs!.name, sublabel: m.clubs!.sport ?? null }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }
+
+  // THIS club's teams, for the "Jump to team" switcher below — the 2026-08-17
+  // navigation-parity work: one click from anywhere in the club view into a
+  // team's workspace (the same /staff/[teamId] shell a practitioner gets,
+  // with the same write access since the parity phases). Deliberately scoped
+  // to the CURRENT club only: "which club" is the club switcher's job directly
+  // above, and the two stacked cards read as the club → team hierarchy.
+  const { data: teamRows } = await supabase
+    .from("teams")
+    .select("id, name, category")
+    .eq("club_id", clubId)
+    .order("name");
+  const jumpTeams = ((teamRows ?? []) as { id: string; name: string; category: string | null }[]).map(
+    (t) => ({ id: t.id, label: t.name, sublabel: t.category ? t.category.replaceAll("_", " ") : null })
+  );
   const navGroups = [
   { label: null, items: [
     { label: "Overview", href: `/club/${clubId}`, icon: LayoutDashboard },
@@ -128,13 +143,34 @@ export default async function ClubLayout({
         style={{ backgroundColor: "var(--surface)" }}
       >
         {/* Top of the sidebar, above the nav — same position as /staff and
-            /admin. See the note in app/staff/[teamId]/layout.tsx. */}
-        <ContextSwitcher
-          currentId={clubId}
-          options={availableClubs}
-          fallbackBase="/club"
-          label="Switch club"
-        />
+            /admin. See the note in app/staff/[teamId]/layout.tsx.
+
+            Below the club switcher: "Jump to team", in the switcher's JUMP-TO
+            mode (currentId null — no club page is scoped to a team, so there
+            is nothing to collapse or highlight; collapseSingle false — a way
+            to get somewhere must stay clickable even with one destination).
+            Selecting a team lands on /staff/<teamId> — the practitioner's
+            exact team workspace. Hidden only when the club has no teams yet.
+            The tight wrapper mirrors the team side's club-card + team-switcher
+            stack. */}
+        <div className="flex flex-col gap-2">
+          <ContextSwitcher
+            currentId={clubId}
+            options={availableClubs}
+            fallbackBase="/club"
+            label="Switch club"
+          />
+          {jumpTeams.length > 0 && (
+            <ContextSwitcher
+              currentId={null}
+              options={jumpTeams}
+              fallbackBase="/staff"
+              label="Jump to team"
+              emptyLabel="Jump to team…"
+              collapseSingle={false}
+            />
+          )}
+        </div>
 
         {isOversight && (
           <div className="px-2">

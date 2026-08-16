@@ -76,9 +76,15 @@ export default async function TeamLayout({
   // sends them straight back into a team, so the old "← My Teams" link led in
   // a circle. They change teams with the switcher in the header instead, so
   // the link is simply absent for them. Manager and oversight both still have
-  // real destinations (their club's staff page, and the teams browse list).
-  const backHref = isOversight ? "/staff" : isManager ? `/club/${team.club_id}/teams-staff` : null;
-  const backLabel = isOversight ? "← All teams" : "← Teams & Staff";
+  // real destinations.
+  //
+  // The manager's destination is the CLUB OVERVIEW, named as such — the mirror
+  // of the club sidebar's "Jump to team" switcher (2026-08-17 navigation
+  // parity work): club view ⇄ team workspace is one round trip, symmetrical
+  // from both ends, not a detour through Teams & Staff.
+  const clubName = team.clubs?.name ?? "Club";
+  const backHref = isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : null;
+  const backLabel = isOversight ? "← All teams" : `← ${clubName} — club view`;
   // Order per the owner's 2026-08-16 restructure: the top group is the daily
   // working set (Supplements promoted from Athlete Data, ahead of Reports);
   // Athlete Data keeps the measurement surfaces; Messenger and Comments move
@@ -137,13 +143,33 @@ export default async function TeamLayout({
         {/* Directly under the header's logo and above the nav, matching the
             design file: the switcher states WHICH context you are in, so it
             belongs at the top of the thing it scopes rather than off in the
-            header next to the account menu. */}
-        <ContextSwitcher
-          currentId={team.id}
-          options={availableTeams.map((t) => ({ id: t.id, label: t.name, sublabel: t.clubName }))}
-          fallbackBase="/staff"
-          label="Switch team"
-        />
+            header next to the account menu.
+
+            For a manager, the club renders ABOVE the team as a collapsed,
+            non-interactive context card — the club → team hierarchy made
+            visible from the team side, mirroring the club sidebar where the
+            club switcher sits above "Jump to team" (2026-08-17 navigation
+            parity). Navigation back up is the named link below; the card only
+            states where this team belongs. (ContextSwitcher with one option
+            and collapseSingle renders exactly that static card.) The tight
+            wrapper keeps card and switcher reading as one stack, not two
+            sidebar sections. */}
+        <div className="flex flex-col gap-2">
+          {isManager && (
+            <ContextSwitcher
+              currentId={team.club_id}
+              options={[{ id: team.club_id, label: clubName, sublabel: "Club" }]}
+              fallbackBase="/club"
+              label="Club"
+            />
+          )}
+          <ContextSwitcher
+            currentId={team.id}
+            options={availableTeams.map((t) => ({ id: t.id, label: t.name, sublabel: t.clubName }))}
+            fallbackBase="/staff"
+            label="Switch team"
+          />
+        </div>
 
         {backHref && (
           <div className="px-2">
