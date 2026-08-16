@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { BADGE, CARD } from "@/lib/ui";
+import { INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 import { SPARK_DAYS, TREND_DAYS, type RosterRow, type Availability } from "@/lib/rosterShape";
 
 // The interactive half of the Roster: filter tabs, sort, sparklines, pills.
@@ -92,6 +93,68 @@ function summarise(spark: RosterRow["spark"]): string {
   return `Last ${SPARK_DAYS} days: ${completed} completed, ${skipped} skipped, ${missing} not logged`;
 }
 
+const injuryStatusLabel = (v: string) => INJURY_STATUSES.find((s) => s.value === v)?.label ?? v;
+const rtpPhaseLabel = (v: string) => RTP_PHASES.find((p) => p.value === v)?.label ?? v;
+
+/**
+ * The WHY behind an athlete's presence in one of the three fact filters,
+ * rendered as a companion row under their table row while that filter is
+ * active. Filtering alone proved an invisible answer — on a small roster a
+ * chip's only visible effect was a row disappearing, and the remaining rows
+ * said nothing about why they matched.
+ */
+function FilterDetail({ filter, r }: { filter: Filter; r: RosterRow }) {
+  if (filter === "Check-In Notes" && r.recentNote) {
+    return (
+      <p className="m-0 text-xs leading-relaxed" style={{ color: "var(--text)" }}>
+        <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>{r.recentNote.date}</span>
+        {" — "}
+        {r.recentNote.text}
+      </p>
+    );
+  }
+  if (filter === "Active Injury" && r.openInjuries.length > 0) {
+    return (
+      <div className="flex flex-col gap-1">
+        {r.openInjuries.map((inj, i) => (
+          <p key={i} className="m-0 text-xs" style={{ color: "var(--text)" }}>
+            <span className="font-medium">{inj.type ?? "Injury"}</span>
+            <span style={{ color: "var(--text-muted)" }}>
+              {" — "}
+              {injuryStatusLabel(inj.status)}
+              {inj.rtpPhase ? ` · ${rtpPhaseLabel(inj.rtpPhase)}` : ""}
+              {" · RTP target "}
+              {inj.targetReturnDate ?? "not set"}
+            </span>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  if (filter === "Missed Supplement" && r.missedSupplements.length > 0) {
+    return (
+      <span className="flex flex-wrap items-center gap-1.5">
+        {r.missedSupplements.map((m) => (
+          // The compliance modal's state colours: missed = danger, "not
+          // sure" = warning. The state is written out, not colour-only.
+          <span
+            key={m.name}
+            className={BADGE}
+            title={`Recorded ${m.date}`}
+            style={{
+              backgroundColor: `color-mix(in srgb, ${m.state === "missed" ? "var(--danger)" : "var(--warning)"} 12%, transparent)`,
+              color: m.state === "missed" ? "var(--danger)" : "var(--warning)",
+            }}
+          >
+            {m.name}: {m.state === "missed" ? "Missed" : "Not sure"}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  return null;
+}
+
 export default function RosterClient({ teamId, rows }: { teamId: string; rows: RosterRow[] }) {
   const [filter, setFilter] = useState<Filter>("All");
   const [sort, setSort] = useState<Sort>("Name");
@@ -100,9 +163,9 @@ export default function RosterClient({ teamId, rows }: { teamId: string; rows: R
     () => ({
       All: rows.length,
       Flagged: rows.filter((r) => r.flagged).length,
-      "Check-In Notes": rows.filter((r) => r.hasRecentNote).length,
-      "Active Injury": rows.filter((r) => r.hasActiveInjury).length,
-      "Missed Supplement": rows.filter((r) => r.hasMissedSupplement).length,
+      "Check-In Notes": rows.filter((r) => r.recentNote !== null).length,
+      "Active Injury": rows.filter((r) => r.openInjuries.length > 0).length,
+      "Missed Supplement": rows.filter((r) => r.missedSupplements.length > 0).length,
     }),
     [rows]
   );
@@ -111,9 +174,9 @@ export default function RosterClient({ teamId, rows }: { teamId: string; rows: R
     const matches = (r: RosterRow) =>
       filter === "All" ||
       (filter === "Flagged" && r.flagged) ||
-      (filter === "Check-In Notes" && r.hasRecentNote) ||
-      (filter === "Active Injury" && r.hasActiveInjury) ||
-      (filter === "Missed Supplement" && r.hasMissedSupplement);
+      (filter === "Check-In Notes" && r.recentNote !== null) ||
+      (filter === "Active Injury" && r.openInjuries.length > 0) ||
+      (filter === "Missed Supplement" && r.missedSupplements.length > 0);
 
     const list = rows.filter(matches);
     return sort === "Name"
@@ -203,8 +266,13 @@ export default function RosterClient({ teamId, rows }: { teamId: string; rows: R
             {visible.map((r, i) => {
               const avail = AVAILABILITY[r.availability];
               const today = r.todayStatus ? TODAY_STYLE[r.todayStatus] ?? NOT_LOGGED : NOT_LOGGED;
+              // Only the three fact filters get the companion detail row —
+              // All and Flagged keep the exact display they always had.
+              const showDetail =
+                filter === "Check-In Notes" || filter === "Active Injury" || filter === "Missed Supplement";
               return (
-                <tr key={r.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
+                <Fragment key={r.id}>
+                <tr style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
                   <td className="px-5 py-3">
                     <Link
                       href={`/staff/${teamId}/athletes/${r.id}`}
@@ -261,6 +329,16 @@ export default function RosterClient({ teamId, rows }: { teamId: string; rows: R
                     </span>
                   </td>
                 </tr>
+                {showDetail && (
+                  <tr>
+                    {/* No top border — this row reads as part of the athlete's
+                        row above, not a new entry. */}
+                    <td colSpan={5} className="px-5 pb-3 pt-0">
+                      <FilterDetail filter={filter} r={r} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>

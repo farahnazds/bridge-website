@@ -43,13 +43,22 @@ export interface RosterRow {
   flagged: boolean;
   /** Why it is flagged, for the row's tooltip. Empty when not flagged. */
   flagReasons: string[];
-  /** A check-in with a non-empty note within the last RECENT_DAYS. */
-  hasRecentNote: boolean;
-  /** Any injury still open (injuries.status != 'cleared'), no time limit. */
-  hasActiveInjury: boolean;
-  /** A check-in within the last RECENT_DAYS recording a supplement as
-   *  "missed" or "unsure" — anything short of a confirmed "taken". */
-  hasMissedSupplement: boolean;
+  /** The MOST RECENT check-in note within the last RECENT_DAYS, or null.
+   *  Carries the text so the Check-In Notes filter can show WHY the athlete
+   *  is listed, not just that they are. */
+  recentNote: { date: string; text: string } | null;
+  /** Every injury still open (injuries.status != 'cleared'), no time limit —
+   *  the Active Injury filter's detail: what it is and the expected RTP. */
+  openInjuries: {
+    type: string | null;
+    status: string;
+    rtpPhase: string | null;
+    targetReturnDate: string | null;
+  }[];
+  /** Supplements recorded short of a confirmed "taken" within the last
+   *  RECENT_DAYS — one entry per supplement, its most recent non-taken state
+   *  ("missed" or "unsure"; "unsure" counts by the 2026-08-16 ruling). */
+  missedSupplements: { name: string; state: "missed" | "unsure"; date: string }[];
 }
 
 export interface RosterOverview {

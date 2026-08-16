@@ -89,7 +89,7 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
       .lte("date", today),
     supabase
       .from("injuries")
-      .select("athlete_id, status, rtp_phase")
+      .select("athlete_id, type, status, rtp_phase, target_return_date")
       .in("athlete_id", athleteIds)
       .neq("status", "cleared"),
     clubId
@@ -115,7 +115,13 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
     else byAthlete.set(c.athlete_id, [c]);
   }
 
-  type InjuryRow = { athlete_id: string; status: string; rtp_phase: string | null };
+  type InjuryRow = {
+    athlete_id: string;
+    type: string | null;
+    status: string;
+    rtp_phase: string | null;
+    target_return_date: string | null;
+  };
   const injuriesByAthlete = new Map<string, InjuryRow[]>();
   for (const i of (injuriesRes.data ?? []) as InjuryRow[]) {
     const list = injuriesByAthlete.get(i.athlete_id);
@@ -188,19 +194,33 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
       .map((c) => ({ date: c.date, status: c.status as CheckinDay["status"] }));
     const breaches = evaluateAthlete(history, thresholds, now);
 
-    // The three filter-chip facts. Notes and missed supplements look only at
-    // the RECENT_DAYS window; the injury fact has no window — the query above
-    // already excludes status='cleared', so any row here is a still-open
-    // injury and the athlete stays on the filter until Injury Log clears it.
-    const recent = mine.filter((c) => recentWindow.has(c.date));
-    const hasRecentNote = recent.some((c) => (c.notes ?? "").trim() !== "");
+    // The three filter-chip facts, WITH the detail the filtered table shows —
+    // membership alone ("this athlete matches") turned out to be an invisible
+    // answer; each fact now carries its why. Notes and missed supplements look
+    // only at the RECENT_DAYS window; injuries have no window — the query
+    // above already excludes status='cleared', so any row here is still open
+    // and the athlete stays on the filter until Injury Log clears it.
+    const recent = mine
+      .filter((c) => recentWindow.has(c.date))
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const noted = recent.find((c) => (c.notes ?? "").trim() !== "");
+    const recentNote = noted ? { date: noted.date, text: (noted.notes as string).trim() } : null;
+
     // "missed" OR "unsure": an athlete who doesn't remember taking a dose is
     // as much a follow-up case as one who skipped it. Only "taken" is clear.
-    const hasMissedSupplement = recent.some((c) =>
-      Object.values(parseSupplements(c.supplements_taken)).some(
-        (s) => s === "missed" || s === "unsure"
-      )
-    );
+    // One entry per supplement — its most recent non-taken state in the
+    // window, so "missed Tuesday, taken since" still surfaces as the fact
+    // that a dose was missed.
+    const missedSupplements: { name: string; state: "missed" | "unsure"; date: string }[] = [];
+    const seenSupplements = new Set<string>();
+    for (const c of recent) {
+      for (const [name, state] of Object.entries(parseSupplements(c.supplements_taken))) {
+        if (state !== "taken" && !seenSupplements.has(name)) {
+          seenSupplements.add(name);
+          missedSupplements.push({ name, state, date: c.date });
+        }
+      }
+    }
 
     return {
       id: a.id,
@@ -218,9 +238,14 @@ export async function getRosterOverview(teamId: string): Promise<RosterOverview>
           ? `${b.count} consecutive days without a completed check-in (club threshold ${b.threshold})`
           : `${b.count} skips this month (club limit ${b.threshold})`
       ),
-      hasRecentNote,
-      hasActiveInjury: open.length > 0,
-      hasMissedSupplement,
+      recentNote,
+      openInjuries: open.map((inj) => ({
+        type: inj.type,
+        status: inj.status,
+        rtpPhase: inj.rtp_phase,
+        targetReturnDate: inj.target_return_date,
+      })),
+      missedSupplements,
     };
   });
 
