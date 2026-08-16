@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_FULL, CARD, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import { BTN_PRIMARY_FULL, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import AthleteSelectField from "@/components/AthleteSelectField";
 import { useFormStatus } from "react-dom";
 import AudienceField from "@/components/AudienceField";
 import { generateCombinedReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
-import ReportMarkdown from "@/components/ReportMarkdown";
+import GeneratedReportViewer from "./GeneratedReportViewer";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { MIN_COMBINED_TYPES, MAX_COMBINED_TYPES } from "@/lib/reportTypes";
 
@@ -262,13 +262,14 @@ export default function CombinedReportForm({
         </p>
       )}
 
-      {state.reportText && (
-        <ReportMarkdown
-          className={`${CARD} p-5`}
-          style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
-        >
-          {state.reportText}
-        </ReportMarkdown>
+      {state.reportId && (
+        <GeneratedReportViewer
+          key={state.reportId}
+          reportId={state.reportId}
+          title={`Combined — ${selectedAthlete ? `${selectedAthlete.first_name} ${selectedAthlete.last_name}` : "Athlete"}`}
+          hasPdf={state.hasPdf === true}
+          reportText={state.reportText}
+        />
       )}
 
       {state.reportId && (

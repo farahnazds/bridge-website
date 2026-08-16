@@ -71,11 +71,13 @@ export interface NutritionReportResult {
   athleteId: string;
   athleteName: string;
   reportId: string | null;
-  /** The generated markdown, for the same inline preview the other four
-   *  generators show. Null on any failure. */
+  /** The generated markdown — shown by the form only when no PDF exists.
+   *  Null on any failure. */
   reportText: string | null;
   error: string | null;
   note: string | null;
+  /** Whether the PDF was actually produced and stored (pdf.path non-null). */
+  hasPdf: boolean;
 }
 
 /**
@@ -134,7 +136,7 @@ export async function generateAndSaveNutritionReport(
   req: NutritionReportRequest
 ): Promise<NutritionReportResult> {
   const athleteName = `${req.clinical.firstName} ${req.clinical.lastName}`;
-  const base = { athleteId: req.athleteId, athleteName, reportId: null, reportText: null, note: null };
+  const base = { athleteId: req.athleteId, athleteName, reportId: null, reportText: null, note: null, hasPdf: false };
 
   const performanceSignals = req.includePerformanceSignals
     ? await loadPerformanceSignals(req.athleteId, req.mode, req.periodStart)
@@ -259,5 +261,6 @@ export async function generateAndSaveNutritionReport(
     reportText,
     error: null,
     note: pdf.error ? `PDF: ${pdf.error}` : null,
+    hasPdf: pdf.path !== null,
   };
 }

@@ -83,6 +83,11 @@ export interface GenerateReportState {
   reportText: string | null;
   dataCheckNote: string | null;
   reportId: string | null;
+  /** Whether a PDF actually exists for reportId — pdf.path from delivery, not
+   *  an assumption. Drives the forms' auto-opening viewer; absent/false means
+   *  the PDF failed and the UI falls back to the prose (dataCheckNote carries
+   *  the reason). Optional so error paths and initial states need not name it. */
+  hasPdf?: boolean;
 }
 
 export async function generateComplianceReport(
@@ -301,7 +306,7 @@ export async function generateComplianceReport(
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
-  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id, hasPdf: pdf.path !== null };
 }
 
 // ---- Body Composition report — same pattern as generateComplianceReport ----
@@ -549,7 +554,7 @@ export async function generateBodyCompositionReport(
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
-  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id, hasPdf: pdf.path !== null };
 }
 
 // ---- Share a report — docs/04-user-flows.md Flow 7, steps 7-9 ----
@@ -875,6 +880,7 @@ export async function generateNutritionReport(
       .filter(Boolean)
       .join(" "),
     reportId: report.reportId,
+    hasPdf: report.hasPdf,
   };
 }
 
@@ -1063,7 +1069,7 @@ export async function generatePerformanceReport(
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
-  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id, hasPdf: pdf.path !== null };
 }
 
 // Injury report — docs/07-ai-engine.md: "Injury | Athlete / Practitioner |
@@ -1256,7 +1262,7 @@ export async function generateInjuryReport(
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
-  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id };
+  return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id, hasPdf: pdf.path !== null };
 }
 
 // ---------------------------------------------------------------------------
@@ -1394,6 +1400,7 @@ export async function generateCombinedReport(
     reportText,
     dataCheckNote: pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote,
     reportId: insertedReport.id,
+    hasPdf: pdf.path !== null,
   };
 }
 

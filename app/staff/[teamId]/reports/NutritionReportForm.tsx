@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_FULL, CARD, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import { BTN_PRIMARY_FULL, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import AthleteSelectField from "@/components/AthleteSelectField";
 import { useFormStatus } from "react-dom";
 import AudienceField from "@/components/AudienceField";
 import { generateNutritionReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
-import ReportMarkdown from "@/components/ReportMarkdown";
+import GeneratedReportViewer from "./GeneratedReportViewer";
 
 // The Nutrition report generator — the same shape as the other four forms, per
 // the original pre-planner design: language, audience, mode, athlete, period,
@@ -217,13 +217,14 @@ export default function NutritionReportForm({
         </p>
       )}
 
-      {state.reportText && (
-        <ReportMarkdown
-          className={`${CARD} p-5`}
-          style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
-        >
-          {state.reportText}
-        </ReportMarkdown>
+      {state.reportId && (
+        <GeneratedReportViewer
+          key={state.reportId}
+          reportId={state.reportId}
+          title={`Nutrition — ${selectedAthlete ? `${selectedAthlete.first_name} ${selectedAthlete.last_name}` : "Athlete"}`}
+          hasPdf={state.hasPdf === true}
+          reportText={state.reportText}
+        />
       )}
 
       {state.reportId && (

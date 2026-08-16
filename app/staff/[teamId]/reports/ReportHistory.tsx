@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import DataModal from "@/components/DataModal";
-import ReportPdfLink from "@/components/ReportPdfLink";
 import ReportPdfModal from "@/components/ReportPdfModal";
 import ReportSummaryBody from "@/components/ReportSummaryBody";
 import ReportFilterBar from "@/components/ReportFilterBar";
@@ -214,7 +213,9 @@ function ReportCard({
           View report
         </button>
 
-        {report.hasPdf && <ReportPdfLink reportId={report.id} variant="button" label="PDF" />}
+        {/* No standalone PDF button: "View report" opens the PDF viewer, and
+            the viewer's own header carries Download PDF — two buttons for the
+            same document were one too many. */}
 
         {/* Sharing is the report owner's action only. A colleague reading an
             official or shared-with-them report sees who else has it, in the

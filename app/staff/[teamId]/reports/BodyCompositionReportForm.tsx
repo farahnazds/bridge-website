@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_FULL, CARD, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import { BTN_PRIMARY_FULL, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import AthleteSelectField from "@/components/AthleteSelectField";
 import { useFormStatus } from "react-dom";
 import AudienceField from "@/components/AudienceField";
 import { generateBodyCompositionReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
-import ReportMarkdown from "@/components/ReportMarkdown";
+import GeneratedReportViewer from "./GeneratedReportViewer";
 
 const initialState: GenerateReportState = {
   error: null,
@@ -186,13 +186,14 @@ export default function BodyCompositionReportForm({
         </p>
       )}
 
-      {state.reportText && (
-        <ReportMarkdown
-          className={`${CARD} p-5`}
-          style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)", color: "var(--text)" }}
-        >
-          {state.reportText}
-        </ReportMarkdown>
+      {state.reportId && (
+        <GeneratedReportViewer
+          key={state.reportId}
+          reportId={state.reportId}
+          title={`Body Composition — ${selectedAthlete ? `${selectedAthlete.first_name} ${selectedAthlete.last_name}` : "Athlete"}`}
+          hasPdf={state.hasPdf === true}
+          reportText={state.reportText}
+        />
       )}
 
       {state.reportId && (
