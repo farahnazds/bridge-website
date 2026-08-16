@@ -79,10 +79,15 @@ export default async function TeamLayout({
   // real destinations (their club's staff page, and the teams browse list).
   const backHref = isOversight ? "/staff" : isManager ? `/club/${team.club_id}/teams-staff` : null;
   const backLabel = isOversight ? "← All teams" : "← Teams & Staff";
+  // Order per the owner's 2026-08-16 restructure: the top group is the daily
+  // working set (Supplements promoted from Athlete Data, ahead of Reports);
+  // Athlete Data keeps the measurement surfaces; Messenger and Comments move
+  // down beside My Profile. Same links, icons and styling throughout.
   const navGroups = [
   { label: null, items: [
     { label: "Roster", href: `/staff/${teamId}`, icon: Users },
     { label: "Load & Periodization", href: `/staff/${teamId}/training-load`, icon: Gauge },
+    { label: "Supplements", href: `/staff/${teamId}/supplements`, icon: Pill },
     // Deliberately the section ROOT, which redirects to /generate, rather than
     // pointing straight at a sub-route. SidebarNav highlights by path prefix
     // unless an href is a prefix of a sibling's (see components/SidebarNav.tsx),
@@ -90,26 +95,30 @@ export default async function TeamLayout({
     // /nutrition. Naming a sub-route here would cost one redirect but lose the
     // highlight on the other two.
     { label: "Reports", href: `/staff/${teamId}/reports`, icon: FileText },
-    { label: "Messenger", href: `/staff/${teamId}/messenger`, icon: MessageSquare },
   ] },
   { label: "ATHLETE DATA", items: [
     { label: "Assessments", href: `/staff/${teamId}/assessments`, icon: ClipboardList },
     { label: "GPS/Performance", href: `/staff/${teamId}/gps-performance`, icon: Activity },
     { label: "VALD", href: `/staff/${teamId}/vald`, icon: Zap },
     { label: "Injury Log", href: `/staff/${teamId}/injuries`, icon: HeartPulse },
-    { label: "Supplements", href: `/staff/${teamId}/supplements`, icon: Pill },
-    { label: "Comments", href: `/staff/${teamId}/comments`, icon: MessageCircle },
     { label: "Compliance", href: `/staff/${teamId}/compliance`, icon: CircleCheckBig },
   ] },
+  // The ACCOUNT group is unconditional now that Messenger and Comments live
+  // in it — a manager or oversight viewer keeps both links (they had them
+  // before the reorder) and simply sees no My Profile row.
+  //
   // My Profile is the practitioner's work-history timeline (/staff/profile),
   // NOT their account settings — those moved to /account in the header
   // dropdown. It used to hang below <SidebarNav> in a bespoke bordered block
   // left over from when identity lived at the foot of the sidebar, which put
-  // it outside the nav flow and outside the accessible <nav> landmark. It is
-  // an ACCOUNT group now, the same shape the athlete sidebar already uses.
-  ...(!isManager && !isOversight
-    ? [{ label: "ACCOUNT", items: [{ label: "My Profile", href: "/staff/profile", icon: CircleUser }] }]
-    : []),
+  // it outside the nav flow and outside the accessible <nav> landmark.
+  { label: "ACCOUNT", items: [
+    { label: "Messenger", href: `/staff/${teamId}/messenger`, icon: MessageSquare },
+    { label: "Comments", href: `/staff/${teamId}/comments`, icon: MessageCircle },
+    ...(!isManager && !isOversight
+      ? [{ label: "My Profile", href: "/staff/profile", icon: CircleUser }]
+      : []),
+  ] },
   ];
 
   return (
