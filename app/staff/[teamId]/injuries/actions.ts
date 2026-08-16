@@ -31,7 +31,10 @@ function injuryFields(formData: FormData) {
 // "Club-Verified — entered by a club practitioner or Club Manager".
 export async function logInjury(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_practitioner") {
+  // club_manager admitted 2026-08-17 — a DELIBERATE owner reversal of the
+  // manager read-only boundary (full write parity with practitioners). RLS
+  // always permitted managers here; only this gate blocked them.
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -66,7 +69,9 @@ export async function logInjury(_prevState: ActionState, formData: FormData): Pr
 // zero-rows-returned detection pattern this mirrors.
 export async function updateInjury(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_practitioner") {
+  // club_manager admitted 2026-08-17 — same deliberate parity reversal as
+  // logInjury above; the 7-day RLS edit window applies to both roles.
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
     return { error: "You don't have permission to do this." };
   }
 

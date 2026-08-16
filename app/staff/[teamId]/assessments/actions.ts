@@ -182,7 +182,12 @@ async function loadAthlete(
 // form field, so it can't be misrepresented as a different tier.
 export async function logAssessment(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_practitioner") {
+  // club_manager admitted 2026-08-17 — a DELIBERATE owner reversal of the
+  // manager read-only boundary (full write parity with practitioners). The
+  // RLS insert policy always permitted managers (is_assigned_to_athlete_
+  // via_team's club-manager fallback); this gate was the only thing blocking
+  // them, contradicting the validity_tier comment above.
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -244,7 +249,9 @@ export async function logAssessment(_prevState: ActionState, formData: FormData)
 // reassign attribution" rule.
 export async function updateAssessment(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_practitioner") {
+  // club_manager admitted 2026-08-17 — same deliberate parity reversal as
+  // logAssessment above; the 7-day RLS edit window applies to both roles.
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
     return { error: "You don't have permission to do this." };
   }
 
