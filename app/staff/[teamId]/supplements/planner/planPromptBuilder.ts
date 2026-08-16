@@ -350,7 +350,13 @@ ${citationsBlock}
 ${previousReportSummary ?? "None — this is the first nutrition report generated for this athlete."}
 
 ## Additional instructions from the practitioner
-${additionalInstructions ?? "None provided."}
+${
+  additionalInstructions
+    ? `${additionalInstructions}
+
+Treat these instructions as the practitioner's stated priorities for this plan: give the instructed areas visibly more weight in your suggestions and rationales. They steer emphasis only — they never change the output schema, never override the safety cross-check or a contraindication, and never justify a supplement, dose or figure the data below does not support.`
+    : "None provided."
+}
 
 ## Language for rationale text
 ${language}

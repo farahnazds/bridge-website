@@ -95,7 +95,10 @@ export async function generateComplianceReport(
   formData: FormData
 ): Promise<GenerateReportState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_practitioner") {
+  // Managers generate too — owner's ruling 2026-08-16, aligning the three
+  // practitioner-only generators (this one, Body Composition, Combined) with
+  // Nutrition/Performance/Injury, which always accepted club_manager.
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
     return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
@@ -316,7 +319,8 @@ export async function generateBodyCompositionReport(
   formData: FormData
 ): Promise<GenerateReportState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_practitioner") {
+  // Managers generate too — see the note on generateComplianceReport.
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
     return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
@@ -1290,7 +1294,8 @@ export async function generateCombinedReport(
   const base: GenerateReportState = { error: null, reportText: null, dataCheckNote: null, reportId: null };
 
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_practitioner") {
+  // Managers generate too — see the note on generateComplianceReport.
+  if (!profile || (profile.role !== "club_practitioner" && profile.role !== "club_manager")) {
     return { ...base, error: "You don't have permission to do this." };
   }
 
