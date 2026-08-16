@@ -29,6 +29,70 @@ export const SPORTS = [
 ];
 export const OTHER_SPORT = "__other__";
 
+// ---------------------------------------------------------------- positions
+//
+// Sport-aware Position field (owner ruling 2026-08-17). Three treatments:
+//   select  — positional sports: dropdown of that sport's real positions,
+//             with the form's standard "Other…" free-text escape.
+//   text    — individual sports where a specialization or weight class is
+//             still worth recording, relabelled to say what it actually is.
+//   hidden  — sports where a "position" is meaningless; the field does not
+//             render and the athlete's position stays/saves as NULL.
+// A sport in none of the maps (the "Other…" free-text sport, or legacy
+// values) keeps the original plain "Position" free-text input — an unknown
+// sport must never LOSE the ability to record a position.
+//
+// Gymnastics sits in the dropdown group but its options are events, so its
+// label says so.
+
+export const POSITIONS_BY_SPORT: Record<string, readonly string[]> = {
+  Basketball: ["Point Guard", "Shooting Guard", "Small Forward", "Power Forward", "Center"],
+  Football: [
+    "Goalkeeper", "Center Back", "Full Back", "Defensive Midfielder",
+    "Central Midfielder", "Winger", "Attacking Midfielder", "Striker",
+  ],
+  Rugby: [
+    "Prop", "Hooker", "Lock", "Flanker", "Number 8",
+    "Scrum-half", "Fly-half", "Center", "Wing", "Full-back",
+  ],
+  Volleyball: [
+    "Setter", "Outside Hitter", "Middle Blocker", "Opposite Hitter",
+    "Libero", "Defensive Specialist",
+  ],
+  Handball: [
+    "Goalkeeper", "Left Wing", "Right Wing", "Left Back", "Right Back",
+    "Center Back", "Pivot",
+  ],
+  "Field Hockey": ["Goalkeeper", "Defender", "Midfielder", "Forward"],
+  Cricket: ["Batsman", "Bowler", "All-rounder", "Wicket-keeper"],
+  Rowing: ["Bow", "Stroke", "Coxswain", "Sweep", "Sculling"],
+  Cycling: ["Sprinter", "Climber", "All-rounder", "Time Trialist", "Domestique"],
+  Gymnastics: ["Floor", "Vault", "Uneven Bars", "Parallel Bars", "Balance Beam", "All-around"],
+};
+
+const EVENT_SPORTS = ["Sprint", "Distance Running", "Swimming"];
+const WEIGHT_CLASS_SPORTS = ["Boxing", "MMA/Wrestling", "Weightlifting"];
+const NO_POSITION_SPORTS = ["Tennis", "Padel", "Golf", "Triathlon", "Motorsport / F1"];
+
+export type PositionFieldSpec =
+  | { kind: "select"; label: string; options: readonly string[] }
+  | { kind: "text"; label: string }
+  | { kind: "hidden" };
+
+export function positionFieldFor(sport: string | null): PositionFieldSpec {
+  if (sport && POSITIONS_BY_SPORT[sport]) {
+    return {
+      kind: "select",
+      label: sport === "Gymnastics" ? "Event / specialization" : "Position",
+      options: POSITIONS_BY_SPORT[sport],
+    };
+  }
+  if (sport && EVENT_SPORTS.includes(sport)) return { kind: "text", label: "Event / specialization" };
+  if (sport && WEIGHT_CLASS_SPORTS.includes(sport)) return { kind: "text", label: "Weight class" };
+  if (sport && NO_POSITION_SPORTS.includes(sport)) return { kind: "hidden" };
+  return { kind: "text", label: "Position" };
+}
+
 // Matches `athletes.tier` check constraint in database/schema.sql.
 export const TIERS = [
   { value: "development", label: "Development" },
@@ -68,6 +132,33 @@ export const GENDERS = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
 ];
+
+// Fixed ethnicity categories (owner ruling 2026-08-17), replacing the free
+// text the field launched with. Stored as the label text itself — the column
+// is unconstrained text that report prompts print verbatim, and existing
+// free-text rows must keep rendering. "Other" routes to a free-text input
+// (the Sport field's pattern); "Prefer not to say" is an explicit answer,
+// stored as-is, distinct from NULL = never asked. The legal-review flag in
+// docs/05-business-rules.md still stands: sign-off is required before this
+// drives dosing for real athletes.
+export const ETHNICITIES = [
+  "Arab / Middle Eastern",
+  "Black — African",
+  "Black — Caribbean",
+  "Black — Other",
+  "East Asian",
+  "South Asian",
+  "Southeast Asian",
+  "Central Asian",
+  "White — European",
+  "White — Other",
+  "Hispanic / Latino",
+  "Pacific Islander",
+  "Indigenous / Native",
+  "Mixed / Multiple ethnicities",
+  "Prefer not to say",
+];
+export const OTHER_ETHNICITY = "__other__";
 
 // Curated starting list, not a DB enum — `teams.category` is free-text by
 // design (see database/schema.sql comment). "Other" keeps it open for

@@ -45,6 +45,12 @@ export async function registerAthlete(
   const code = String(formData.get("code") ?? "").trim();
   const menstrualStatus = String(formData.get("menstrual_status") ?? "").trim() || null;
   const ironStatus = String(formData.get("iron_status") ?? "").trim() || null;
+  // Migration 047 cycle facts — the form only renders these when gender is
+  // female, so they arrive null otherwise. Input-only; nothing computes on
+  // them yet.
+  const avgCycleLengthDays = parseNumeric(formData.get("avg_cycle_length_days"));
+  const periodDurationDays = parseNumeric(formData.get("period_duration_days"));
+  const lastPeriodStartDate = String(formData.get("last_period_start_date") ?? "").trim() || null;
   const photo = formData.get("photo") as File | null;
 
   const conditionCodes = formData.getAll("conditions").map(String);
@@ -73,6 +79,15 @@ export async function registerAthlete(
     return { error: `Iron status must be one of: ${IRON_VALUES.join(", ")}.` };
   }
 
+  // Bounds mirror migration 047's CHECK constraints, so a slip reads as a
+  // sentence here instead of a raw Postgres violation.
+  if (avgCycleLengthDays !== null && (!Number.isInteger(avgCycleLengthDays) || avgCycleLengthDays < 10 || avgCycleLengthDays > 120)) {
+    return { error: "Average cycle length must be a whole number between 10 and 120 days." };
+  }
+  if (periodDurationDays !== null && (!Number.isInteger(periodDurationDays) || periodDurationDays < 1 || periodDurationDays > 30)) {
+    return { error: "Period duration must be a whole number between 1 and 30 days." };
+  }
+
   const supabase = await createClient();
   const adminClient = createAdminClient();
 
@@ -98,6 +113,9 @@ export async function registerAthlete(
       height_cm: heightCm,
       menstrual_status: menstrualStatus,
       iron_status: ironStatus,
+      avg_cycle_length_days: avgCycleLengthDays,
+      period_duration_days: periodDurationDays,
+      last_period_start_date: lastPeriodStartDate,
     })
     .select("id")
     .single();

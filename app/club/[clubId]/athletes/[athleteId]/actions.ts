@@ -110,6 +110,24 @@ export async function updateAthleteIdentity(
   const goalLm = readGoal("goal_lean_mass_kg", "Goal lean mass (kg)", 20, 150);
   if (goalLm.error) return { error: goalLm.error, saved: false };
 
+  // Cycle facts (migration 047) — whole-day integers, bounds mirroring the
+  // CHECKs. The form renders them only while gender = female; absent fields
+  // clear the stored values, which is the ruling's "fully hidden" made
+  // consistent on write.
+  const readCycleInt = (field: string, label: string, min: number, max: number) => {
+    const raw = String(formData.get(field) ?? "").trim();
+    if (!raw) return { value: null as number | null };
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed)) return { error: `${label} must be a whole number of days.` };
+    if (parsed < min || parsed > max) return { error: `${label} must be between ${min} and ${max}.` };
+    return { value: parsed as number | null };
+  };
+  const cycleLen = readCycleInt("avg_cycle_length_days", "Average cycle length", 10, 120);
+  if (cycleLen.error) return { error: cycleLen.error, saved: false };
+  const periodDur = readCycleInt("period_duration_days", "Period duration", 1, 30);
+  if (periodDur.error) return { error: periodDur.error, saved: false };
+  const lastPeriod = String(formData.get("last_period_start_date") ?? "").trim() || null;
+
   const status = String(formData.get("status") ?? "").trim();
   if (status && !["active", "read_only"].includes(status)) {
     return { error: "Status must be active or read_only.", saved: false };
@@ -134,11 +152,18 @@ export async function updateAthleteIdentity(
     tier: tier || null,
     diet_preference: diet || null,
     country: String(formData.get("country") ?? "").trim() || null,
+    // Fixed categories since 2026-08-17 (ETHNICITIES), with an "Other" free
+    // text — stored as plain text either way, so legacy free-text rows are
+    // untouched until edited. docs/05's legal-review flag still applies.
+    ethnicity: String(formData.get("ethnicity") ?? "").trim() || null,
     dob: dob || null,
     gender: gender || null,
     status: status || "active",
     menstrual_status: menstrualStatus || null,
     iron_status: ironStatus || null,
+    avg_cycle_length_days: cycleLen.value ?? null,
+    period_duration_days: periodDur.value ?? null,
+    last_period_start_date: lastPeriod,
     goal_body_fat_pct: goalBf.value ?? null,
     goal_lean_mass_kg: goalLm.value ?? null,
     updated_at: new Date().toISOString(),

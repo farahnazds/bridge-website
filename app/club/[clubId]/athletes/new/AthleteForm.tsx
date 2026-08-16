@@ -6,6 +6,8 @@ import { useFormStatus } from "react-dom";
 import { getAllCountries } from "countries-and-timezones";
 import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 import { generateAthleteCode } from "@/lib/athleteCode";
+import EthnicityField from "@/components/EthnicityField";
+import PositionField from "@/components/PositionField";
 import { registerAthlete, type RegisterAthleteState } from "./actions";
 
 const initialState: RegisterAthleteState = { error: null };
@@ -132,6 +134,14 @@ export default function AthleteForm({
   const [sportMode, setSportMode] = useState<"select" | "other">(
     clubSport && !clubSportListed ? "other" : "select"
   );
+  // The sport is tracked as VALUE, not just mode, because the Position field
+  // below is sport-aware — its options, label, or very existence follow the
+  // sport currently chosen (see components/PositionField.tsx).
+  const [sportChoice, setSportChoice] = useState(clubSportListed ? (clubSport as string) : "");
+  const [sportText, setSportText] = useState(clubSport && !clubSportListed ? clubSport : "");
+  const effectiveSport = sportMode === "select" ? sportChoice : sportText;
+  // Gender gates the Female athlete cycle section — fully hidden otherwise.
+  const [gender, setGender] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   function handleLastNameChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -267,7 +277,14 @@ export default function AthleteForm({
             <label htmlFor="gender" className={labelClass} style={{ color: "var(--text)" }}>
               Gender
             </label>
-            <select id="gender" name="gender" defaultValue="" className={INPUT} style={INPUT_STYLE}>
+            <select
+              id="gender"
+              name="gender"
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              className={INPUT}
+              style={INPUT_STYLE}
+            >
               <option value="">Not specified</option>
               {GENDERS.map((g) => (
                 <option key={g.value} value={g.value}>
@@ -291,21 +308,7 @@ export default function AthleteForm({
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="ethnicity" className={labelClass} style={{ color: "var(--text)" }}>
-            Ethnicity
-          </label>
-          <input
-            id="ethnicity"
-            name="ethnicity"
-            type="text"
-            className={INPUT}
-            style={INPUT_STYLE}
-          />
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Sensitive field — visibility is restricted to Medical staff, Admin, and Super Admin.
-          </p>
-        </div>
+        <EthnicityField />
       </section>
 
       {/* ---- Body composition ---- */}
@@ -395,8 +398,13 @@ export default function AthleteForm({
       </section>
 
       {/* ---- Female athlete cycle ---- */}
+      {/* Rendered ONLY when gender = female (owner ruling 2026-08-17) —
+          including the migration-028 status fields that used to always show.
+          Hidden inputs don't submit, so flipping gender away simply saves
+          nothing here. */}
+      {gender === "female" && (
       <section className="flex flex-col gap-5">
-        <SectionHeading>Female athlete cycle (where tracked)</SectionHeading>
+        <SectionHeading>Female athlete cycle</SectionHeading>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
             <label
@@ -439,7 +447,54 @@ export default function AthleteForm({
             </select>
           </div>
         </div>
+        {/* Migration 047 — input-only cycle facts; no calculation logic reads
+            these yet (docs/07's cycle-phase engine is the eventual consumer). */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="avg_cycle_length_days" className={labelClass} style={{ color: "var(--text)" }}>
+              Average cycle length (days)
+            </label>
+            <input
+              id="avg_cycle_length_days"
+              name="avg_cycle_length_days"
+              type="number"
+              min="10"
+              max="120"
+              step="1"
+              className={INPUT}
+              style={INPUT_STYLE}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="period_duration_days" className={labelClass} style={{ color: "var(--text)" }}>
+              Period duration (days)
+            </label>
+            <input
+              id="period_duration_days"
+              name="period_duration_days"
+              type="number"
+              min="1"
+              max="30"
+              step="1"
+              className={INPUT}
+              style={INPUT_STYLE}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="last_period_start_date" className={labelClass} style={{ color: "var(--text)" }}>
+              Start date of last period
+            </label>
+            <input
+              id="last_period_start_date"
+              name="last_period_start_date"
+              type="date"
+              className={INPUT}
+              style={INPUT_STYLE}
+            />
+          </div>
+        </div>
       </section>
+      )}
 
       {/* ---- Sport & classification ---- */}
       <section className="flex flex-col gap-5">
@@ -455,9 +510,10 @@ export default function AthleteForm({
                 id="sport"
                 name="sport"
                 required
-                defaultValue={clubSportListed ? (clubSport as string) : ""}
+                value={sportChoice}
                 onChange={(e) => {
                   if (e.target.value === OTHER_SPORT) setSportMode("other");
+                  else setSportChoice(e.target.value);
                 }}
                 className={INPUT}
                 style={INPUT_STYLE}
@@ -479,7 +535,8 @@ export default function AthleteForm({
                   name="sport"
                   type="text"
                   required
-                  defaultValue={clubSport && !clubSportListed ? clubSport : ""}
+                  value={sportText}
+                  onChange={(e) => setSportText(e.target.value)}
                   placeholder="Enter sport name"
                   className={INPUT}
                   style={INPUT_STYLE}
@@ -496,19 +553,9 @@ export default function AthleteForm({
             )}
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="position" className={labelClass} style={{ color: "var(--text)" }}>
-              Position
-            </label>
-            <input
-              id="position"
-              name="position"
-              type="text"
-              placeholder="e.g. Point Guard"
-              className={INPUT}
-              style={INPUT_STYLE}
-            />
-          </div>
+          {/* Sport-aware: options/label/visibility follow the chosen sport;
+              the key remounts it so state can't leak across sports. */}
+          <PositionField key={effectiveSport || "none"} sport={effectiveSport || null} />
         </div>
 
         <div className="grid grid-cols-2 gap-4">

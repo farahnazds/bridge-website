@@ -5,6 +5,8 @@ import { BTN_PRIMARY, CARD, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useFormStatus } from "react-dom";
 import { updateAthleteIdentity, type IdentityState } from "@/app/club/[clubId]/athletes/[athleteId]/actions";
 import { SPORTS, OTHER_SPORT, TIERS, DIET_PREFERENCES, GENDERS, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
+import EthnicityField from "@/components/EthnicityField";
+import PositionField from "@/components/PositionField";
 import type { AthleteIdentity } from "@/lib/athleteProfile";
 
 const initial: IdentityState = { error: null, saved: false };
@@ -47,6 +49,13 @@ export default function AthleteIdentityForm({
   const [editing, setEditing] = useState(false);
   const knownSport = SPORTS.includes(athlete.sport ?? "");
   const [sport, setSport] = useState(athlete.sport && !knownSport ? OTHER_SPORT : athlete.sport ?? "");
+  // Controlled (it used to lose the saved value entirely when unknown): the
+  // free-text sport, which also feeds the sport-aware Position field below.
+  const [sportText, setSportText] = useState(athlete.sport && !knownSport ? athlete.sport : "");
+  const effectiveSport = sport === OTHER_SPORT ? sportText : sport;
+  // Gates the Female athlete cycle block on the LIVE form value, so setting
+  // gender to female reveals it in the same edit session.
+  const [gender, setGender] = useState(athlete.gender ?? "");
 
   if (state.saved && editing) setEditing(false);
 
@@ -81,9 +90,19 @@ export default function AthleteIdentityForm({
           <Read label="Date of birth" value={athlete.dob ?? "—"} />
           <Read label="Gender" value={genderLabel} />
           <Read label="Country" value={athlete.country ?? "—"} />
+          <Read label="Ethnicity" value={athlete.ethnicity ?? "—"} />
           <Read label="Status" value={athlete.status === "read_only" ? "Read-only" : "Active"} />
-          <Read label="Menstrual status" value={menstrualLabel} />
-          <Read label="Iron status" value={ironLabel} />
+          {/* The whole cycle block — the 028 statuses AND the 047 cycle
+              facts — shows only for female athletes (ruling 2026-08-17). */}
+          {athlete.gender === "female" && (
+            <>
+              <Read label="Menstrual status" value={menstrualLabel} />
+              <Read label="Iron status" value={ironLabel} />
+              <Read label="Avg cycle length" value={athlete.avg_cycle_length_days !== null ? `${athlete.avg_cycle_length_days} days` : "Not recorded"} />
+              <Read label="Period duration" value={athlete.period_duration_days !== null ? `${athlete.period_duration_days} days` : "Not recorded"} />
+              <Read label="Last period started" value={athlete.last_period_start_date ?? "Not recorded"} />
+            </>
+          )}
           <Read label="Goal body fat" value={athlete.goal_body_fat_pct !== null ? athlete.goal_body_fat_pct + "%" : "No goal set"} />
           <Read label="Goal lean mass" value={athlete.goal_lean_mass_kg !== null ? athlete.goal_lean_mass_kg + " kg" : "No goal set"} />
         </div>
@@ -120,12 +139,17 @@ export default function AthleteIdentityForm({
             <option value={OTHER_SPORT}>Other…</option>
           </select>
           {sport === OTHER_SPORT && (
-            <input name="sport" required placeholder="Sport" className={`${INPUT} mt-2`} style={INPUT_STYLE} />
+            <input name="sport" required placeholder="Sport" value={sportText}
+              onChange={(e) => setSportText(e.target.value)} className={`${INPUT} mt-2`} style={INPUT_STYLE} />
           )}
         </Field>
-        <Field label="Position">
-          <input name="position" defaultValue={athlete.position ?? ""} className={INPUT} style={INPUT_STYLE} />
-        </Field>
+        {/* Sport-aware, shared with the registration form — options, label
+            and visibility follow the sport chosen above. */}
+        <PositionField
+          key={effectiveSport || "none"}
+          sport={effectiveSport || null}
+          initialPosition={athlete.position}
+        />
         <Field label="Tier">
           <select name="tier" defaultValue={athlete.tier ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">—</option>
@@ -142,7 +166,8 @@ export default function AthleteIdentityForm({
           <input name="dob" type="date" defaultValue={athlete.dob ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Gender">
-          <select name="gender" defaultValue={athlete.gender ?? ""} className={INPUT} style={INPUT_STYLE}>
+          <select name="gender" value={gender} onChange={(e) => setGender(e.target.value)}
+            className={INPUT} style={INPUT_STYLE}>
             <option value="">—</option>
             {GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
           </select>
@@ -156,14 +181,6 @@ export default function AthleteIdentityForm({
             <option value="read_only">Read-only</option>
           </select>
         </Field>
-        {/* Permanent health fields, not per-session. Blank = not recorded, and
-            the nutrition prompt reports that rather than assuming normal. */}
-        <Field label="Menstrual status">
-          <select name="menstrual_status" defaultValue={athlete.menstrual_status ?? ""} className={INPUT} style={INPUT_STYLE}>
-            <option value="">Not recorded</option>
-            {MENSTRUAL_STATUSES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </Field>
         <Field label="Goal body fat %">
           <input name="goal_body_fat_pct" type="number" min={3} max={60} step={0.1}
             placeholder="No goal set" defaultValue={athlete.goal_body_fat_pct ?? ""}
@@ -174,13 +191,51 @@ export default function AthleteIdentityForm({
             placeholder="No goal set" defaultValue={athlete.goal_lean_mass_kg ?? ""}
             className={INPUT} style={INPUT_STYLE} />
         </Field>
-        <Field label="Iron status">
-          <select name="iron_status" defaultValue={athlete.iron_status ?? ""} className={INPUT} style={INPUT_STYLE}>
-            <option value="">Not recorded</option>
-            {IRON_STATUSES.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
-          </select>
-        </Field>
+        <EthnicityField initialValue={athlete.ethnicity} />
       </div>
+
+      {/* Female athlete cycle — the 028 statuses and the 047 cycle facts as
+          ONE block, rendered only while gender = female (ruling 2026-08-17).
+          Hidden inputs don't submit; the action treats absent as "clear", so
+          flipping gender away clears these on save rather than stranding
+          stale values. Blank = not recorded, and the nutrition prompt reports
+          that rather than assuming normal. */}
+      {gender === "female" && (
+        <div className="flex flex-col gap-3">
+          <p className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+            Female athlete cycle
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Menstrual status">
+              <select name="menstrual_status" defaultValue={athlete.menstrual_status ?? ""} className={INPUT} style={INPUT_STYLE}>
+                <option value="">Not recorded</option>
+                {MENSTRUAL_STATUSES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Iron status">
+              <select name="iron_status" defaultValue={athlete.iron_status ?? ""} className={INPUT} style={INPUT_STYLE}>
+                <option value="">Not recorded</option>
+                {IRON_STATUSES.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Average cycle length (days)">
+              <input name="avg_cycle_length_days" type="number" min={10} max={120} step={1}
+                placeholder="Not recorded" defaultValue={athlete.avg_cycle_length_days ?? ""}
+                className={INPUT} style={INPUT_STYLE} />
+            </Field>
+            <Field label="Period duration (days)">
+              <input name="period_duration_days" type="number" min={1} max={30} step={1}
+                placeholder="Not recorded" defaultValue={athlete.period_duration_days ?? ""}
+                className={INPUT} style={INPUT_STYLE} />
+            </Field>
+            <Field label="Start date of last period">
+              <input name="last_period_start_date" type="date"
+                defaultValue={athlete.last_period_start_date ?? ""}
+                className={INPUT} style={INPUT_STYLE} />
+            </Field>
+          </div>
+        </div>
+      )}
 
       {state.error && (
         <p role="alert" className={NOTICE}

@@ -10,7 +10,33 @@ Admin-editable — additive, no schema change needed to extend them.
 - Country
 - Age / date of birth
 - Gender
-- Ethnicity (see `05-business-rules.md` — legal-review flag attached)
+- Ethnicity — fixed dropdown since 2026-08-17 (`ETHNICITIES` in
+  `lib/constants.ts`: 15 categories + "Other" free text + "Prefer not to
+  say"), replacing free text; legacy free-text values still render and
+  stay editable. The `05-business-rules.md` legal-review flag remains
+  attached — sign-off required before ethnicity drives dosing for real
+  athletes.
+
+## Sport & position
+
+- Sport (Super Admin's configured list + "Other" free text; defaults to
+  the club's own sport at registration)
+- Position — sport-aware since 2026-08-17 (`positionFieldFor` in
+  `lib/constants.ts`): dropdown + "Other" for Basketball, Football,
+  Rugby, Volleyball, Handball, Field Hockey, Cricket, Rowing, Cycling,
+  Gymnastics (labelled "Event / specialization"); free-text
+  "Event / specialization" for Sprint, Distance Running, Swimming;
+  free-text "Weight class" for Boxing, MMA/Wrestling, Weightlifting;
+  hidden (saves NULL) for Tennis, Padel, Golf, Triathlon,
+  Motorsport / F1; plain free text for any other/custom sport.
+
+## Female athlete cycle (gender = female only; hidden otherwise)
+
+- Menstrual status, Iron status (migration 028)
+- Average cycle length (days), Period duration (days), Start date of
+  last period (migration 047 — input-only; no calculation logic reads
+  these yet, `07-ai-engine.md`'s cycle-phase engine is the eventual
+  consumer)
 
 ## Body composition
 

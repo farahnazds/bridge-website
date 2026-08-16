@@ -56,6 +56,11 @@ export interface AthleteIdentity {
   profile_photo_url: string | null;
   menstrual_status: string | null;
   iron_status: string | null;
+  /** Migration 047 cycle facts — input-only, shown/edited only when
+   *  gender = female. */
+  avg_cycle_length_days: number | null;
+  period_duration_days: number | null;
+  last_period_start_date: string | null;
   goal_body_fat_pct: number | null;
   goal_lean_mass_kg: number | null;
   is_subscribed: boolean;
@@ -235,7 +240,7 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
   const { data: athlete } = await supabase
     .from("athletes")
     .select(
-      "id, profile_id, club_id, first_name, last_name, code, sport, position, tier, diet_preference, country, dob, gender, ethnicity, status, profile_photo_url, menstrual_status, iron_status, goal_body_fat_pct, goal_lean_mass_kg, is_subscribed, created_at, updated_at"
+      "id, profile_id, club_id, first_name, last_name, code, sport, position, tier, diet_preference, country, dob, gender, ethnicity, status, profile_photo_url, menstrual_status, iron_status, avg_cycle_length_days, period_duration_days, last_period_start_date, goal_body_fat_pct, goal_lean_mass_kg, is_subscribed, created_at, updated_at"
     )
     .eq("id", athleteId)
     .maybeSingle();
