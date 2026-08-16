@@ -493,10 +493,42 @@ migration** — trap 1 above stands for any fresh project.
 | # | Item | State |
 |---|---|---|
 | 1 | Database separation | Investigated, plan drafted, **paused**. Nothing created or changed. |
-| 2 | Production env vars in Vercel | **Not started.** Needs CLI/dashboard access. |
+| 2 | Production env vars in Vercel | **Done + guarded (2026-08-16)**, the hard way: `ANTHROPIC_API_KEY` was missing from Vercel and broke every AI feature on the live pilot until added. Now enforced — see "Required environment variables" below. |
 | 3 | Compliance-alert cron genuinely firing | **Code reviewed only.** Never confirmed against real execution logs. |
 | 4 | Test-data cleanup in production | **Not started**, but the audit is done — see §3b. Production currently holds *only* test data: 2 test clubs, 3 test athletes, 56 test reports. |
 | 5 | Full production smoke test | **Not started.** |
+
+### Required environment variables (authoritative checklist, added 2026-08-16)
+
+**The machine truth is `lib/envManifest.ts`** — this table mirrors it for
+humans. Every variable must be set in Vercel for **Production AND Preview**
+(and in `.env.local` for local work). Two guards enforce the list, born of a
+real incident (2026-08-16: `ANTHROPIC_API_KEY` was never configured in
+Vercel; the app deployed fine and all seven AI call sites failed one
+practitioner at a time):
+
+- **Build gate** — `next.config.ts` refuses to build when a required
+  variable is missing or malformed, so a misconfigured deploy fails red in
+  Vercel instead of going live half-broken.
+- **Runtime check** — `GET /api/health` reports, for the deployment actually
+  serving, which variables are missing/malformed (names only, never values).
+  200 when healthy, 503 when not.
+
+| Variable | Required | Breaks without it |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | everything — all database/auth/storage |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | everything client/RLS side, sign-in |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | public booking, clinical library, compliance alert fan-out, admin client |
+| `ANTHROPIC_API_KEY` | yes | ALL AI: Nutrition Planner + every report generator |
+| `RESEND_API_KEY` | yes | every outbound email |
+| `CRON_SECRET` | yes | daily compliance cron silently never runs |
+| `RESEND_FROM_EMAIL` | fallback exists | From address falls back to a hardcoded default that may not match the verified sending domain |
+| `AUTH_CONTEXT_SECRET` | fallback exists | per-request auth optimisation off; full `getUser()` round trip every request |
+| `NEXT_PUBLIC_SITE_URL` | fallback exists | email links fall back to the request's own host |
+
+**When adding a new variable:** add it to `lib/envManifest.ts` in the same
+change that introduces it, and add it to Vercel before merging. The build
+gate then makes it impossible to deploy an environment that lacks it.
 
 **On item 3, what is known:** the cron is declared in `vercel.json:2-7` —
 `/api/cron/compliance-check`, schedule `0 6 * * *`. The route

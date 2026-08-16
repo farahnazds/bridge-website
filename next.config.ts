@@ -1,4 +1,38 @@
 import type { NextConfig } from "next";
+import { checkEnv } from "./lib/envManifest";
+
+// ---- THE ENVIRONMENT GATE ----
+// Runs when this config is evaluated — the start of every `next build`, on
+// Vercel and locally. A missing or malformed REQUIRED variable fails the
+// build outright: on Vercel that is a red deployment with this message in
+// the build log, and the previous deployment stays live. That is the loud,
+// early failure the 2026-08-16 ANTHROPIC_API_KEY incident lacked, when the
+// app shipped fine and every AI feature failed quietly at request time.
+// The list lives in lib/envManifest.ts; GET /api/health runs the same check
+// against the running deployment.
+const envCheck = checkEnv(process.env);
+if (!envCheck.ok) {
+  const lines = [
+    "",
+    "========================================================================",
+    "REFUSING TO BUILD: the environment is missing required configuration.",
+    ...envCheck.missing.map((m) => `  MISSING   ${m.name} — needed for ${m.usedFor}`),
+    ...envCheck.malformed.map(
+      (m) => `  MALFORMED ${m.name} — expected ${m.shapeHint}; needed for ${m.usedFor}`
+    ),
+    "Set these in Vercel → Project → Settings → Environment Variables (for",
+    "Production AND Preview), or in .env.local for local work, then rebuild.",
+    "The authoritative list is lib/envManifest.ts; see docs/PROJECT-STATUS.md.",
+    "========================================================================",
+    "",
+  ];
+  throw new Error(lines.join("\n"));
+}
+if (envCheck.optionalMissing.length > 0) {
+  console.warn(
+    `[env] Optional variables not set (a fallback applies): ${envCheck.optionalMissing.join(", ")} — see lib/envManifest.ts.`
+  );
+}
 
 const nextConfig: NextConfig = {
   // pdfkit must not be bundled into the server output.
