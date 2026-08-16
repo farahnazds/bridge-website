@@ -79,6 +79,8 @@ Required output structure, in this exact order:
 4. Goals for next period
 5. Practitioner recommendations
 
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
+
 Citations — hard rule: only cite entries from the "Clinical + Research library entries" section in the data below, if any are provided. Never cite anything from general training knowledge, even if a relevant paper is "known" to you. If no library entries are provided, do not include any citation for that point — write it without one rather than reaching for an unverified source.
 
 Safety cross-check: if any check-in's "supplements taken" text conflicts with the athlete's declared allergies, intolerances, or medical conditions listed in the data, flag it plainly in the report rather than silently ignoring it.

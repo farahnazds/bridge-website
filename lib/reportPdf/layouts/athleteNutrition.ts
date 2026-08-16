@@ -20,6 +20,7 @@ import {
 import type { Citation, Narrative, ReportIdentity } from "../model";
 import {
   bannerBlocks,
+  capSentences,
   intNum,
   longDate,
   narrativeTail,
@@ -226,13 +227,7 @@ function oneLine(text: string | null): string {
   return flat.length > 140 ? `${flat.slice(0, 137)}…` : flat;
 }
 
-/** First N sentences of a paragraph — the "what this means" hard cap. The
- *  prompt asks for three; this enforces it against a model that overruns. */
-function capSentences(text: string, max: number): string {
-  const matches = text.match(/[^.!?]+[.!?]+(\s|$)/g);
-  if (!matches || matches.length <= max) return text;
-  return matches.slice(0, max).join("").trim();
-}
+// capSentences moved to ./common.ts — compliance clamps with the same rule.
 
 /** How many strip cells fit across the content width before they crowd. */
 const MAX_STRIP_DAYS = 7;

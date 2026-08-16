@@ -184,19 +184,44 @@ export function createPageMachine(
         tracking: px(1),
       });
     }
+    // The right-side box is the CLUB's slot, and only ever the club's: the
+    // uploaded logo when one exists, otherwise an empty bordered placeholder
+    // reading "Club logo" (owner's 2026-08-16 rule). The Bridgetx mark never
+    // appears here — it lives on the left, and nothing falls back to it.
     const LOGO = px(32);
     const logoX = right - LOGO;
-    doc.roundedRect(logoX, brandTop, LOGO, LOGO, px(6)).fillOpacity(0.14).fill(HEADER_TEXT);
-    doc.fillOpacity(1);
+    const drawClubPlaceholder = () => {
+      doc
+        .roundedRect(logoX + 0.5, brandTop + 0.5, LOGO - 1, LOGO - 1, px(6))
+        .lineWidth(0.75)
+        .strokeOpacity(0.5)
+        .strokeColor(HEADER_DIM)
+        .stroke();
+      doc.strokeOpacity(1);
+      drawLine(doc, "Club", logoX, brandTop + px(9), LOGO, {
+        size: px(6.5),
+        color: HEADER_DIM,
+        align: "center",
+      });
+      drawLine(doc, "logo", logoX, brandTop + px(17.5), LOGO, {
+        size: px(6.5),
+        color: HEADER_DIM,
+        align: "center",
+      });
+    };
     const logo = openLogo();
     if (logo) {
+      doc.roundedRect(logoX, brandTop, LOGO, LOGO, px(6)).fillOpacity(0.14).fill(HEADER_TEXT);
+      doc.fillOpacity(1);
       try {
         doc.image(logo as Parameters<typeof doc.image>[0], logoX + px(2), brandTop + px(2), {
           fit: [LOGO - px(4), LOGO - px(4)],
         });
       } catch {
-        // Unreadable logo falls back to the wordmark below — never a failed report.
+        drawClubPlaceholder();
       }
+    } else {
+      drawClubPlaceholder();
     }
     // Club identity stack, right-aligned beside the logo box: club name, team,
     // then the small-caps tagline — the design's "Performance Nutrition" line.

@@ -918,6 +918,34 @@ export function mealBlock(spec: MealBlock): Block {
     kind: "meal-block",
     gapAfter: GAP.mealBlock,
     measure: (ctx) => totalH(ctx),
+    // Splittable between rows, like a bare table: the per-day-type meal
+    // tables (six columns, many rows) grew tall enough that moving one whole
+    // to the next page stranded a near-blank half page behind it — the
+    // 2026-08-16 empty-space feedback. The head part keeps title/meta and the
+    // column header; the tail repeats both with "(continued)" and carries the
+    // note, so no content is lost and no page is left hollow.
+    split: (ctx, avail) => {
+      if (spec.rows.length < 2) return null;
+      const ws = widths(ctx.width);
+      const base =
+        headerBarH(ctx, ctx.width) + STROKE.hairline + rowH(ctx, spec.head, ws, headStyle);
+      let used = base;
+      let count = 0;
+      for (const r of spec.rows) {
+        const rh = rowH(ctx, r, ws, cellStyle) + STROKE.hairline;
+        if (used + rh > avail) break;
+        used += rh;
+        count += 1;
+      }
+      if (count < 1 || count >= spec.rows.length) return null;
+      const contTitle = spec.title.endsWith("(continued)")
+        ? spec.title
+        : `${spec.title} (continued)`;
+      return [
+        mealBlock({ ...spec, rows: spec.rows.slice(0, count), note: undefined }),
+        mealBlock({ ...spec, title: contTitle, rows: spec.rows.slice(count) }),
+      ];
+    },
     draw: (ctx, y) => {
       const h = totalH(ctx);
       const ws = widths(ctx.width);
@@ -1000,12 +1028,24 @@ export function darkPanel(stats: DarkStat[], donut?: { percent: number; caption?
     upper: true,
   };
   const valueStyle: TextStyle = { size: SIZE.darkValue, font: FONT.bold, color: COLOR.white };
+  // The bounded fallback for a value that is a phrase rather than a figure. A
+  // long value at the 19px display size wrapped over many lines and blew the
+  // whole panel tall while its sibling columns sat mostly empty — one of the
+  // 2026-08-16 oversized-region findings. Anything past two display-size lines
+  // steps down to this compact size instead; the height stays proportionate
+  // and nothing is truncated.
+  const valueCompactStyle: TextStyle = { size: px(11.5), font: FONT.bold, color: COLOR.white };
   const subStyle: TextStyle = { size: SIZE.darkSub, color: "#8C99C0" };
   const DONUT = px(82);
 
   const statWidth = (w: number): number => {
     const inner = w - PAD.darkPanel.x * 2 - (donut ? DONUT + px(14) : 0);
     return inner / stats.length;
+  };
+
+  const valueStyleFor = (ctx: RenderCtx, value: string, cw: number): TextStyle => {
+    const atDisplay = measureText(ctx.doc, value, cw, valueStyle);
+    return atDisplay > lineHeight(ctx.doc, valueStyle) * 2.2 ? valueCompactStyle : valueStyle;
   };
 
   const heightOf = (ctx: RenderCtx): number => {
@@ -1015,7 +1055,7 @@ export function darkPanel(stats: DarkStat[], donut?: { percent: number; caption?
         (s) =>
           measureText(ctx.doc, s.label, sw, labelStyle) +
           px(4) +
-          measureText(ctx.doc, s.value, sw, valueStyle) +
+          measureText(ctx.doc, s.value, sw, valueStyleFor(ctx, s.value, sw)) +
           (s.sub ? px(3) + measureText(ctx.doc, s.sub, sw, subStyle) : 0)
       )
     );
@@ -1037,13 +1077,14 @@ export function darkPanel(stats: DarkStat[], donut?: { percent: number; caption?
       stats.forEach((s, i) => {
         const cx = ctx.x + PAD.darkPanel.x + sw * i;
         const cw = sw - px(14);
+        const vStyle = valueStyleFor(ctx, s.value, cw);
         let cy = y + PAD.darkPanel.y;
         cy += drawText(ctx.doc, s.label, cx, cy, cw, labelStyle) + px(4);
-        const vh = drawText(ctx.doc, s.value, cx, cy, cw, valueStyle);
+        const vh = drawText(ctx.doc, s.value, cx, cy, cw, vStyle);
         if (s.unit) {
           // `.v small` sits on the value's baseline, so it is placed from the
           // value's width rather than on a line of its own.
-          applyFontWidth(ctx.doc, s.value, valueStyle, (w) =>
+          applyFontWidth(ctx.doc, s.value, vStyle, (w) =>
             drawLine(ctx.doc, s.unit as string, cx + w + px(2), cy + px(6), cw, {
               size: px(10),
               color: "#C3CBE4",

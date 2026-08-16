@@ -27,7 +27,13 @@ import {
   type Narrative,
   type ReportIdentity,
 } from "../model";
-import { summaryHeading } from "./common";
+import { capSentences, summaryHeading } from "./common";
+
+/** The compliance-only narrative cap (owner's 2026-08-16 rule): no narrative
+ *  text block runs past four sentences (~4–5 rendered lines). Applied to the
+ *  summary, every analysis panel and the monitoring note; recommendation items
+ *  are single lines by construction and need no clamp. */
+const MAX_NARRATIVE_SENTENCES = 4;
 
 // Layout for lib/reportPdf/templates/athlete/compliance.html.
 //
@@ -156,7 +162,9 @@ export async function athleteComplianceBlocks(
   );
 
   if (narrative.meansBox) {
-    blocks.push(meansBox(summaryHeading(identity), narrative.meansBox));
+    blocks.push(
+      meansBox(summaryHeading(identity), capSentences(narrative.meansBox, MAX_NARRATIVE_SENTENCES))
+    );
   }
 
   // ---- Category Trends ----
@@ -255,7 +263,8 @@ export async function athleteComplianceBlocks(
   // ---- Interpretation ----
   if (narrative.interps.length > 0) {
     blocks.push(sectionTitle("Compliance-linked analysis"));
-    for (const n of narrative.interps) blocks.push(interp(n.title, n.body, n.tone));
+    for (const n of narrative.interps)
+      blocks.push(interp(n.title, capSentences(n.body, MAX_NARRATIVE_SENTENCES), n.tone));
   }
 
   // ---- Recommendations ----
@@ -267,7 +276,9 @@ export async function athleteComplianceBlocks(
   // ---- Monitoring ----
   if (narrative.monitoring) {
     blocks.push(sectionTitle("Monitoring plan"));
-    blocks.push(interp("Next review", narrative.monitoring, "blue"));
+    blocks.push(
+      interp("Next review", capSentences(narrative.monitoring, MAX_NARRATIVE_SENTENCES), "blue")
+    );
   }
 
   // ---- Summary bar ----

@@ -67,6 +67,15 @@ export function intNum(v: number | null | undefined, unit = ""): string {
   return `${Math.round(Number(v)).toLocaleString("en-GB")}${unit}`;
 }
 
+/** First N sentences of a paragraph — the narrative hard cap. The prompts ask
+ *  for a length; this enforces it against a model that overruns. Shared by the
+ *  layouts that clamp (nutrition, compliance) so the rule cannot drift. */
+export function capSentences(text: string, max: number): string {
+  const matches = text.match(/[^.!?]+[.!?]+(\s|$)/g);
+  if (!matches || matches.length <= max) return text;
+  return matches.slice(0, max).join("").trim();
+}
+
 /** The Rx strip, when a prescriber is known. */
 export function prescriberBlocks(identity: ReportIdentity): Block[] {
   const p = identity.prescriber;
