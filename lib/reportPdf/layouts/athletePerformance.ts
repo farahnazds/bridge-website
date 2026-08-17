@@ -1,5 +1,6 @@
 import "server-only";
 import type { Block } from "../layout";
+import { VALD_TEST_TYPES, VALIDITY_TIER_LABELS } from "@/lib/constants";
 import { CHART, COLOR } from "../theme";
 import { rasteriseChart } from "../charts";
 import { lineChartSvg, type Point } from "../svgChart";
@@ -21,6 +22,12 @@ import {
 // separate measurements with separate validity: `gps_logs` (session external
 // load) and `vald_data` (neuromuscular testing). The template shows them as two
 // sections and two charts, and they are never averaged together.
+
+// Slug→label: `vald_data.test_type` stores values like "nordic_curl", which
+// previously printed raw in the VALD table and the peak-asymmetry card.
+const TEST_TYPE_LABEL: Record<string, string> = Object.fromEntries(
+  VALD_TEST_TYPES.map((t) => [t.value, t.label])
+);
 
 export interface GpsRow {
   date: string;
@@ -100,7 +107,7 @@ export async function athletePerformanceBlocks(
         sub:
           peak.row === null
             ? "no VALD record"
-            : `${peak.row.testType} · threshold ${data.asymmetryThreshold}%`,
+            : `${TEST_TYPE_LABEL[peak.row.testType] ?? peak.row.testType} · threshold ${data.asymmetryThreshold}%`,
         tone:
           peak.value === null
             ? "neutral"
@@ -149,7 +156,13 @@ export async function athletePerformanceBlocks(
     const [a, b] = await Promise.all([
       haveAsym
         ? rasteriseChart(
-            lineChartSvg(asymPoints, { min: 0, max: Math.max(20, data.asymmetryThreshold + 5), color: COLOR.red }),
+            lineChartSvg(asymPoints, {
+              min: 0,
+              max: Math.max(20, data.asymmetryThreshold + 5),
+              color: COLOR.red,
+              xLabel: "Test date",
+              yLabel: "Asymmetry (%)",
+            }),
             chartW
           )
         : Promise.resolve(null),
@@ -159,6 +172,8 @@ export async function athletePerformanceBlocks(
               min: 0,
               max: Math.max(1000, (max(distPoints.map((p) => p.value)) ?? 1000) * 1.1),
               color: COLOR.blue,
+              xLabel: "Session date",
+              yLabel: "Distance (m)",
             }),
             chartW
           )
@@ -216,14 +231,14 @@ export async function athletePerformanceBlocks(
         numeric: [2],
         rows: vald.slice(0, 12).map((r) => [
           shortDate(r.date),
-          r.testType,
+          TEST_TYPE_LABEL[r.testType] ?? r.testType,
           num(r.asymmetryPct, "%"),
           r.asymmetryPct === null
             ? "—"
             : r.asymmetryPct >= data.asymmetryThreshold
               ? `Above ${data.asymmetryThreshold}%`
               : `Within ${data.asymmetryThreshold}%`,
-          r.validityTier.replace(/_/g, " "),
+          VALIDITY_TIER_LABELS[r.validityTier] ?? r.validityTier,
         ]),
       })
     );

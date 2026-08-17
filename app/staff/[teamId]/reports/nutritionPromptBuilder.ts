@@ -6,7 +6,19 @@ import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
 // same split as promptBuilder.ts (Compliance) and
 // bodyCompositionPromptBuilder.ts.
 
-import { SESSION_TYPES, SESSION_DURATION_BANDS, RTP_PHASES, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
+import {
+  SESSION_TYPES,
+  SESSION_DURATION_BANDS,
+  RTP_PHASES,
+  MENSTRUAL_STATUSES,
+  IRON_STATUSES,
+  TIERS,
+  DIET_PREFERENCES,
+  INJURY_STATUSES,
+  SEASON_PHASES,
+  VALD_TEST_TYPES,
+  PRODUCT_CATEGORIES,
+} from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
 
 // "next_day" became "day_specific" when the single-athlete/single-day Nutrition
@@ -39,6 +51,15 @@ const DURATION_BAND_LABEL: Record<string, string> = Object.fromEntries(SESSION_D
 const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
 const MENSTRUAL_LABEL: Record<string, string> = Object.fromEntries(MENSTRUAL_STATUSES.map((m) => [m.value, m.label]));
 const IRON_LABEL: Record<string, string> = Object.fromEntries(IRON_STATUSES.map((i) => [i.value, i.label]));
+// Slug→label maps for every remaining enum this prompt renders. Raw values
+// like "gluten_free" or "nordic_curl" leak from the prompt into the generated
+// report text, so everything the model reads is resolved to its display label.
+const TIER_LABEL: Record<string, string> = Object.fromEntries(TIERS.map((t) => [t.value, t.label]));
+const DIET_LABEL: Record<string, string> = Object.fromEntries(DIET_PREFERENCES.map((d) => [d.value, d.label]));
+const INJURY_STATUS_LABEL: Record<string, string> = Object.fromEntries(INJURY_STATUSES.map((s) => [s.value, s.label]));
+const SEASON_LABEL: Record<string, string> = Object.fromEntries(SEASON_PHASES.map((s) => [s.value, s.label]));
+const TEST_TYPE_LABEL: Record<string, string> = Object.fromEntries(VALD_TEST_TYPES.map((t) => [t.value, t.label]));
+const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(PRODUCT_CATEGORIES.map((c) => [c.value, c.label]));
 
 // Earliest phase = most limiting. Gives the model one unambiguous anchor when
 // an athlete sits at several RTP phases at once — which is the normal case,
@@ -231,6 +252,8 @@ function listOrNone(items: string[]): string {
 export function nutritionSystemPrompt(audience: ReportAudience): string {
   return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Nutrition report — the platform's one FORWARD-LOOKING report type.
 
+DOCUMENT TITLE — hard rule: open the document with a level-1 markdown heading naming the report type exactly: "# Nutrition Report". Never a generic title such as "Clinical Report".
+
 ${audienceDirective(audience)}
 
 THE CONFIRMED PROTOCOL IS ALREADY DECIDED — read this before anything else.
@@ -259,6 +282,7 @@ Clinical reference rules (docs/07-ai-engine.md):
 - WHERE NO GOAL IS SET, say so plainly and recommend that the practitioner set one. Do not invent a target, and do not present current values as though they were on target.
 - Age, diet preference and declared conditions filter what may be recommended at all.
 - Where cultural or seasonal context is relevant (regional heat, travel), apply it to timing and hydration guidance.
+- FOOD EXAMPLES default to widely available, globally recognisable foods (oats, rice, eggs, chicken, yoghurt, bananas, pasta). Use culturally or regionally specific foods (Arabic flatbread, dates, and the like) ONLY when the athlete's recorded context makes them relevant — their ethnicity, a Ramadan season phase, or the practitioner's instructions — never as a default. The platform does not record the athlete's location, so do not assume one.
 - RAMADAN. When the season phase is Ramadan, a "Ramadan context" section appears in the data below. Follow it: the whole day's fuelling collapses into two windows, so generic "eat within 30 minutes post-session" advice is wrong and must not be given. Anchor every recommendation to Iftar or Suhoor rather than to clock times, because this athlete's actual fasting times are not recorded anywhere in the platform — say that plainly rather than assuming a sunset or dawn hour. Cite the library's Ramadan entry for the specific figures rather than inventing your own.
 - Session type and duration drive the MACRO split, not just the total. A strength session and an endurance session of the same RPE need different carbohydrate and protein handling; a match or a double session is not the same fuelling problem as a skill session; a recovery session should not be fuelled as though it were a hard one. Duration band sets the fuelling window — whether intra-session carbohydrate is warranted at all, and how the pre/post split should sit around it.
 - Estimated sweat rate, when recorded, drives INDIVIDUALISED fluid and sodium targets in ml per hour rather than generic advice. When it is not recorded, say plainly that hydration guidance is generic because no sweat rate was measured, and state what measuring it would change. Never invent a sweat rate figure.
@@ -295,13 +319,13 @@ const DAY_SPECIFIC_STRUCTURE = `Required output structure, in this exact order. 
 
 1. Executive summary — at most FOUR short sentences, numbers first. This is a hard cap.
 
-2. Daily targets — training day — a markdown pipe table, at most 4 rows, columns exactly: | Target | Value | Basis |. Cover energy (kcal), carbohydrate, protein and fluid for a standard training day. Derive the values from the RECORDED data below — TDEE and body mass from the latest assessment, protein from g/kg of recorded body mass — and say so in the Basis column ("estimated from TDEE 2,410 kcal, scan 11 Aug"). These are methodology-based estimates from recorded figures, never invented numbers. If NO assessment appears below, OMIT this section and sections 3 and 4 entirely — no placeholder, no empty table, no apology.
+2. Daily targets — training day — a markdown pipe table, at most 4 rows, columns exactly: | Target | Value | Basis |. Cover energy (kcal), carbohydrate, protein and fluid for a standard training day. Every Value cell carries its unit — kcal, g, or ml — never a bare number. Derive the values from the RECORDED data below — TDEE and body mass from the latest assessment, protein from g/kg of recorded body mass — and say so in the Basis column ("estimated from TDEE 2,410 kcal, scan 11 Aug"). These are methodology-based estimates from recorded figures, never invented numbers. If NO assessment appears below, OMIT this section and sections 3 and 4 entirely — no placeholder, no empty table, no apology.
 
 3. Daily targets — match day — the same table shape for a match day, scaled from the same recorded figures (carbohydrate raised, energy adjusted, fluid brought forward), with the scaling named in the Basis column. Produce this even when the period contains no match: it is the standing match-day prescription, not a description of a scheduled match.
 
-4. Day type fuel map — a markdown pipe table, columns exactly: | Day type | kcal | Carbohydrate | Protein |, one row per day type occurring in this period, using exactly this vocabulary for the Day type column: High Intensity, Moderate Intensity, Low Intensity, Match Day, Rest Day — plus one final row exactly "Baseline (no load logged)" when any day of the period has no Training Load Plan entry. Whole-day figures scaled from the daily targets above. This table is DATA for the periodisation grid: no prose beyond one optional mapping line naming which dates fall under each type.
+4. Day type fuel map — a markdown pipe table, columns exactly: | Day type | kcal | Carbohydrate | Protein |, one row per day type occurring in this period, using exactly this vocabulary for the Day type column: High Intensity, Moderate Intensity, Low Intensity, Match Day, Rest Day — plus one final row exactly "Baseline (no load logged)" when any day of the period has no Training Load Plan entry. Whole-day figures scaled from the daily targets above; Carbohydrate and Protein cells carry the g unit (e.g. "520g", never a bare number). This table is DATA for the periodisation grid: no prose beyond one optional mapping line naming which dates fall under each type.
 
-5. Meal timing — one subsection PER DAY TYPE occurring in this period, each headed exactly "Meal timing — <day type>" (e.g. "Meal timing — High Intensity"), each containing a markdown pipe table with columns exactly: | Meal / window | kcal | Macros | Foods and portions | Supplements (dose) | Notes |. Real foods, concrete portions, sized to that day type's fuel. The Supplements column places each item of the CONFIRMED protocol below at the meal window matching its confirmed timing, with its dose — never a supplement that is not in the confirmed protocol, and "—" where a meal carries none. Keep cells tight: kcal as a bare number, Macros as "C 120 · P 35 · F 15" in grams.
+5. Meal timing — one subsection PER DAY TYPE occurring in this period, each headed exactly "Meal timing — <day type>" (e.g. "Meal timing — High Intensity"), each containing a markdown pipe table with columns exactly: | Meal / window | kcal | Macros | Foods and portions | Supplements (dose) | Notes |. Real foods, concrete portions, sized to that day type's fuel. EVERY food example carries an explicit quantity — grams, millilitres, or a household measure ("80 g rolled oats", "2 whole eggs", "250 ml milk") — never a food named without an amount. The Supplements column places each item of the CONFIRMED protocol below at the meal window matching its confirmed timing, with its dose — never a supplement that is not in the confirmed protocol, and "—" where a meal carries none. Keep cells tight: kcal as a bare number, Macros as "C 120g · P 35g · F 15g" — the g unit appears on every macro figure, no exceptions.
 
 6. Performance interpretation — exactly three subsections, each opening with a level-3 markdown heading on its own line, exactly: "### Where you are now", "### Performance goal & target", "### Energy availability", in that order. MARKDOWN HEADINGS, not bold labels — the renderer splits on headings and a bold label merges the three into one block. Each subsection at most THREE short sentences. Hard caps. Numbers first, anchored to the recorded data and the plan above.
 
@@ -313,11 +337,11 @@ const GENERAL_STRUCTURE = `Required output structure, in this exact order. Use e
 
 1. Executive summary — at most FOUR short sentences, numbers first. This is a hard cap.
 
-2. Daily targets — training day — a markdown pipe table, at most 4 rows, columns exactly: | Target | Value | Basis |, derived from the RECORDED assessment data below (TDEE, body mass) with the derivation named in the Basis column. Methodology-based estimates from recorded figures, never invented numbers. If NO assessment appears below, OMIT this section and section 3 entirely.
+2. Daily targets — training day — a markdown pipe table, at most 4 rows, columns exactly: | Target | Value | Basis |, derived from the RECORDED assessment data below (TDEE, body mass) with the derivation named in the Basis column. Every Value cell carries its unit — kcal, g, or ml — never a bare number. Methodology-based estimates from recorded figures, never invented numbers. If NO assessment appears below, OMIT this section and section 3 entirely.
 
 3. Daily targets — match day — the same table shape scaled for a match day, with the scaling named in the Basis column. This is the standing match-day prescription; no specific match is being described.
 
-4. Meal timing — standard day — one section containing a markdown pipe table with columns exactly: | Meal / window | kcal | Macros | Foods and portions | Supplements (dose) | Notes |, for a standard day. The Supplements column places each item of the CONFIRMED protocol below at the meal window matching its confirmed timing, with its dose — never a supplement outside the confirmed protocol, "—" where a meal carries none. This is a general standing plan: do not invent a specific day's session, because no training load entry was requested for this mode.
+4. Meal timing — standard day — one section containing a markdown pipe table with columns exactly: | Meal / window | kcal | Macros | Foods and portions | Supplements (dose) | Notes |, for a standard day. EVERY food example carries an explicit quantity — grams, millilitres, or a household measure ("80 g rolled oats", "2 whole eggs", "250 ml milk") — never a food named without an amount. Keep cells tight: kcal as a bare number, Macros as "C 120g · P 35g · F 15g" — the g unit appears on every macro figure, no exceptions. The Supplements column places each item of the CONFIRMED protocol below at the meal window matching its confirmed timing, with its dose — never a supplement outside the confirmed protocol, "—" where a meal carries none. This is a general standing plan: do not invent a specific day's session, because no training load entry was requested for this mode.
 
 5. Performance interpretation — exactly three subsections, each opening with a level-3 markdown heading on its own line, exactly: "### Where you are now", "### Performance goal & target", "### Energy availability", in that order. MARKDOWN HEADINGS, not bold labels. Each subsection at most THREE short sentences. Hard caps.
 
@@ -383,7 +407,7 @@ ${
         ? "\nCLINICAL FLAG — RED-S SCREENING REQUIRED: this is a female athlete with an irregular or absent menstrual cycle. Treat low energy availability as a live differential, not a footnote."
         : "",
       ironFlag
-        ? `\nCLINICAL FLAG — IRON REPLETION REQUIRED: iron status is ${athlete.iron_status}. An iron protocol with vitamin C co-ingestion is indicated.`
+        ? `\nCLINICAL FLAG — IRON REPLETION REQUIRED: iron status is ${ironLabel.toLowerCase()}. An iron protocol with vitamin C co-ingestion is indicated.`
         : "",
     ].join("");
 
@@ -401,7 +425,7 @@ ${
       : sortedInjuries
           .map((i) => {
             const target = i.targetReturnDate ? ` | target return: ${i.targetReturnDate}` : "";
-            return `- ${i.type ?? "Unspecified injury"} (sustained ${i.date}) | status: ${i.status} | RTP phase: ${phaseLabel(i.rtpPhase)}${target}`;
+            return `- ${i.type ?? "Unspecified injury"} (sustained ${i.date}) | status: ${INJURY_STATUS_LABEL[i.status] ?? i.status} | RTP phase: ${phaseLabel(i.rtpPhase)}${target}`;
           })
           .join("\n") +
         `\n\nMost limiting phase: ${phaseLabel(sortedInjuries[0].rtpPhase)}. Anchor recovery nutrition to THIS phase.`;
@@ -436,7 +460,7 @@ No GPS sessions and no VALD tests were recorded in this window. Say that plainly
       vald.length === 0
         ? "No VALD tests recorded in the window."
         : vald
-            .map((v) => `- ${v.date} | ${v.test_type} | asymmetry ${v.asymmetry_pct ?? "—"}%`)
+            .map((v) => `- ${v.date} | ${TEST_TYPE_LABEL[v.test_type] ?? v.test_type} | asymmetry ${v.asymmetry_pct ?? "—"}%`)
             .join("\n");
 
     return `${header}
@@ -508,7 +532,7 @@ DATA GAP — state this plainly in the report: this platform does not record the
               }
               const l = d.load;
               return `- ${day}: intensity ${l.intensity} | RPE ${l.rpe ?? "not recorded"} | season phase ${
-                l.seasonPhase ?? "not specified"
+                l.seasonPhase ? SEASON_LABEL[l.seasonPhase] ?? l.seasonPhase : "not specified"
               } | session type ${SESSION_TYPE_LABEL[l.sessionType ?? ""] ?? "not recorded"} | duration ${
                 DURATION_BAND_LABEL[l.durationBand ?? ""] ?? "not recorded"
               } | est. sweat rate ${l.sweatRateMl !== null ? `${l.sweatRateMl} ml/hour` : "not recorded"} | scope ${
@@ -552,7 +576,7 @@ ${
     ? prescription.products
         .map(
           (p) =>
-            `- ${p.name}${p.category ? ` [category: ${p.category}]` : " [category: not set]"}${
+            `- ${p.name}${p.category ? ` [category: ${CATEGORY_LABEL[p.category] ?? p.category}]` : " [category: not set]"}${
               p.basePrice !== null ? ` — ${p.currency} ${p.basePrice}` : ""
             }${p.description ? ` — ${p.description}` : ""}`
         )
@@ -566,13 +590,17 @@ ${
       ? supplementLibrary
           .map(
             (s) =>
-              `- ${s.name} [${s.category}]${s.evidenceGrade ? ` evidence ${s.evidenceGrade}` : ""}${
+              `- ${s.name} [${CATEGORY_LABEL[s.category] ?? s.category}]${s.evidenceGrade ? ` evidence ${s.evidenceGrade}` : ""}${
                 s.ageMin !== null || s.ageMax !== null ? ` | age ${s.ageMin ?? "?"}-${s.ageMax ?? "?"}` : ""
               }${
                 s.contraindicatedConditions.length > 0
                   ? ` | contraindicated: ${s.contraindicatedConditions.join(", ")}`
                   : ""
-              }${s.dietCompatibility.length > 0 ? ` | diet: ${s.dietCompatibility.join(", ")}` : ""}${
+              }${
+                s.dietCompatibility.length > 0
+                  ? ` | diet: ${s.dietCompatibility.map((d) => DIET_LABEL[d] ?? d).join(", ")}`
+                  : ""
+              }${
                 s.culturalNotes ? ` | ${s.culturalNotes}` : ""
               }`
           )
@@ -602,9 +630,9 @@ ${subMode === "day_specific" ? DAY_SPECIFIC_STRUCTURE : GENERAL_STRUCTURE}
 
 ## Athlete
 Name: ${athlete.first_name} ${athlete.last_name}
-Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ?? "not specified"}
+Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ? TIER_LABEL[athlete.tier] ?? athlete.tier : "not specified"}
 Age: ${age ?? "not provided"} | Gender: ${athlete.gender ?? "not specified"}
-Diet preference: ${athlete.diet_preference}
+Diet preference: ${DIET_LABEL[athlete.diet_preference] ?? athlete.diet_preference}
 Menstrual status: ${menstrualLabel} | Iron status: ${ironLabel}${healthFlags}
 Declared allergies: ${listOrNone(allergies)}
 Declared intolerances: ${listOrNone(intolerances)}

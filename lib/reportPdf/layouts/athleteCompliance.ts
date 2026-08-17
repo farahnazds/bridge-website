@@ -27,13 +27,7 @@ import {
   type Narrative,
   type ReportIdentity,
 } from "../model";
-import { capSentences, summaryHeading } from "./common";
-
-/** The compliance-only narrative cap (owner's 2026-08-16 rule): no narrative
- *  text block runs past four sentences (~4–5 rendered lines). Applied to the
- *  summary, every analysis panel and the monitoring note; recommendation items
- *  are single lines by construction and need no clamp. */
-const MAX_NARRATIVE_SENTENCES = 4;
+import { capSentences, MAX_NARRATIVE_SENTENCES, summaryHeading } from "./common";
 
 // Layout for lib/reportPdf/templates/athlete/compliance.html.
 //
@@ -187,10 +181,25 @@ export async function athleteComplianceBlocks(
   const hasSeries = complianceSeries.some((p) => p.value !== null);
   if (hasSeries) {
     const [left, right] = await Promise.all([
-      rasteriseChart(lineChartSvg(complianceSeries, { min: 0, max: 100, color: COLOR.blue }), chartW),
+      rasteriseChart(
+        lineChartSvg(complianceSeries, {
+          min: 0,
+          max: 100,
+          color: COLOR.blue,
+          xLabel: "Check-in date",
+          yLabel: "Compliance (%)",
+        }),
+        chartW
+      ),
       rasteriseChart(
         sleepSeries.some((p) => p.value !== null)
-          ? lineChartSvg(sleepSeries, { min: 0, max: 100, color: COLOR.teal })
+          ? lineChartSvg(sleepSeries, {
+              min: 0,
+              max: 100,
+              color: COLOR.teal,
+              xLabel: "Check-in date",
+              yLabel: "Sleep (0–100)",
+            })
           : barChartSvg([], { min: 0, max: 100 }),
         chartW
       ),
@@ -270,7 +279,9 @@ export async function athleteComplianceBlocks(
   // ---- Recommendations ----
   if (narrative.recommendations.length > 0) {
     blocks.push(sectionTitle("Practitioner recommendations"));
-    narrative.recommendations.forEach((r, i) => blocks.push(recItem(i + 1, r)));
+    narrative.recommendations.forEach((r, i) =>
+      blocks.push(recItem(i + 1, capSentences(r, MAX_NARRATIVE_SENTENCES)))
+    );
   }
 
   // ---- Monitoring ----

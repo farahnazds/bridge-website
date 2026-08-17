@@ -229,6 +229,24 @@ function oneLine(text: string | null): string {
 
 // capSentences moved to ./common.ts — compliance clamps with the same rule.
 
+/** "520" -> "520g"; a cell that already carries a unit is left alone. */
+function grams(v: string): string {
+  return /^\d+(?:[.,]\d+)?$/.test(v) ? `${v}g` : v;
+}
+
+/**
+ * "C 120 · P 35 · F 15" -> "C 120g · P 35g · F 15g".
+ *
+ * The prompt now asks for the unit on every macro figure, but stored reports
+ * predate that rule, so the unit is also guaranteed here — the g suffix is a
+ * rendering fact, not something the model gets to omit.
+ */
+function withMacroUnits(cell: string): string {
+  // The (?![\d.,]) guard stops backtracking from splitting an already-united
+  // figure: without it "C 120g" re-matched as "C 12" + "0g" and doubled the g.
+  return cell.replace(/\b([CPF])\s?(\d+(?:[.,]\d+)?)(?![\d.,]|\s*g)/g, "$1 $2g");
+}
+
 /** How many strip cells fit across the content width before they crowd. */
 const MAX_STRIP_DAYS = 7;
 
@@ -272,7 +290,7 @@ function fuelForDay(
   if (!kcal) return undefined;
   const cho = (row[2] ?? "").trim();
   const pro = (row[3] ?? "").trim();
-  const macros = [cho ? `C ${cho}` : null, pro ? `P ${pro}` : null]
+  const macros = [cho ? `C ${grams(cho)}` : null, pro ? `P ${grams(pro)}` : null]
     .filter((v): v is string => v !== null)
     .join(" · ");
   return { kcal: /kcal/i.test(kcal) ? kcal : `${kcal} kcal`, macros };
@@ -370,17 +388,23 @@ export function athleteNutritionBlocks(
   if (meals.length > 0) {
     blocks.push(sectionTitle("Meal timing and portions"));
     for (const m of meals) {
+      const sixCol = m.head.length === 6;
       blocks.push(
         mealBlock({
           title: m.title,
           meta: m.meta ?? undefined,
           head: m.head,
-          rows: m.rows,
+          // Macros column (index 2) gets its g units guaranteed and never
+          // wraps — a "F 15g" pushed to a second line reads as a new figure.
+          rows: sixCol
+            ? m.rows.map((r) => r.map((c, i) => (i === 2 ? withMacroUnits(c) : c)))
+            : m.rows,
+          nowrap: sixCol ? [2] : undefined,
           // The 2026-08-16 six-column shape (window · kcal · macros · foods ·
           // supplements · notes) gets proportioned widths; older three-column
           // tables keep even columns.
           // kcal gets enough width for its own header not to wrap.
-          weights: m.head.length === 6 ? [1.3, 0.7, 0.95, 1.95, 1.5, 1.25] : undefined,
+          weights: sixCol ? [1.3, 0.7, 0.95, 1.95, 1.5, 1.25] : undefined,
           // Right-align nothing by default: these are portions and timings, not
           // measured quantities, and a right-aligned "2 h pre" reads oddly.
           note: m.note ?? undefined,

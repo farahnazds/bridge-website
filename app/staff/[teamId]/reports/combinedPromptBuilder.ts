@@ -1,6 +1,18 @@
 import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
-import { REPORT_TYPE_LABELS, RTP_PHASES, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
+import {
+  REPORT_TYPE_LABELS,
+  RTP_PHASES,
+  MENSTRUAL_STATUSES,
+  IRON_STATUSES,
+  TIERS,
+  DIET_PREFERENCES,
+  INJURY_STATUSES,
+  VALD_TEST_TYPES,
+  VALIDITY_TIER_LABELS,
+  PRODUCT_CATEGORIES,
+} from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
+import { ASSESSMENT_METHOD_NAMES } from "./nutritionPromptBuilder";
 import type { ReportBundle, ReportType } from "@/lib/reportBundle";
 
 // The COMBINED report prompt: two or more types merged into one document.
@@ -33,6 +45,13 @@ import type { ReportBundle, ReportType } from "@/lib/reportBundle";
 const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
 const MENSTRUAL_LABEL: Record<string, string> = Object.fromEntries(MENSTRUAL_STATUSES.map((m) => [m.value, m.label]));
 const IRON_LABEL: Record<string, string> = Object.fromEntries(IRON_STATUSES.map((i) => [i.value, i.label]));
+// Slug→label maps for every remaining enum this prompt renders — raw values
+// leak from the prompt into the generated report text.
+const TIER_LABEL: Record<string, string> = Object.fromEntries(TIERS.map((t) => [t.value, t.label]));
+const DIET_LABEL: Record<string, string> = Object.fromEntries(DIET_PREFERENCES.map((d) => [d.value, d.label]));
+const INJURY_STATUS_LABEL: Record<string, string> = Object.fromEntries(INJURY_STATUSES.map((s) => [s.value, s.label]));
+const TEST_TYPE_LABEL: Record<string, string> = Object.fromEntries(VALD_TEST_TYPES.map((t) => [t.value, t.label]));
+const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(PRODUCT_CATEGORIES.map((c) => [c.value, c.label]));
 
 const typeLabel = (t: ReportType) => REPORT_TYPE_LABELS[t] ?? t;
 
@@ -55,6 +74,8 @@ export function combinedSystemPrompt(audience: ReportAudience, types: ReportType
 
   return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a COMBINED report covering ${n} domains for one athlete: ${labels.join(", ")}.
 
+DOCUMENT TITLE — hard rule: open the document with a level-1 markdown heading naming the report type exactly: "# Combined Performance Report". Never a generic title such as "Clinical Report".
+
 ${audienceDirective(audience)}
 
 THIS IS ONE DOCUMENT, NOT ${n} REPORTS.
@@ -67,6 +88,8 @@ ${domainSections}
 ${n + 2}. Cross-domain synthesis — the core of this report. Explicitly relate the domains to one another: where timelines coincide, where one domain plausibly explains another, and where they disagree. Anchor every link to dated observations from the data (for example "the drop in check-in completion from 12 Jul overlaps the same fortnight as the fall in high-speed distance"). If two domains genuinely have no observable relationship over this period, say that in one sentence rather than manufacturing a connection — a stated non-finding is a finding.
 ${n + 3}. Goals for next period — one consolidated set, not one per domain.
 ${n + 4}. Practitioner recommendations — one consolidated, priority-ordered list. Where a single action serves several domains, say so once and note which domains it serves, rather than repeating it under each.
+
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 
 Correlation discipline: coincidence in time is not causation, and you must not present it as such. Say "coincides with", "is consistent with", "may reflect" — never "caused". Where a relationship is plausible but the data cannot establish it, name the measurement that would settle it.
 
@@ -96,9 +119,9 @@ export function buildCombinedUserPrompt(input: {
 
   blocks.push(`## Athlete
 Name: ${a.first_name} ${a.last_name}
-Sport: ${a.sport} | Position: ${a.position ?? "not specified"} | Tier: ${a.tier ?? "not specified"}
+Sport: ${a.sport} | Position: ${a.position ?? "not specified"} | Tier: ${a.tier ? TIER_LABEL[a.tier] ?? a.tier : "not specified"}
 Age: ${ageFromDob(a.dob)} | Gender: ${a.gender ?? "not specified"}
-Diet preference: ${a.diet_preference}
+Diet preference: ${DIET_LABEL[a.diet_preference] ?? a.diet_preference}
 Declared allergies: ${listOrNone(bundle.allergies)}
 Declared intolerances: ${listOrNone(bundle.intolerances)}
 Declared medical/operational conditions: ${listOrNone(bundle.conditions)}
@@ -147,7 +170,7 @@ ${bundle.types.map(typeLabel).join(", ")}`);
         ? bundle.assessments
             .map(
               (s) =>
-                `- ${s.date} | weight: ${num(s.weight_kg)} kg | height: ${num(s.height_cm)} cm | body fat: ${num(s.body_fat_pct)}% | lean: ${num(s.lean_mass_kg)} kg | muscle: ${num(s.muscle_mass_kg)} kg | visceral: ${num(s.visceral_fat)} | BMR: ${num(s.bmr)} | TDEE: ${num(s.tdee)} | validity: ${s.validity_tier} | notes: ${s.notes ?? "—"}`
+                `- ${s.date} | weight: ${num(s.weight_kg)} kg | height: ${num(s.height_cm)} cm | body fat: ${num(s.body_fat_pct)}% | lean: ${num(s.lean_mass_kg)} kg | muscle: ${num(s.muscle_mass_kg)} kg | visceral: ${num(s.visceral_fat)} | BMR: ${num(s.bmr)} | TDEE: ${num(s.tdee)} | validity: ${VALIDITY_TIER_LABELS[s.validity_tier] ?? s.validity_tier} | notes: ${s.notes ?? "—"}`
             )
             .join("\n")
         : "No assessment on file.";
@@ -179,7 +202,7 @@ ${bundle.types.map(typeLabel).join(", ")}`);
         ? bundle.valdRows!
             .map((v) => {
               const metrics = Object.entries(v.metric_json ?? {});
-              return `- ${v.date} | test: ${v.test_type} | asymmetry: ${num(v.asymmetry_pct)}% | metrics: ${
+              return `- ${v.date} | test: ${TEST_TYPE_LABEL[v.test_type] ?? v.test_type} | asymmetry: ${num(v.asymmetry_pct)}% | metrics: ${
                 metrics.length > 0 ? metrics.map(([k, val]) => `${k}=${val}`).join(", ") : "none recorded"
               }`;
             })
@@ -194,9 +217,9 @@ ${bundle.types.map(typeLabel).join(", ")}`);
         ? bundle.injuries
             .map(
               (i) =>
-                `- sustained ${i.date} | type: ${i.type} | status: ${i.status} | RTP phase: ${
+                `- sustained ${i.date} | type: ${i.type} | status: ${INJURY_STATUS_LABEL[i.status] ?? i.status} | RTP phase: ${
                   i.rtp_phase ? RTP_LABEL[i.rtp_phase] ?? i.rtp_phase : "not specified"
-                } | target return: ${i.target_return_date ?? "—"} | cleared: ${i.cleared_date ?? "not cleared"} | validity: ${i.validity_tier}\n    clinical description: ${i.description?.trim() || "none recorded"}`
+                } | target return: ${i.target_return_date ?? "—"} | cleared: ${i.cleared_date ?? "not cleared"} | validity: ${VALIDITY_TIER_LABELS[i.validity_tier] ?? i.validity_tier}\n    clinical description: ${i.description?.trim() || "none recorded"}`
             )
             .join("\n")
         : "No injuries relevant to this period.";
@@ -210,7 +233,7 @@ ${bundle.types.map(typeLabel).join(", ")}`);
         ? p.products
             .map(
               (pr) =>
-                `- ${pr.name}${pr.category ? ` (${pr.category})` : ""}${
+                `- ${pr.name}${pr.category ? ` (${CATEGORY_LABEL[pr.category] ?? pr.category})` : ""}${
                   pr.basePrice !== null ? ` — ${pr.currency} ${pr.basePrice}` : ""
                 }${pr.description ? ` — ${pr.description}` : ""}`
             )
@@ -219,11 +242,15 @@ ${bundle.types.map(typeLabel).join(", ")}`);
     const lib = bundle.supplementLibrary
       .map(
         (s) =>
-          `- ${s.name} (${s.category})${s.evidenceGrade ? ` | evidence ${s.evidenceGrade}` : ""}${
+          `- ${s.name} (${CATEGORY_LABEL[s.category] ?? s.category})${s.evidenceGrade ? ` | evidence ${s.evidenceGrade}` : ""}${
             s.ageMin !== null || s.ageMax !== null ? ` | ages ${s.ageMin ?? "—"}-${s.ageMax ?? "—"}` : ""
           }${
             s.contraindicatedConditions.length ? ` | contraindicated: ${s.contraindicatedConditions.join(", ")}` : ""
-          }${s.dietCompatibility.length ? ` | diets: ${s.dietCompatibility.join(", ")}` : ""}${
+          }${
+            s.dietCompatibility.length
+              ? ` | diets: ${s.dietCompatibility.map((d) => DIET_LABEL[d] ?? d).join(", ")}`
+              : ""
+          }${
             s.culturalNotes ? ` | ${s.culturalNotes}` : ""
           }`
       )
@@ -248,7 +275,7 @@ ${
 ### Latest assessment (anchor for energy and protein targets)
 ${
   bundle.latestAssessment
-    ? `${bundle.latestAssessment.date} | method ${bundle.latestAssessment.method ?? "not recorded"} | weight ${num(bundle.latestAssessment.weight_kg)} kg | body fat ${num(bundle.latestAssessment.body_fat_pct)}% | lean ${num(bundle.latestAssessment.lean_mass_kg)} kg | BMR ${num(bundle.latestAssessment.bmr)} | TDEE ${num(bundle.latestAssessment.tdee)}`
+    ? `${bundle.latestAssessment.date} | method ${bundle.latestAssessment.method ? ASSESSMENT_METHOD_NAMES[bundle.latestAssessment.method] ?? bundle.latestAssessment.method : "not recorded"} | weight ${num(bundle.latestAssessment.weight_kg)} kg | body fat ${num(bundle.latestAssessment.body_fat_pct)}% | lean ${num(bundle.latestAssessment.lean_mass_kg)} kg | BMR ${num(bundle.latestAssessment.bmr)} | TDEE ${num(bundle.latestAssessment.tdee)}`
     : "No assessment on file — say so, and do not invent energy targets from nothing."
 }
 

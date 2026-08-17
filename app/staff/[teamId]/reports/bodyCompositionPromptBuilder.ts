@@ -1,5 +1,5 @@
 import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
-
+import { DIET_PREFERENCES, TIERS, VALIDITY_TIER_LABELS } from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
 // Builds the Body Composition report prompt exactly per
 // prompts/report-generation.md and docs/07-ai-engine.md. Kept separate from
@@ -88,6 +88,11 @@ function listOrNone(items: string[]): string {
   return items.length > 0 ? items.join(", ") : "none declared";
 }
 
+// Slug→label maps: a raw "gluten_free" or "practitioner_verified" in the
+// prompt leaks straight into the generated report text.
+const TIER_LABEL: Record<string, string> = Object.fromEntries(TIERS.map((t) => [t.value, t.label]));
+const DIET_LABEL: Record<string, string> = Object.fromEntries(DIET_PREFERENCES.map((d) => [d.value, d.label]));
+
 /** Spelled out for the model rather than passed as a slug, so it reasons about
  *  "DEXA scan" and "bioelectrical impedance" rather than about "dexa". */
 const METHOD_NAMES: Record<string, string> = {
@@ -103,6 +108,8 @@ const METHOD_NAMES: Record<string, string> = {
 export function bodyCompositionSystemPrompt(audience: ReportAudience): string {
   return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Body Composition report for an athlete — analysis of their assessment data (weight, height, body fat %, lean mass, muscle mass, visceral fat, BMR, TDEE) over a period, compared against their own trend and, where available, an elite benchmark for their sport/gender/age band.
 
+DOCUMENT TITLE — hard rule: open the document with a level-1 markdown heading naming the report type exactly: "# Body Composition Report". Never a generic title such as "Clinical Report".
+
 ${audienceDirective(audience)}
 
 Required output structure, in this exact order:
@@ -111,6 +118,8 @@ Required output structure, in this exact order:
 3. Compliance-linked analysis — if compliance/check-in data isn't part of this report's input, note briefly that a combined Compliance report would strengthen this analysis, without fabricating any check-in data
 4. Goals for next period
 5. Practitioner recommendations
+
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 
 Elite benchmark handling — hard rules:
 - If a benchmark row is provided, you may reference it directly as this athlete's sport/gender/age-band elite benchmark for body fat %, lean mass ratio, and kcal/kg lean mass.
@@ -168,7 +177,7 @@ export function buildBodyCompositionPrompt(input: BodyCompositionPromptInput): s
                 a.muscle_mass_kg !== null ? ` | muscle mass: ${a.muscle_mass_kg} kg (legacy field, method-specific)` : ""
               }${
                 a.visceral_fat !== null ? ` | visceral fat: ${a.visceral_fat} (legacy field, method-specific)` : ""
-              } | BMR: ${a.bmr ?? "—"} | TDEE: ${a.tdee ?? "—"} | validity: ${a.validity_tier} | notes: ${
+              } | BMR: ${a.bmr ?? "—"} | TDEE: ${a.tdee ?? "—"} | validity: ${VALIDITY_TIER_LABELS[a.validity_tier] ?? a.validity_tier} | notes: ${
                 a.notes ?? "—"
               }`
           )
@@ -208,9 +217,9 @@ Source note: ${benchmark.source_note ?? "—"}`
 
   return `## Athlete
 Name: ${athlete.first_name} ${athlete.last_name}
-Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ?? "not specified"}
+Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ? TIER_LABEL[athlete.tier] ?? athlete.tier : "not specified"}
 Age: ${ageFromDob(athlete.dob)} | Gender: ${athlete.gender ?? "not specified"}
-Diet preference: ${athlete.diet_preference}
+Diet preference: ${DIET_LABEL[athlete.diet_preference] ?? athlete.diet_preference}
 Declared allergies: ${listOrNone(allergies)}
 Declared intolerances: ${listOrNone(intolerances)}
 Declared medical/operational conditions: ${listOrNone(conditions)}

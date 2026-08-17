@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getClinicalLibraryEntries } from "@/lib/clinicalLibrary";
+import { loadVocabularyLabels, vocabularyLabelsFor } from "@/lib/vocabularyLabels";
 import { type ReportType } from "@/lib/reportTypes";
 
 // Re-exported so a SERVER caller needs only this module. Client components
@@ -329,16 +330,24 @@ export async function getReportBundle(
       }
     }
 
-    const { data: supplementRows } = await supabase
-      .from("supplement_library")
-      .select("name, category, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, cultural_notes");
+    const [{ data: supplementRows }, vocab] = await Promise.all([
+      supabase
+        .from("supplement_library")
+        .select("name, category, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, cultural_notes"),
+      // Contraindication codes span all three clinical vocabularies; resolved
+      // here so the prompt reads "Milk / Dairy", never "milk_dairy".
+      loadVocabularyLabels(),
+    ]);
     supplementLibrary = (supplementRows ?? []).map((s) => ({
       name: s.name as string,
       category: s.category as string,
       evidenceGrade: (s.evidence_grade as string | null) ?? null,
       ageMin: (s.age_min as number | null) ?? null,
       ageMax: (s.age_max as number | null) ?? null,
-      contraindicatedConditions: (s.contraindicated_conditions as string[] | null) ?? [],
+      contraindicatedConditions: vocabularyLabelsFor(
+        vocab,
+        (s.contraindicated_conditions as string[] | null) ?? []
+      ),
       dietCompatibility: (s.diet_compatibility as string[] | null) ?? [],
       culturalNotes: (s.cultural_notes as string | null) ?? null,
     }));

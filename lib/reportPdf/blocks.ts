@@ -19,6 +19,7 @@ import {
   columns,
   drawBadge,
   drawBox,
+  drawFitLine,
   drawLine,
   drawRule,
   drawText,
@@ -617,7 +618,10 @@ export function weekStrip(days: DayCell[]): Block {
           iy += px(4);
           iy += drawText(ctx.doc, d.fuel.kcal, x, iy, w, fuelKcalStyle);
           iy += px(1);
-          iy += drawText(ctx.doc, d.fuel.macros, x, iy, w, fuelMacroStyle);
+          // One line, shrink-to-fit: the cell height budgets a single macro
+          // line, and a wrapped "F 15g" on its own row reads as a new figure.
+          drawFitLine(ctx.doc, d.fuel.macros, x, iy, w, fuelMacroStyle);
+          iy += lineHeight(ctx.doc, fuelMacroStyle);
         }
         if (d.caption) drawText(ctx.doc, d.caption, x, iy + px(1), w, capStyle);
       });
@@ -864,6 +868,10 @@ export interface MealBlock {
   rows: string[][];
   weights?: number[];
   numeric?: number[];
+  /** Column indexes whose cells must stay on ONE line: they shrink to fit the
+   *  column instead of wrapping. Used for the Macros column, where a wrapped
+   *  "F 15g" reads as a separate figure. */
+  nowrap?: number[];
   note?: string;
 }
 
@@ -894,7 +902,14 @@ export function mealBlock(spec: MealBlock): Block {
   };
 
   const rowH = (ctx: RenderCtx, cells: string[], ws: number[], style: TextStyle): number =>
-    Math.max(...cells.map((c, i) => measureText(ctx.doc, c, ws[i] - CELL.x * 2, style))) + CELL.y * 2;
+    Math.max(
+      ...cells.map((c, i) =>
+        // A nowrap cell is one line by construction, whatever its content.
+        spec.nowrap?.includes(i)
+          ? lineHeight(ctx.doc, style)
+          : measureText(ctx.doc, c, ws[i] - CELL.x * 2, style)
+      )
+    ) + CELL.y * 2;
 
   const headerBarH = (ctx: RenderCtx, w: number): number => {
     const tw = w - PAD.mealHead.x * 2;
@@ -986,10 +1001,15 @@ export function mealBlock(spec: MealBlock): Block {
         const rh = rowH(ctx, cells, ws, style);
         cells.forEach((c, i) => {
           const cx = columnX(ctx.x, ws, 0, i);
-          drawText(ctx.doc, c, cx + CELL.x, atY + CELL.y, ws[i] - CELL.x * 2, {
+          const cellStyleHere: TextStyle = {
             ...style,
             align: spec.numeric?.includes(i) ? "right" : "left",
-          });
+          };
+          if (spec.nowrap?.includes(i)) {
+            drawFitLine(ctx.doc, c, cx + CELL.x, atY + CELL.y, ws[i] - CELL.x * 2, cellStyleHere);
+          } else {
+            drawText(ctx.doc, c, cx + CELL.x, atY + CELL.y, ws[i] - CELL.x * 2, cellStyleHere);
+          }
         });
         return rh;
       };

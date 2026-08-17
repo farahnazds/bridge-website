@@ -1,4 +1,5 @@
 import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { INJURY_STATUSES, RTP_PHASES, TIERS, VALIDITY_TIER_LABELS } from "@/lib/constants";
 
 // Builds the Injury report prompt per prompts/report-generation.md and
 // docs/07-ai-engine.md ("Injury | Athlete / Practitioner | Past (last
@@ -59,17 +60,11 @@ export interface InjuryPromptInput {
 }
 
 const RTP_ORDER = ["acute", "sub_acute", "return_to_training", "returned"];
-const RTP_LABEL: Record<string, string> = {
-  acute: "Acute",
-  sub_acute: "Sub-acute",
-  return_to_training: "Return to Training",
-  returned: "Returned",
-};
-const STATUS_LABEL: Record<string, string> = {
-  active: "Active",
-  recovering: "Recovering",
-  cleared: "Cleared",
-};
+// From lib/constants.ts rather than local copies — the same enum must not read
+// differently here than on any other surface.
+const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
+const STATUS_LABEL: Record<string, string> = Object.fromEntries(INJURY_STATUSES.map((s) => [s.value, s.label]));
+const TIER_LABEL: Record<string, string> = Object.fromEntries(TIERS.map((t) => [t.value, t.label]));
 
 function ageFromDob(dob: string | null): string {
   if (!dob) return "not provided";
@@ -107,6 +102,8 @@ function daysBetween(a: string, b: string): number | null {
 export function injurySystemPrompt(audience: ReportAudience): string {
   return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating an Injury report — analysis of an athlete's injury history, return-to-play (RTP) phase progression and recovery timeline over a past period.
 
+DOCUMENT TITLE — hard rule: open the document with a level-1 markdown heading naming the report type exactly: "# Injury Report". Never a generic title such as "Clinical Report".
+
 ${audienceDirective(audience)}
 
 This report includes the free-text clinical description recorded against each injury, and that is true for either audience. Do not omit or generalise away a diagnosis, mechanism, or complication because the athlete may read it — an injury report that leaves out the injury is not safer, it is wrong. Never fabricate an injury, a date, a phase, or a recovery duration not present in the data provided.
@@ -119,6 +116,8 @@ Required output structure, in this exact order:
 5. Patterns and risk — recurrence, injuries to the same or contralateral site, injuries clustering in time, and concurrent injury burden. Be explicit about how thin the evidence is when it is thin.
 6. Goals for next period
 7. Practitioner recommendations
+
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 
 DATA-CONFIDENCE RULE: every injury carries a validity tier — club-verified, practitioner-verified or self-reported. Where a conclusion leans on a self-reported entry, say so. Do not treat tiers as interchangeable.
 
@@ -183,7 +182,7 @@ export function buildInjuryPrompt(input: InjuryPromptInput): string {
             } | status: ${STATUS_LABEL[i.status] ?? i.status} | RTP phase: ${
               i.rtp_phase ? (RTP_LABEL[i.rtp_phase] ?? i.rtp_phase) : "not set"
             } | ${target} | ${elapsed === null ? "duration unknown" : `${elapsed} day(s) from onset to ${i.cleared_date ? "clearance" : `end of period`}`} | validity: ${
-              i.validity_tier
+              VALIDITY_TIER_LABELS[i.validity_tier] ?? i.validity_tier
             }\n    clinical description: ${i.description?.trim() || "none recorded"}`;
           })
           .join("\n")
@@ -221,7 +220,7 @@ export function buildInjuryPrompt(input: InjuryPromptInput): string {
 
   return `## Athlete
 Name: ${athlete.first_name} ${athlete.last_name}
-Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ?? "not specified"}
+Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ? TIER_LABEL[athlete.tier] ?? athlete.tier : "not specified"}
 Age: ${ageFromDob(athlete.dob)} | Gender: ${athlete.gender ?? "not specified"}
 Declared allergies: ${listOrNone(allergies)}
 Declared intolerances: ${listOrNone(intolerances)}

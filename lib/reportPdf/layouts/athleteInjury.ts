@@ -4,6 +4,7 @@ import { callout, interp, missingNote, sectionTitle, statusRow, summaryBar, tabl
 import type { Citation, Narrative, ReportIdentity } from "../model";
 import type { AssessmentRow } from "./athleteBodyComposition";
 import { METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
+import { VALIDITY_TIER_LABELS } from "@/lib/constants";
 import {
   bannerBlocks,
   longDate,
@@ -135,7 +136,7 @@ export function athleteInjuryBlocks(
       {
         label: "Status",
         value: STATUS_LABEL[current.status],
-        sub: current.validityTier.replace(/_/g, " "),
+        sub: VALIDITY_TIER_LABELS[current.validityTier] ?? current.validityTier,
         tone: STATUS_TONE[current.status],
         big: true,
       },

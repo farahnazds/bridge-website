@@ -26,12 +26,28 @@ export type Block =
   | { kind: "table"; header: Inline[][]; rows: Inline[][][] }
   | { kind: "rule" };
 
-// Matched in one pass so ** binds before * and nothing nests ambiguously.
-// The underscore alternative requires non-alphanumeric neighbours so
-// snake_case identifiers (rtp_phase, body_fat_pct, goal_ffm) survive intact —
-// verified against a fixture containing exactly those.
+// Matched in one pass so *** binds before **, ** before *, and nothing nests
+// ambiguously. The *** / ___ alternatives exist because models routinely write
+// ***bold-italic***, and without them the ** alternative consumed "***text**"
+// and left a literal * in the rendered report — the stray-asterisk defect from
+// the 2026-08-17 report feedback. The single-underscore alternative requires
+// non-alphanumeric neighbours so snake_case identifiers (rtp_phase,
+// body_fat_pct, goal_ffm) survive intact — verified against a fixture
+// containing exactly those.
 const INLINE =
-  /(\*\*[\s\S]+?\*\*|__[\s\S]+?__|`[^`\n]+`|\*[^*\n]+\*|(?<![a-zA-Z0-9])_[^_\n]+_(?![a-zA-Z0-9]))/g;
+  /(\*\*\*[\s\S]+?\*\*\*|___[\s\S]+?___|\*\*[\s\S]+?\*\*|__[\s\S]+?__|`[^`\n]+`|\*[^*\n]+\*|(?<![a-zA-Z0-9])_[^_\n]+_(?![a-zA-Z0-9]))/g;
+
+/** True when `tok` is a complete ***…*** / ___…___ run. Checked structurally
+ *  rather than by startsWith alone: the ** alternative can legitimately match
+ *  an unbalanced "***text**", whose first three characters lie about which
+ *  alternative matched. */
+function isTripleWrapped(tok: string): boolean {
+  return (
+    tok.length >= 7 &&
+    ((tok.startsWith("***") && tok.endsWith("***")) ||
+      (tok.startsWith("___") && tok.endsWith("___")))
+  );
+}
 
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
@@ -40,7 +56,10 @@ export function parseInline(text: string): Inline[] {
     const start = m.index ?? 0;
     if (start > last) out.push({ kind: "text", text: text.slice(last, start) });
     const tok = m[0];
-    if (tok.startsWith("**") || tok.startsWith("__")) out.push({ kind: "bold", text: tok.slice(2, -2) });
+    // Bold-italic degrades to bold: the closed Inline union stays closed, and
+    // bold is the half of the emphasis a report actually needs.
+    if (isTripleWrapped(tok)) out.push({ kind: "bold", text: tok.slice(3, -3) });
+    else if (tok.startsWith("**") || tok.startsWith("__")) out.push({ kind: "bold", text: tok.slice(2, -2) });
     else if (tok.startsWith("`")) out.push({ kind: "code", text: tok.slice(1, -1) });
     else out.push({ kind: "italic", text: tok.slice(1, -1) });
     last = start + tok.length;

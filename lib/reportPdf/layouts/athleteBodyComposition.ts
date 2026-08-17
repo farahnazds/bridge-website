@@ -1,6 +1,7 @@
 import "server-only";
 import type { Block } from "../layout";
 import { METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
+import { VALIDITY_TIER_LABELS } from "@/lib/constants";
 import { CHART, COLOR } from "../theme";
 import { rasteriseChart } from "../charts";
 import { lineChartSvg, type Point } from "../svgChart";
@@ -150,7 +151,7 @@ export async function athleteBodyCompositionBlocks(
       {
         label: "Lean mass",
         value: num(latest.leanMassKg, " kg"),
-        sub: latest.validityTier.replace(/_/g, " "),
+        sub: VALIDITY_TIER_LABELS[latest.validityTier] ?? latest.validityTier,
         tone: "neutral",
       },
     ])
@@ -187,9 +188,24 @@ export async function athleteBodyCompositionBlocks(
   const chartW = (contentWidth - 9) / 2;
   if (bfPoints.filter((p) => p.value !== null).length >= 2) {
     const [a, b] = await Promise.all([
-      rasteriseChart(lineChartSvg(bfPoints, { min: 0, max: 30, color: COLOR.blue }), chartW),
       rasteriseChart(
-        lineChartSvg(vatPoints, { min: 0, max: Math.max(10, ...vatPoints.map((p) => p.value ?? 0)) , color: COLOR.teal }),
+        lineChartSvg(bfPoints, {
+          min: 0,
+          max: 30,
+          color: COLOR.blue,
+          xLabel: "Scan date",
+          yLabel: "Body fat (%)",
+        }),
+        chartW
+      ),
+      rasteriseChart(
+        lineChartSvg(vatPoints, {
+          min: 0,
+          max: Math.max(10, ...vatPoints.map((p) => p.value ?? 0)),
+          color: COLOR.teal,
+          xLabel: "Scan date",
+          yLabel: "Visceral fat rating",
+        }),
         chartW
       ),
     ]);

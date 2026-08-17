@@ -4,6 +4,7 @@ import EmptyState from "@/components/EmptyState";
 import TrendSparkline from "@/components/TrendSparkline";
 import { CARD, NOTICE } from "@/lib/ui";
 import { METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
+import { VALIDITY_TIER_LABELS } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Body Composition — Bridgetx" };
 
@@ -32,11 +33,8 @@ type AssessmentRow = {
   validity_tier: string;
 };
 
-const VALIDITY_LABEL: Record<string, string> = {
-  club_verified: "Club-Verified",
-  practitioner_verified: "Practitioner-Verified",
-  self_reported: "Self-Reported",
-};
+// One shared map (lib/constants.ts) — was a local copy in four pages.
+const VALIDITY_LABEL = VALIDITY_TIER_LABELS;
 const STALE_DAYS = 90;
 
 function fmt(v: number | null, unit = ""): string {

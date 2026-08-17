@@ -76,6 +76,9 @@ export function capSentences(text: string, max: number): string {
   return matches.slice(0, max).join("").trim();
 }
 
+/** Every prompt states this cap; every narrative slot is clamped against it. */
+export const MAX_NARRATIVE_SENTENCES = 4;
+
 /** The Rx strip, when a prescriber is known. */
 export function prescriberBlocks(identity: ReportIdentity): Block[] {
   const p = identity.prescriber;
@@ -112,17 +115,22 @@ export function narrativeTail(
 ): Block[] {
   const includeRecommendations = opts?.includeRecommendations ?? true;
   const out: Block[] = [];
+  // Every narrative slot is clamped at the shared cap — the prompts state the
+  // four-sentence rule, and this enforces it against a model that overruns.
   if (narrative.interps.length > 0) {
     out.push(sectionTitle(interpretationTitle));
-    for (const n of narrative.interps) out.push(interp(n.title, n.body, n.tone));
+    for (const n of narrative.interps)
+      out.push(interp(n.title, capSentences(n.body, MAX_NARRATIVE_SENTENCES), n.tone));
   }
   if (includeRecommendations && narrative.recommendations.length > 0) {
     out.push(sectionTitle("Recommendations"));
-    narrative.recommendations.forEach((r, i) => out.push(recItem(i + 1, r)));
+    narrative.recommendations.forEach((r, i) =>
+      out.push(recItem(i + 1, capSentences(r, MAX_NARRATIVE_SENTENCES)))
+    );
   }
   if (narrative.monitoring) {
     out.push(sectionTitle("Monitoring plan"));
-    out.push(interp("Next review", narrative.monitoring, "blue"));
+    out.push(interp("Next review", capSentences(narrative.monitoring, MAX_NARRATIVE_SENTENCES), "blue"));
   }
   return out;
 }

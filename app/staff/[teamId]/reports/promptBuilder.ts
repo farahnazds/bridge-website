@@ -1,4 +1,5 @@
 import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { DIET_PREFERENCES, TIERS } from "@/lib/constants";
 
 // Builds the Compliance report prompt exactly per prompts/report-generation.md
 // and docs/07-ai-engine.md. Kept separate from actions.ts so the prompt text
@@ -61,6 +62,11 @@ function listOrNone(items: string[]): string {
   return items.length > 0 ? items.join(", ") : "none declared";
 }
 
+// Slug→label maps: a raw "gluten_free" or "development" in the prompt leaks
+// straight into the generated report text.
+const TIER_LABEL: Record<string, string> = Object.fromEntries(TIERS.map((t) => [t.value, t.label]));
+const DIET_LABEL: Record<string, string> = Object.fromEntries(DIET_PREFERENCES.map((d) => [d.value, d.label]));
+
 // The register block comes from lib/reportAudience.ts rather than being
 // written here, so all five report types describe their reader identically.
 // It replaces a hardcoded "Tone:" line that hedged toward "the athlete might
@@ -69,6 +75,8 @@ function listOrNone(items: string[]): string {
 // cannot be reworded per report type.
 export function complianceSystemPrompt(audience: ReportAudience): string {
   return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Compliance report for an athlete — analysis of their supplement/nutrition check-in adherence over a period.
+
+DOCUMENT TITLE — hard rule: open the document with a level-1 markdown heading naming the report type exactly: "# Compliance Report". Never a generic title such as "Clinical Report".
 
 ${audienceDirective(audience)}
 
@@ -134,9 +142,9 @@ export function buildCompliancePrompt(input: CompliancePromptInput): string {
 
   return `## Athlete
 Name: ${athlete.first_name} ${athlete.last_name}
-Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ?? "not specified"}
+Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ? TIER_LABEL[athlete.tier] ?? athlete.tier : "not specified"}
 Age: ${ageFromDob(athlete.dob)} | Gender: ${athlete.gender ?? "not specified"}
-Diet preference: ${athlete.diet_preference}
+Diet preference: ${DIET_LABEL[athlete.diet_preference] ?? athlete.diet_preference}
 Declared allergies: ${listOrNone(allergies)}
 Declared intolerances: ${listOrNone(intolerances)}
 Declared medical/operational conditions: ${listOrNone(conditions)}

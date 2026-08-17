@@ -24,6 +24,7 @@ import {
   loadSupplementLibrary,
   type PlanSafetyFinding,
 } from "@/lib/supplementPlanSafety";
+import { loadVocabularyLabels, vocabularyLabelsFor } from "@/lib/vocabularyLabels";
 import {
   loadAthletePlanningExtras,
   loadNutritionCitations,
@@ -271,19 +272,30 @@ async function runGeneratePlan(
     return { error: "None of those athletes are on this team.", plan: null };
   }
 
-  const [contexts, library, extrasById, loadDaysById, citations, verifyLibrary] = await Promise.all([
-    loadAthleteClinicalContext(athleteIds),
-    loadSupplementLibrary(),
-    loadAthletePlanningExtras(athleteIds, periodStart, periodEnd),
-    mode === "day_specific"
-      ? loadTrainingLoadDays(teamId, athleteIds, periodStart, periodEnd)
-      : Promise.resolve(new Map<string, never[]>()),
-    loadNutritionCitations(),
-    // The WHOLE library, for post-generation citation verification — distinct
-    // from `citations` above, which is the nutrition-tagged slice the prompt
-    // is allowed to draw on.
-    getAllClinicalLibraryEntries(),
-  ]);
+  const [contexts, library, extrasById, loadDaysById, citations, verifyLibrary, vocab] =
+    await Promise.all([
+      loadAthleteClinicalContext(athleteIds),
+      loadSupplementLibrary(),
+      loadAthletePlanningExtras(athleteIds, periodStart, periodEnd),
+      mode === "day_specific"
+        ? loadTrainingLoadDays(teamId, athleteIds, periodStart, periodEnd)
+        : Promise.resolve(new Map<string, never[]>()),
+      loadNutritionCitations(),
+      // The WHOLE library, for post-generation citation verification — distinct
+      // from `citations` above, which is the nutrition-tagged slice the prompt
+      // is allowed to draw on.
+      getAllClinicalLibraryEntries(),
+      loadVocabularyLabels(),
+    ]);
+
+  // A labelled COPY for the prompt only: contraindication codes span all three
+  // clinical vocabularies and would otherwise print as raw slugs (milk_dairy)
+  // in the model's input. `library` itself keeps its codes — checkPlanItems()
+  // matches them against the athlete's declared codes and must not see labels.
+  const promptLibrary = library.map((s) => ({
+    ...s,
+    contraindicatedConditions: vocabularyLabelsFor(vocab, s.contraindicatedConditions),
+  }));
 
   const prescriptions = await loadPrescriptions(
     athleteIds.map((id) => ({
@@ -387,7 +399,7 @@ async function runGeneratePlan(
       days: loadDaysById.get(athleteId) ?? [],
       currentProtocol: extras.currentProtocol,
       prescription: prescriptions.get(athleteId) ?? null,
-      supplementLibrary: library,
+      supplementLibrary: promptLibrary,
       clinicalLibraryEntries: citations,
       previousReportSummary: extras.previousReportSummary,
       additionalInstructions,

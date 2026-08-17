@@ -33,8 +33,46 @@ interface Geometry {
 
 const GEO: Geometry = { width: 320, height: 120, padL: 26, padR: 8, padT: 10, padB: 18 };
 
+/** Extra padding reserved when an axis title is present. */
+const AXIS_TITLE_PAD = 11;
+
+interface AxisTitles {
+  /** Axis title along the bottom, e.g. "Scan date". */
+  xLabel?: string;
+  /** Axis title up the left edge, e.g. "Body fat (%)". */
+  yLabel?: string;
+}
+
+/** The base geometry, widened where an axis title needs its own row/column. */
+function geoFor(titles: AxisTitles): Geometry {
+  return {
+    ...GEO,
+    padL: GEO.padL + (titles.yLabel ? AXIS_TITLE_PAD : 0),
+    padB: GEO.padB + (titles.xLabel ? AXIS_TITLE_PAD : 0),
+  };
+}
+
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** The axis titles themselves: X centred under the plot, Y rotated up its left edge. */
+function axisTitles(titles: AxisTitles, geo: Geometry): string {
+  const font = `font-family="Helvetica,Arial,sans-serif" font-size="7.5" fill="${COLOR.muted3}"`;
+  let out = "";
+  if (titles.yLabel) {
+    const midY = (geo.padT + (geo.height - geo.padB)) / 2;
+    out += `<text x="9" y="${midY.toFixed(1)}" transform="rotate(-90 9 ${midY.toFixed(
+      1
+    )})" text-anchor="middle" ${font}>${esc(titles.yLabel)}</text>`;
+  }
+  if (titles.xLabel) {
+    const midX = (geo.padL + (geo.width - geo.padR)) / 2;
+    out += `<text x="${midX.toFixed(1)}" y="${geo.height - 3}" text-anchor="middle" ${font}>${esc(
+      titles.xLabel
+    )}</text>`;
+  }
+  return out;
 }
 
 function scale(points: Point[], min: number, max: number, geo: Geometry) {
@@ -79,9 +117,12 @@ function gridAndAxis(min: number, max: number, geo: Geometry, s: ReturnType<type
  */
 export function lineChartSvg(
   points: Point[],
-  opts: { min: number; max: number; color?: string; fill?: boolean } = { min: 0, max: 100 }
+  opts: { min: number; max: number; color?: string; fill?: boolean } & AxisTitles = {
+    min: 0,
+    max: 100,
+  }
 ): string {
-  const geo = GEO;
+  const geo = geoFor(opts);
   const color = opts.color ?? COLOR.blue;
   const s = scale(points, opts.min, opts.max, geo);
 
@@ -120,9 +161,10 @@ export function lineChartSvg(
   }
 
   // First and last labels only — the templates never label every point, and at
-  // this width more than two collide.
+  // this width more than two collide. Sits at a fixed offset below the plot so
+  // an X-axis title, when present, gets its own row beneath.
   if (points.length > 0) {
-    const y = geo.height - 5;
+    const y = geo.height - geo.padB + 13;
     body += `<text x="${geo.padL}" y="${y}" font-family="Helvetica,Arial,sans-serif" font-size="8" fill="${
       COLOR.muted3
     }">${esc(points[0].label)}</text>`;
@@ -133,15 +175,17 @@ export function lineChartSvg(
     }
   }
 
+  body += axisTitles(opts, geo);
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geo.width} ${geo.height}">${body}</svg>`;
 }
 
 /** A bar chart, for per-category comparisons (supplement adherence by item). */
 export function barChartSvg(
   points: Point[],
-  opts: { min: number; max: number; color?: string } = { min: 0, max: 100 }
+  opts: { min: number; max: number; color?: string } & AxisTitles = { min: 0, max: 100 }
 ): string {
-  const geo = GEO;
+  const geo = geoFor(opts);
   const color = opts.color ?? COLOR.teal;
   const s = scale(points, opts.min, opts.max, geo);
   const slot = points.length > 0 ? s.innerW / points.length : s.innerW;
@@ -159,7 +203,7 @@ export function barChartSvg(
   });
 
   if (points.length > 0) {
-    const y = geo.height - 5;
+    const y = geo.height - geo.padB + 13;
     points.forEach((p, i) => {
       if (points.length > 8 && i % 2 === 1) return;
       const x = geo.padL + slot * i + slot / 2;
@@ -170,6 +214,8 @@ export function barChartSvg(
       }">${esc(p.label)}</text>`;
     });
   }
+
+  body += axisTitles(opts, geo);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geo.width} ${geo.height}">${body}</svg>`;
 }

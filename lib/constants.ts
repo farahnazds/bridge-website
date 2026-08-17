@@ -404,6 +404,19 @@ export const RTP_PHASES = [
   { value: "returned", label: "Returned" },
 ];
 
+// Matches the `validity_tier` check constraints on assessments, gps_logs,
+// vald_data and injuries. Previously hand-copied as a local VALIDITY_LABEL in
+// four pages and approximated with .replace(/_/g, " ") in the PDF layouts —
+// one map here so the same tier cannot read differently across surfaces.
+export const VALIDITY_TIERS = [
+  { value: "club_verified", label: "Club-Verified" },
+  { value: "practitioner_verified", label: "Practitioner-Verified" },
+  { value: "self_reported", label: "Self-Reported" },
+];
+export const VALIDITY_TIER_LABELS: Record<string, string> = Object.fromEntries(
+  VALIDITY_TIERS.map((t) => [t.value, t.label])
+);
+
 // Display names for the `role` values on `profiles`. Previously declared as a
 // local ROLE_LABEL inside app/staff/[teamId]/layout.tsx covering only the four
 // roles that reach a team; the shared account page needs all of them, and two

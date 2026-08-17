@@ -109,6 +109,39 @@ export function drawLine(
   });
 }
 
+/**
+ * Single-line text that shrinks its font size (never below `minSize`) until it
+ * fits the width, instead of wrapping. For values that must read as ONE line —
+ * a macro string like "C 120g · P 35g · F 15g" split across two lines reads as
+ * two different figures.
+ */
+export function drawFitLine(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  s: TextStyle,
+  minSize = s.size * 0.7
+): void {
+  applyStyle(doc, s);
+  const str = styled(text, s);
+  let size = s.size;
+  while (
+    size > minSize &&
+    doc.widthOfString(str, { characterSpacing: s.tracking ?? 0 }) > width
+  ) {
+    size -= 0.25;
+    doc.fontSize(size);
+  }
+  doc.text(str, x, y, {
+    width,
+    align: s.align ?? "left",
+    lineBreak: false,
+    characterSpacing: s.tracking ?? 0,
+  });
+}
+
 /** One line's height for the given style. Safe before the first page exists. */
 export function lineHeight(doc: PDFKit.PDFDocument, s: TextStyle): number {
   applyFont(doc, s);

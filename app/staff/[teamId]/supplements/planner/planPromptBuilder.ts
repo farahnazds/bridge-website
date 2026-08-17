@@ -1,4 +1,15 @@
-import { SESSION_TYPES, SESSION_DURATION_BANDS, RTP_PHASES, MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
+import {
+  SESSION_TYPES,
+  SESSION_DURATION_BANDS,
+  RTP_PHASES,
+  MENSTRUAL_STATUSES,
+  IRON_STATUSES,
+  TIERS,
+  DIET_PREFERENCES,
+  INJURY_STATUSES,
+  SEASON_PHASES,
+  PRODUCT_CATEGORIES,
+} from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
 import { ageInYears, weekdayOf } from "@/app/staff/[teamId]/reports/nutritionPromptBuilder";
 import type {
@@ -61,6 +72,13 @@ const DURATION_BAND_LABEL: Record<string, string> = Object.fromEntries(SESSION_D
 const RTP_LABEL: Record<string, string> = Object.fromEntries(RTP_PHASES.map((p) => [p.value, p.label]));
 const MENSTRUAL_LABEL: Record<string, string> = Object.fromEntries(MENSTRUAL_STATUSES.map((m) => [m.value, m.label]));
 const IRON_LABEL: Record<string, string> = Object.fromEntries(IRON_STATUSES.map((i) => [i.value, i.label]));
+// Slug→label maps for the remaining enums this prompt renders — raw values
+// like "gluten_free" leak from the prompt into generated text.
+const TIER_LABEL: Record<string, string> = Object.fromEntries(TIERS.map((t) => [t.value, t.label]));
+const DIET_LABEL: Record<string, string> = Object.fromEntries(DIET_PREFERENCES.map((d) => [d.value, d.label]));
+const INJURY_STATUS_LABEL: Record<string, string> = Object.fromEntries(INJURY_STATUSES.map((s) => [s.value, s.label]));
+const SEASON_LABEL: Record<string, string> = Object.fromEntries(SEASON_PHASES.map((s) => [s.value, s.label]));
+const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(PRODUCT_CATEGORIES.map((c) => [c.value, c.label]));
 const RTP_ORDER = ["acute", "sub_acute", "return_to_training", "returned"];
 
 /** The sentinel `date` value for a standing (general-mode) suggestion.
@@ -192,7 +210,7 @@ function renderDay(day: PlanDay): string {
   }
   const l = day.load;
   return `- ${label}: intensity ${l.intensity} | RPE ${l.rpe ?? "not recorded"} | season phase ${
-    l.seasonPhase ?? "not specified"
+    l.seasonPhase ? SEASON_LABEL[l.seasonPhase] ?? l.seasonPhase : "not specified"
   } | session type ${SESSION_TYPE_LABEL[l.sessionType ?? ""] ?? "not recorded"} | duration ${
     DURATION_BAND_LABEL[l.durationBand ?? ""] ?? "not recorded"
   } | est. sweat rate ${l.sweatRateMl !== null ? `${l.sweatRateMl} ml/hour` : "not recorded"} | scope ${
@@ -219,7 +237,7 @@ export function buildPlanPrompt(input: PlanPromptInput): string {
       ? "\nCLINICAL FLAG — RED-S SCREENING REQUIRED: female athlete with an irregular or absent menstrual cycle. Treat low energy availability as a live differential, not a footnote."
       : "",
     clinical.ironFlag
-      ? `\nCLINICAL FLAG — IRON REPLETION REQUIRED: iron status is ${clinical.ironStatus}. An iron protocol with vitamin C co-ingestion is indicated.`
+      ? `\nCLINICAL FLAG — IRON REPLETION REQUIRED: iron status is ${ironLabel.toLowerCase()}. An iron protocol with vitamin C co-ingestion is indicated.`
       : "",
   ].join("");
 
@@ -233,7 +251,7 @@ export function buildPlanPrompt(input: PlanPromptInput): string {
       : sortedInjuries
           .map(
             (i) =>
-              `- ${i.type ?? "Unspecified injury"} (sustained ${i.date}) | status: ${i.status} | RTP phase: ${phaseLabel(i.rtpPhase)}${
+              `- ${i.type ?? "Unspecified injury"} (sustained ${i.date}) | status: ${INJURY_STATUS_LABEL[i.status] ?? i.status} | RTP phase: ${phaseLabel(i.rtpPhase)}${
                 i.targetReturnDate ? ` | target return: ${i.targetReturnDate}` : ""
               }`
           )
@@ -277,10 +295,12 @@ ${
       ? supplementLibrary
           .map(
             (s) =>
-              `- id: ${s.id} | ${s.name} [${s.category}]${s.evidenceGrade ? ` evidence ${s.evidenceGrade}` : ""}${
+              `- id: ${s.id} | ${s.name} [${CATEGORY_LABEL[s.category] ?? s.category}]${s.evidenceGrade ? ` evidence ${s.evidenceGrade}` : ""}${
                 s.ageMin !== null || s.ageMax !== null ? ` | age ${s.ageMin ?? "?"}-${s.ageMax ?? "?"}` : ""
               }${s.contraindicatedConditions.length > 0 ? ` | contraindicated: ${s.contraindicatedConditions.join(", ")}` : ""}${
-                s.dietCompatibility.length > 0 ? ` | diet: ${s.dietCompatibility.join(", ")}` : ""
+                s.dietCompatibility.length > 0
+                  ? ` | diet: ${s.dietCompatibility.map((d) => DIET_LABEL[d] ?? d).join(", ")}`
+                  : ""
               }${s.culturalNotes ? ` | ${s.culturalNotes}` : ""}`
           )
           .join("\n")
@@ -293,7 +313,7 @@ Available products:
 ${
   prescription.products.length > 0
     ? prescription.products
-        .map((p) => `- ${p.name}${p.category ? ` [category: ${p.category}]` : " [category: not set]"}${p.description ? ` — ${p.description}` : ""}`)
+        .map((p) => `- ${p.name}${p.category ? ` [category: ${CATEGORY_LABEL[p.category] ?? p.category}]` : " [category: not set]"}${p.description ? ` — ${p.description}` : ""}`)
         .join("\n")
     : "This brand has no products listed. Give the clinical suggestions anyway."
 }
@@ -313,9 +333,9 @@ ${mode === "day_specific" ? "DAY-SPECIFIC — a connected plan across the dated 
 
 ## Athlete
 Name: ${clinical.firstName} ${clinical.lastName}
-Sport: ${sport} | Position: ${position ?? "not specified"} | Tier: ${tier ?? "not specified"}
+Sport: ${sport} | Position: ${position ?? "not specified"} | Tier: ${tier ? TIER_LABEL[tier] ?? tier : "not specified"}
 Age: ${age ?? "not provided"} | Gender: ${clinical.gender ?? "not specified"}
-Diet preference: ${clinical.dietPreference}
+Diet preference: ${DIET_LABEL[clinical.dietPreference] ?? clinical.dietPreference}
 Menstrual status: ${menstrualLabel} | Iron status: ${ironLabel}${healthFlags}
 Declared allergies: ${listOrNone(clinical.allergies)}
 Declared intolerances: ${listOrNone(clinical.intolerances)}

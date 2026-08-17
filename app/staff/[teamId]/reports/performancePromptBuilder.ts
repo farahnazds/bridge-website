@@ -1,4 +1,5 @@
 import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { TIERS, VALD_TEST_TYPES } from "@/lib/constants";
 
 // Builds the Performance report prompt per prompts/report-generation.md and
 // docs/07-ai-engine.md ("Performance | Athlete / Practitioner | Past |
@@ -79,10 +80,17 @@ function listOrNone(items: string[]): string {
   return items.length > 0 ? items.join(", ") : "none declared";
 }
 
+// Slug→label maps: a raw "nordic_curl" or "development" in the prompt leaks
+// straight into the generated report text.
+const TIER_LABEL: Record<string, string> = Object.fromEntries(TIERS.map((t) => [t.value, t.label]));
+const TEST_TYPE_LABEL: Record<string, string> = Object.fromEntries(VALD_TEST_TYPES.map((t) => [t.value, t.label]));
+
 // Register block shared with the other four report types — see
 // lib/reportAudience.ts and the note in promptBuilder.ts.
 export function performanceSystemPrompt(audience: ReportAudience): string {
   return `You are the clinical report-writing engine for Bridgetx, a sports nutrition intelligence platform for football/basketball academies. You are generating a Performance report — analysis of an athlete's external load (GPS) and neuromuscular testing (VALD) over a past period.
+
+DOCUMENT TITLE — hard rule: open the document with a level-1 markdown heading naming the report type exactly: "# Performance Report". Never a generic title such as "Clinical Report".
 
 ${audienceDirective(audience)}
 
@@ -93,6 +101,8 @@ Required output structure, in this exact order:
 4. Combined interpretation — read the two together. This is the section that justifies the report existing: relate external load to neuromuscular response (for example, whether a spike in high-speed distance or player load is followed by a change in asymmetry or test scores). If only ONE data source is present, say so plainly and give the single-source interpretation instead — do NOT invent the missing half, and do NOT imply a relationship you cannot observe.
 5. Goals for next period
 6. Practitioner recommendations
+
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 
 DATA-GAP RULE — this matters more here than in any other report type, because docs/07-ai-engine.md defines this report as covering "GPS and/or neuromuscular (VALD)". A club may legitimately run one system and not the other. Therefore:
 - If one source has no data for the period, describe that plainly and factually, in the same register as any other observation. Never call it an error, never call it a failure, never imply the practitioner has done something wrong, and never pad the report with speculation to compensate.
@@ -148,7 +158,7 @@ export function buildPerformancePrompt(input: PerformancePromptInput): string {
       ? valdRows
           .map((v) => {
             const metrics = Object.entries(v.metric_json ?? {});
-            return `- ${v.date} | test: ${v.test_type} | asymmetry: ${
+            return `- ${v.date} | test: ${TEST_TYPE_LABEL[v.test_type] ?? v.test_type} | asymmetry: ${
               v.asymmetry_pct ?? "—"
             }% | metrics: ${metrics.length > 0 ? metrics.map(([k, val]) => `${k}=${val}`).join(", ") : "none recorded"}`;
           })
@@ -180,7 +190,7 @@ export function buildPerformancePrompt(input: PerformancePromptInput): string {
 
   return `## Athlete
 Name: ${athlete.first_name} ${athlete.last_name}
-Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ?? "not specified"}
+Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ? TIER_LABEL[athlete.tier] ?? athlete.tier : "not specified"}
 Age: ${ageFromDob(athlete.dob)} | Gender: ${athlete.gender ?? "not specified"}
 Declared allergies: ${listOrNone(allergies)}
 Declared intolerances: ${listOrNone(intolerances)}

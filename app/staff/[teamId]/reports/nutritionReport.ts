@@ -13,6 +13,7 @@ import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
 import type { ReportAudience } from "@/lib/reportAudience";
 import type { PlanMode } from "@/lib/supplementPlan";
 import type { AthleteClinicalContext, SupplementLibraryRow } from "@/lib/supplementPlanSafety";
+import { loadVocabularyLabels, vocabularyLabelsFor } from "@/lib/vocabularyLabels";
 import {
   buildNutritionPrompt,
   nutritionSystemPrompt,
@@ -142,6 +143,11 @@ export async function generateAndSaveNutritionReport(
     ? await loadPerformanceSignals(req.athleteId, req.mode, req.periodStart)
     : null;
 
+  // Contraindication codes span all three clinical vocabularies; resolved here
+  // so the prompt reads "Milk / Dairy", never "milk_dairy". The raw rows in
+  // req.supplementLibrary keep their codes — the safety check needs them.
+  const vocab = await loadVocabularyLabels();
+
   const userPrompt = buildNutritionPrompt({
     subMode: req.mode,
     athlete: {
@@ -174,7 +180,7 @@ export async function generateAndSaveNutritionReport(
       evidenceGrade: s.evidenceGrade,
       ageMin: s.ageMin,
       ageMax: s.ageMax,
-      contraindicatedConditions: s.contraindicatedConditions,
+      contraindicatedConditions: vocabularyLabelsFor(vocab, s.contraindicatedConditions),
       dietCompatibility: s.dietCompatibility,
       culturalNotes: s.culturalNotes,
     })),
