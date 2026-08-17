@@ -203,34 +203,30 @@ export async function complianceDomainBlocks(
   const chartW = (contentWidth - 9) / 2;
   const hasSeries = complianceSeries.some((p) => p.value !== null);
   if (hasSeries) {
-    const [left, right] = await Promise.all([
-      rasteriseChart(
-        lineChartSvg(complianceSeries, {
+    const complianceChart = lineChartSvg(complianceSeries, {
+      min: 0,
+      max: 100,
+      color: COLOR.blue,
+      xLabel: "Check-in date",
+      yLabel: "Compliance (%)",
+    });
+    const sleepChart = sleepSeries.some((p) => p.value !== null)
+      ? lineChartSvg(sleepSeries, {
           min: 0,
           max: 100,
-          color: COLOR.blue,
+          color: COLOR.teal,
           xLabel: "Check-in date",
-          yLabel: "Compliance (%)",
-        }),
-        chartW
-      ),
-      rasteriseChart(
-        sleepSeries.some((p) => p.value !== null)
-          ? lineChartSvg(sleepSeries, {
-              min: 0,
-              max: 100,
-              color: COLOR.teal,
-              xLabel: "Check-in date",
-              yLabel: "Sleep (0–100)",
-            })
-          : barChartSvg([], { min: 0, max: 100 }),
-        chartW
-      ),
+          yLabel: "Sleep (0–100)",
+        })
+      : barChartSvg([], { min: 0, max: 100 });
+    const [left, right] = await Promise.all([
+      rasteriseChart(complianceChart.svg, chartW),
+      rasteriseChart(sleepChart.svg, chartW),
     ]);
     blocks.push(
       chartsRow([
-        { title: "Daily compliance score (%)", png: left?.png ?? null, height: CHART.height },
-        { title: "Sleep quality (scaled to 100)", png: right?.png ?? null, height: CHART.height },
+        { title: "Daily compliance score (%)", raster: left, height: CHART.height, texts: complianceChart.texts, viewBox: complianceChart.viewBox },
+        { title: "Sleep quality (scaled to 100)", raster: right, height: CHART.height, texts: sleepChart.texts, viewBox: sleepChart.viewBox },
       ])
     );
   } else {
@@ -352,22 +348,25 @@ export async function athleteComplianceBlocks(
   if (narrative.interps.length > 0) {
     blocks.push(sectionTitle("Compliance-linked analysis"));
     for (const n of narrative.interps)
-      blocks.push(interp(n.title, capSentences(n.body, MAX_NARRATIVE_SENTENCES), n.tone));
+      blocks.push(interp(n.title, capSentences(n.body, MAX_NARRATIVE_SENTENCES), n.tone, n.points));
   }
 
   // ---- Recommendations ----
   if (narrative.recommendations.length > 0) {
     blocks.push(sectionTitle(recommendationsHeading(identity)));
-    narrative.recommendations.forEach((r, i) =>
-      blocks.push(recItem(i + 1, capSentences(r, MAX_NARRATIVE_SENTENCES)))
-    );
+    narrative.recommendations.forEach((r, i) => blocks.push(recItem(i + 1, capSentences(r, 2))));
   }
 
   // ---- Monitoring ----
   if (narrative.monitoring) {
     blocks.push(sectionTitle("Monitoring plan"));
     blocks.push(
-      interp("Next review", capSentences(narrative.monitoring, MAX_NARRATIVE_SENTENCES), "blue")
+      interp(
+        "Next review",
+        capSentences(narrative.monitoring, MAX_NARRATIVE_SENTENCES),
+        "blue",
+        narrative.monitoringPoints
+      )
     );
   }
 

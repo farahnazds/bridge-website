@@ -146,7 +146,7 @@ Required output structure, in this exact order:
 4. Goals for next period
 5. ${recommendationsSection(audience)}
 
-LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth. Write analysis and interpretation content as SHORT BULLET POINTS — one evidence-backed sentence per bullet — rather than flowing paragraphs; the renderer presents bullets as separated, scannable points and flattens paragraphs.
 
 Elite benchmark handling — hard rules:
 - If a benchmark row is provided, you may reference it directly as this athlete's sport/gender/age-band elite benchmark for body fat %, lean mass ratio, and kcal/kg lean mass.

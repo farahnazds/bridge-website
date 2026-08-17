@@ -2,6 +2,7 @@ import "server-only";
 import { inlineText, parseReportBlocks, type Block as MdBlock } from "@/lib/reportContent";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import type { ReportType } from "@/lib/reportTypes";
+import { splitSentences } from "./sentences";
 import { EMPTY_NARRATIVE, type InterpNote, type InterpTone, type Narrative } from "./model";
 
 // Maps the model's generated markdown onto the Narrative slots the layouts
@@ -148,6 +149,45 @@ function proseOf(blocks: MdBlock[]): string {
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
+/** How many points one panel shows. Matches the four-sentence spirit of the
+ *  prompts' LENGTH rule with one point of headroom for list-shaped sections. */
+const MAX_PANEL_POINTS = 5;
+
+/**
+ * A section as SEPARATE short points (the 2026-08-17 formatting fix).
+ *
+ * proseOf() below deliberately flattens a section for tone detection and for
+ * prose panels — but rendering that flattened string was how a 2,431-character
+ * section became one paragraph. Here the structure the model actually wrote is
+ * preserved instead: each list item is its own point, and each paragraph is
+ * split per sentence. Capped at MAX_PANEL_POINTS — structure-preserving
+ * truncation, unlike the old sentence cap which either overshot (mis-counted
+ * decimals) or silently discarded most of a section.
+ */
+function pointsOf(blocks: MdBlock[]): string[] {
+  const points: string[] = [];
+  for (const b of blocks) {
+    if (b.kind === "list") {
+      for (const item of b.items) {
+        const text = inlineText(item).trim();
+        if (text) points.push(text);
+      }
+    } else if (b.kind === "paragraph") {
+      for (const line of b.lines) {
+        const text = inlineText(line).trim();
+        if (text) points.push(...splitSentences(text));
+      }
+    }
+  }
+  return points.slice(0, MAX_PANEL_POINTS);
+}
+
+/** Panel display title: the model's numbering ("2. Body Composition") is a
+ *  structure artefact, not a name — seen leaking onto real panels. */
+function displayTitle(title: string): string {
+  return title.replace(/^\d+[.)]\s*/, "").trim() || title;
+}
+
 /** List items under a heading, falling back to paragraph lines. */
 function itemsOf(blocks: MdBlock[]): string[] {
   const items: string[] = [];
@@ -164,7 +204,9 @@ function itemsOf(blocks: MdBlock[]): string[] {
     if (b.kind === "paragraph") {
       for (const line of b.lines) {
         const text = inlineText(line).trim();
-        if (text) items.push(text);
+        // Per-sentence, not per-line: a model that writes its recommendations
+        // as one flowing paragraph used to become ONE giant numbered item.
+        if (text) items.push(...splitSentences(text));
       }
     }
   }
@@ -240,8 +282,16 @@ export function parseNarrative(markdown: string | null | undefined): Narrative {
 
     let means: string | null = null;
     let monitoring: string | null = null;
+    let monitoringPoints: string[] = [];
     const interps: InterpNote[] = [];
     const recommendations: string[] = [];
+
+    const asInterp = (section: Section, prose: string): InterpNote => ({
+      title: displayTitle(section.title),
+      body: prose,
+      tone: toneFor(section.title, prose),
+      points: pointsOf(section.blocks),
+    });
 
     for (const section of sections) {
       if (isTitleSection(section)) continue;
@@ -256,12 +306,14 @@ export function parseNarrative(markdown: string | null | undefined): Narrative {
         // First summary wins; a second one becomes an interpretation rather
         // than silently replacing the first.
         if (means === null) means = prose;
-        else interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+        else interps.push(asInterp(section, prose));
       } else if (slot === "monitoring") {
-        if (monitoring === null) monitoring = prose;
-        else interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+        if (monitoring === null) {
+          monitoring = prose;
+          monitoringPoints = pointsOf(section.blocks);
+        } else interps.push(asInterp(section, prose));
       } else {
-        interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+        interps.push(asInterp(section, prose));
       }
     }
 
@@ -278,7 +330,7 @@ export function parseNarrative(markdown: string | null | undefined): Narrative {
       if (looksLikeProse(prose)) means = prose;
     }
 
-    const result: Narrative = { meansBox: means, interps, recommendations, monitoring };
+    const result: Narrative = { meansBox: means, interps, recommendations, monitoring, monitoringPoints };
     return isEmpty(result) ? EMPTY_NARRATIVE : result;
   } catch {
     // Deliberately swallowed. A narrative parse failure must never be the
@@ -310,8 +362,10 @@ export interface CombinedNarrative {
    *  neither a domain nor the synthesis — those stay interpretation panels. */
   base: Narrative;
   /** Matched domain sections, in the order they appear in the markdown. */
-  domains: { type: ReportType; body: string }[];
+  domains: { type: ReportType; body: string; points: string[] }[];
   synthesis: string | null;
+  /** Synthesis as separate points — same formatting rule as every panel. */
+  synthesisPoints: string[];
 }
 
 /** Whether a heading names one of the selected domains — matched on the
@@ -339,6 +393,7 @@ export function parseCombinedNarrative(
     base: parseNarrative(markdown),
     domains: [],
     synthesis: null,
+    synthesisPoints: [],
   });
   try {
     if (!markdown || markdown.trim() === "") return fallback();
@@ -349,10 +404,19 @@ export function parseCombinedNarrative(
 
     let means: string | null = null;
     let monitoring: string | null = null;
+    let monitoringPoints: string[] = [];
     let synthesis: string | null = null;
+    let synthesisPoints: string[] = [];
     const interps: InterpNote[] = [];
     const recommendations: string[] = [];
-    const domains: { type: ReportType; body: string }[] = [];
+    const domains: { type: ReportType; body: string; points: string[] }[] = [];
+
+    const asInterp = (section: Section, prose: string): InterpNote => ({
+      title: displayTitle(section.title),
+      body: prose,
+      tone: toneFor(section.title, prose),
+      points: pointsOf(section.blocks),
+    });
 
     for (const section of sections) {
       if (isTitleSection(section)) continue;
@@ -365,8 +429,10 @@ export function parseCombinedNarrative(
         if (!prose) continue;
         // First synthesis wins; a second becomes an interpretation, mirroring
         // the means/monitoring rule in parseNarrative().
-        if (synthesis === null) synthesis = prose;
-        else interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+        if (synthesis === null) {
+          synthesis = prose;
+          synthesisPoints = pointsOf(section.blocks);
+        } else interps.push(asInterp(section, prose));
         continue;
       }
       const domain = domainFor(section.title, types);
@@ -374,8 +440,10 @@ export function parseCombinedNarrative(
         const prose = proseOf(section.blocks);
         if (!prose) continue;
         const existing = domains.find((d) => d.type === domain);
-        if (existing) existing.body = `${existing.body} ${prose}`;
-        else domains.push({ type: domain, body: prose });
+        if (existing) {
+          existing.body = `${existing.body} ${prose}`;
+          existing.points = [...existing.points, ...pointsOf(section.blocks)].slice(0, MAX_PANEL_POINTS);
+        } else domains.push({ type: domain, body: prose, points: pointsOf(section.blocks) });
         continue;
       }
 
@@ -388,23 +456,30 @@ export function parseCombinedNarrative(
       if (!prose) continue;
       if (slot === "means") {
         if (means === null) means = prose;
-        else interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+        else interps.push(asInterp(section, prose));
       } else if (slot === "monitoring") {
-        if (monitoring === null) monitoring = prose;
-        else interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+        if (monitoring === null) {
+          monitoring = prose;
+          monitoringPoints = pointsOf(section.blocks);
+        } else interps.push(asInterp(section, prose));
       } else {
-        interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+        interps.push(asInterp(section, prose));
       }
     }
 
-    return { base: { meansBox: means, interps, recommendations, monitoring }, domains, synthesis };
+    return {
+      base: { meansBox: means, interps, recommendations, monitoring, monitoringPoints },
+      domains,
+      synthesis,
+      synthesisPoints,
+    };
   } catch {
     // Same deliberate swallow as parseNarrative(): a combined parse failure
     // must never block the document — the flat parse still renders everything.
     try {
       return fallback();
     } catch {
-      return { base: EMPTY_NARRATIVE, domains: [], synthesis: null };
+      return { base: EMPTY_NARRATIVE, domains: [], synthesis: null, synthesisPoints: [] };
     }
   }
 }

@@ -77,14 +77,12 @@ export function intNum(v: number | null | undefined, unit = ""): string {
   return `${Math.round(Number(v)).toLocaleString("en-GB")}${unit}`;
 }
 
-/** First N sentences of a paragraph — the narrative hard cap. The prompts ask
- *  for a length; this enforces it against a model that overruns. Shared by the
- *  layouts that clamp (nutrition, compliance) so the rule cannot drift. */
-export function capSentences(text: string, max: number): string {
-  const matches = text.match(/[^.!?]+[.!?]+(\s|$)/g);
-  if (!matches || matches.length <= max) return text;
-  return matches.slice(0, max).join("").trim();
-}
+// capSentences moved to ../sentences.ts — the old inline regex mis-segmented
+// around decimals and abbreviations (a "4-sentence" panel rendered 11 lines on
+// a real report; see the note there). Re-exported so every existing layout
+// import keeps working against the ONE corrected splitter.
+import { capSentences } from "../sentences";
+export { capSentences };
 
 /** Every prompt states this cap; every narrative slot is clamped against it. */
 export const MAX_NARRATIVE_SENTENCES = 4;
@@ -130,18 +128,27 @@ export function narrativeTail(
   // four-sentence rule, and this enforces it against a model that overruns.
   if (narrative.interps.length > 0) {
     out.push(sectionTitle(interpretationTitle));
+    // Points render as separated bulleted lines (the 2026-08-17 formatting
+    // fix); the capped prose stays as the fallback for pointless narratives.
     for (const n of narrative.interps)
-      out.push(interp(n.title, capSentences(n.body, MAX_NARRATIVE_SENTENCES), n.tone));
+      out.push(interp(n.title, capSentences(n.body, MAX_NARRATIVE_SENTENCES), n.tone, n.points));
   }
   if (includeRecommendations && narrative.recommendations.length > 0) {
     out.push(sectionTitle(recommendationsHeading(identity)));
-    narrative.recommendations.forEach((r, i) =>
-      out.push(recItem(i + 1, capSentences(r, MAX_NARRATIVE_SENTENCES)))
-    );
+    // Two sentences per item, not four: the prompts ask for one-sentence
+    // recommendations, and the clamp guards a model that runs on.
+    narrative.recommendations.forEach((r, i) => out.push(recItem(i + 1, capSentences(r, 2))));
   }
   if (narrative.monitoring) {
     out.push(sectionTitle("Monitoring plan"));
-    out.push(interp("Next review", capSentences(narrative.monitoring, MAX_NARRATIVE_SENTENCES), "blue"));
+    out.push(
+      interp(
+        "Next review",
+        capSentences(narrative.monitoring, MAX_NARRATIVE_SENTENCES),
+        "blue",
+        narrative.monitoringPoints
+      )
+    );
   }
   return out;
 }

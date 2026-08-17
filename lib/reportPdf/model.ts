@@ -86,8 +86,15 @@ export type InterpTone = "teal" | "blue" | "amber" | "red";
 
 export interface InterpNote {
   title: string;
+  /** The section flattened to prose — kept for tone detection and as the
+   *  fallback rendering when no points exist. */
   body: string;
   tone: InterpTone;
+  /** The section as SEPARATE short points (2026-08-17 formatting fix): the
+   *  model's own bullets stay distinct, and paragraph prose is split per
+   *  sentence. Panels render these as scannable bulleted lines instead of the
+   *  flattened paragraph — which read as a wall of text on real reports. */
+  points?: string[];
 }
 
 /**
@@ -104,6 +111,9 @@ export interface Narrative {
   recommendations: string[];
   /** The Monitoring Plan panel. */
   monitoring: string | null;
+  /** Monitoring/goals as separate points — the models write "Goals for next
+   *  period" as bullets, which the prose flattening used to erase. */
+  monitoringPoints: string[];
 }
 
 export const EMPTY_NARRATIVE: Narrative = {
@@ -111,6 +121,7 @@ export const EMPTY_NARRATIVE: Narrative = {
   interps: [],
   recommendations: [],
   monitoring: null,
+  monitoringPoints: [],
 };
 
 /** Citations, sourced ONLY from clinical_research_library. */

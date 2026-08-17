@@ -175,7 +175,8 @@ export async function athleteCombinedBlocks(
         interp(
           `${label(type)} — findings`,
           capSentences(findings.body, DOMAIN_FINDINGS_SENTENCES),
-          toneFor(label(type), findings.body)
+          toneFor(label(type), findings.body),
+          findings.points
         )
       );
     }
@@ -188,7 +189,8 @@ export async function athleteCombinedBlocks(
       interp(
         "Where the domains meet",
         capSentences(combined.synthesis, DOMAIN_FINDINGS_SENTENCES),
-        toneFor("synthesis", combined.synthesis)
+        toneFor("synthesis", combined.synthesis),
+        combined.synthesisPoints
       )
     );
   }

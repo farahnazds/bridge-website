@@ -1,25 +1,55 @@
 import "server-only";
 import { COLOR } from "./theme";
 
-// Generates the chart SVGs from live data.
+// Generates the chart GEOMETRY as SVG, and the chart TEXT as positioned
+// annotations for pdfkit to draw.
 //
-// The <svg> elements inside lib/reportPdf/templates/**.html carry SPECIMEN
-// values — they are the visual reference, not something that can be reused for
-// a real athlete. So the shape is copied from them and the geometry is computed
-// from real points here, then handed to ./charts.ts to rasterise.
+// ============================================================================
+// WHY NO <text> ELEMENTS IN THE SVG — 2026-08-17, learned in production
+// ============================================================================
+// Chart SVGs are rasterised by sharp (librsvg inside libvips). librsvg renders
+// <text> with whatever fonts the HOST provides — and Vercel's serverless
+// runtime provides none, so every tick figure, date label and axis title
+// rendered as tofu boxes (▯) in production while looking perfect on any dev
+// machine with system fonts. Verified by extracting the embedded chart images
+// from a stored production PDF and comparing against the identical local
+// render.
 //
-// Deliberately small: one line chart and one bar chart is everything the five
-// athlete templates use. Anything more elaborate belongs in a chart library,
-// and a chart library is not worth a dependency for two shapes.
+// The fix is structural, not a font install: the SVG carries ONLY geometry
+// (grid, line, area, bars, markers — shapes librsvg renders without fonts),
+// and every piece of text is returned as a `ChartText` annotation in viewBox
+// coordinates. The chartsRow block maps those into page space and draws them
+// with pdfkit's built-in Helvetica — the same environment-independent core
+// font every other label in the document uses. Chart text is now vector-crisp
+// and renders identically everywhere.
 //
-// Null points are HOLES, not zeros. A day an athlete did not log is absent from
-// the record; plotting it at zero would draw a crash that never happened. The
-// line breaks and resumes instead, which is the same decision the compliance
-// page makes when it treats "no row" as different from "skipped".
+// Null points are HOLES, not zeros. A day an athlete did not log is absent
+// from the record; plotting it at zero would draw a crash that never happened.
+// The line breaks and resumes instead, which is the same decision the
+// compliance page makes when it treats "no row" as different from "skipped".
 
 export interface Point {
   label: string;
   value: number | null;
+}
+
+/** One piece of chart text, in viewBox coordinates. `y` is the BASELINE (SVG
+ *  text semantics); the renderer converts to pdfkit's top-of-text origin. */
+export interface ChartText {
+  x: number;
+  y: number;
+  text: string;
+  /** Font size in viewBox units. */
+  size: number;
+  anchor: "start" | "middle" | "end";
+  /** Rotated -90° around (x, y) — the Y-axis title. */
+  rotated?: boolean;
+}
+
+export interface ChartSvg {
+  svg: string;
+  texts: ChartText[];
+  viewBox: { width: number; height: number };
 }
 
 interface Geometry {
@@ -52,29 +82,6 @@ function geoFor(titles: AxisTitles): Geometry {
   };
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-/** The axis titles themselves: X centred under the plot, Y rotated up its left edge. */
-function axisTitles(titles: AxisTitles, geo: Geometry): string {
-  const font = `font-family="Helvetica,Arial,sans-serif" font-size="7.5" fill="${COLOR.muted3}"`;
-  let out = "";
-  if (titles.yLabel) {
-    const midY = (geo.padT + (geo.height - geo.padB)) / 2;
-    out += `<text x="9" y="${midY.toFixed(1)}" transform="rotate(-90 9 ${midY.toFixed(
-      1
-    )})" text-anchor="middle" ${font}>${esc(titles.yLabel)}</text>`;
-  }
-  if (titles.xLabel) {
-    const midX = (geo.padL + (geo.width - geo.padR)) / 2;
-    out += `<text x="${midX.toFixed(1)}" y="${geo.height - 3}" text-anchor="middle" ${font}>${esc(
-      titles.xLabel
-    )}</text>`;
-  }
-  return out;
-}
-
 function scale(points: Point[], min: number, max: number, geo: Geometry) {
   const span = Math.max(1e-6, max - min);
   const innerW = geo.width - geo.padL - geo.padR;
@@ -88,7 +95,14 @@ function scale(points: Point[], min: number, max: number, geo: Geometry) {
   };
 }
 
-function gridAndAxis(min: number, max: number, geo: Geometry, s: ReturnType<typeof scale>): string {
+/** Grid lines into the SVG; tick figures into the annotation list. */
+function gridAndTicks(
+  min: number,
+  max: number,
+  geo: Geometry,
+  s: ReturnType<typeof scale>,
+  texts: ChartText[]
+): string {
   const ticks = 3;
   let out = "";
   for (let i = 0; i <= ticks; i++) {
@@ -97,13 +111,21 @@ function gridAndAxis(min: number, max: number, geo: Geometry, s: ReturnType<type
     out += `<line x1="${geo.padL}" y1="${y.toFixed(1)}" x2="${geo.width - geo.padR}" y2="${y.toFixed(
       1
     )}" stroke="${COLOR.borderSoft}" stroke-width="1"/>`;
-    out += `<text x="${geo.padL - 4}" y="${(y + 3).toFixed(
-      1
-    )}" text-anchor="end" font-family="Helvetica,Arial,sans-serif" font-size="8" fill="${
-      COLOR.muted3
-    }">${Math.round(v)}</text>`;
+    texts.push({ x: geo.padL - 4, y: y + 3, text: String(Math.round(v)), size: 8, anchor: "end" });
   }
   return out;
+}
+
+/** The axis titles: X centred under the plot, Y rotated up the left edge. */
+function axisTitleTexts(titles: AxisTitles, geo: Geometry, texts: ChartText[]): void {
+  if (titles.yLabel) {
+    const midY = (geo.padT + (geo.height - geo.padB)) / 2;
+    texts.push({ x: 9, y: midY, text: titles.yLabel, size: 7.5, anchor: "middle", rotated: true });
+  }
+  if (titles.xLabel) {
+    const midX = (geo.padL + (geo.width - geo.padR)) / 2;
+    texts.push({ x: midX, y: geo.height - 3, text: titles.xLabel, size: 7.5, anchor: "middle" });
+  }
 }
 
 /**
@@ -121,10 +143,11 @@ export function lineChartSvg(
     min: 0,
     max: 100,
   }
-): string {
+): ChartSvg {
   const geo = geoFor(opts);
   const color = opts.color ?? COLOR.blue;
   const s = scale(points, opts.min, opts.max, geo);
+  const texts: ChartText[] = [];
 
   // Contiguous runs of real values; a null starts a new run.
   const runs: { i: number; v: number }[][] = [];
@@ -139,7 +162,7 @@ export function lineChartSvg(
   });
   if (current.length > 0) runs.push(current);
 
-  let body = gridAndAxis(opts.min, opts.max, geo, s);
+  let body = gridAndTicks(opts.min, opts.max, geo, s, texts);
 
   for (const run of runs) {
     const d = run
@@ -165,33 +188,40 @@ export function lineChartSvg(
   // an X-axis title, when present, gets its own row beneath.
   if (points.length > 0) {
     const y = geo.height - geo.padB + 13;
-    body += `<text x="${geo.padL}" y="${y}" font-family="Helvetica,Arial,sans-serif" font-size="8" fill="${
-      COLOR.muted3
-    }">${esc(points[0].label)}</text>`;
+    texts.push({ x: geo.padL, y, text: points[0].label, size: 8, anchor: "start" });
     if (points.length > 1) {
-      body += `<text x="${geo.width - geo.padR}" y="${y}" text-anchor="end" font-family="Helvetica,Arial,sans-serif" font-size="8" fill="${
-        COLOR.muted3
-      }">${esc(points[points.length - 1].label)}</text>`;
+      texts.push({
+        x: geo.width - geo.padR,
+        y,
+        text: points[points.length - 1].label,
+        size: 8,
+        anchor: "end",
+      });
     }
   }
 
-  body += axisTitles(opts, geo);
+  axisTitleTexts(opts, geo, texts);
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geo.width} ${geo.height}">${body}</svg>`;
+  return {
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geo.width} ${geo.height}">${body}</svg>`,
+    texts,
+    viewBox: { width: geo.width, height: geo.height },
+  };
 }
 
 /** A bar chart, for per-category comparisons (supplement adherence by item). */
 export function barChartSvg(
   points: Point[],
   opts: { min: number; max: number; color?: string } & AxisTitles = { min: 0, max: 100 }
-): string {
+): ChartSvg {
   const geo = geoFor(opts);
   const color = opts.color ?? COLOR.teal;
   const s = scale(points, opts.min, opts.max, geo);
   const slot = points.length > 0 ? s.innerW / points.length : s.innerW;
   const barW = Math.max(3, Math.min(18, slot * 0.55));
+  const texts: ChartText[] = [];
 
-  let body = gridAndAxis(opts.min, opts.max, geo, s);
+  let body = gridAndTicks(opts.min, opts.max, geo, s, texts);
   points.forEach((p, i) => {
     if (p.value === null) return;
     const x = geo.padL + slot * i + (slot - barW) / 2;
@@ -207,15 +237,15 @@ export function barChartSvg(
     points.forEach((p, i) => {
       if (points.length > 8 && i % 2 === 1) return;
       const x = geo.padL + slot * i + slot / 2;
-      body += `<text x="${x.toFixed(
-        1
-      )}" y="${y}" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="7.5" fill="${
-        COLOR.muted3
-      }">${esc(p.label)}</text>`;
+      texts.push({ x, y, text: p.label, size: 7.5, anchor: "middle" });
     });
   }
 
-  body += axisTitles(opts, geo);
+  axisTitleTexts(opts, geo, texts);
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geo.width} ${geo.height}">${body}</svg>`;
+  return {
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geo.width} ${geo.height}">${body}</svg>`,
+    texts,
+    viewBox: { width: geo.width, height: geo.height },
+  };
 }

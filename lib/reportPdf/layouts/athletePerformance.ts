@@ -150,36 +150,32 @@ export async function performanceDomainBlocks(
 
   if (haveAsym || haveDist) {
     blocks.push(sectionTitle("Neuromuscular trend & session load"));
+    const asymChart = haveAsym
+      ? lineChartSvg(asymPoints, {
+          min: 0,
+          max: Math.max(20, data.asymmetryThreshold + 5),
+          color: COLOR.red,
+          xLabel: "Test date",
+          yLabel: "Asymmetry (%)",
+        })
+      : null;
+    const distChart = haveDist
+      ? lineChartSvg(distPoints, {
+          min: 0,
+          max: Math.max(1000, (max(distPoints.map((p) => p.value)) ?? 1000) * 1.1),
+          color: COLOR.blue,
+          xLabel: "Session date",
+          yLabel: "Distance (m)",
+        })
+      : null;
     const [a, b] = await Promise.all([
-      haveAsym
-        ? rasteriseChart(
-            lineChartSvg(asymPoints, {
-              min: 0,
-              max: Math.max(20, data.asymmetryThreshold + 5),
-              color: COLOR.red,
-              xLabel: "Test date",
-              yLabel: "Asymmetry (%)",
-            }),
-            chartW
-          )
-        : Promise.resolve(null),
-      haveDist
-        ? rasteriseChart(
-            lineChartSvg(distPoints, {
-              min: 0,
-              max: Math.max(1000, (max(distPoints.map((p) => p.value)) ?? 1000) * 1.1),
-              color: COLOR.blue,
-              xLabel: "Session date",
-              yLabel: "Distance (m)",
-            }),
-            chartW
-          )
-        : Promise.resolve(null),
+      asymChart ? rasteriseChart(asymChart.svg, chartW) : Promise.resolve(null),
+      distChart ? rasteriseChart(distChart.svg, chartW) : Promise.resolve(null),
     ]);
     blocks.push(
       chartsRow([
-        { title: "Asymmetry (%)", png: a?.png ?? null, height: CHART.height },
-        { title: "Session distance (m)", png: b?.png ?? null, height: CHART.height },
+        { title: "Asymmetry (%)", raster: a, height: CHART.height, texts: asymChart?.texts, viewBox: asymChart?.viewBox },
+        { title: "Session distance (m)", raster: b, height: CHART.height, texts: distChart?.texts, viewBox: distChart?.viewBox },
       ])
     );
   }

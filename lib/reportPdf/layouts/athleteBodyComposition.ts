@@ -226,32 +226,28 @@ export async function bodyCompDomainBlocks(
 
   const chartW = (contentWidth - 9) / 2;
   if (bfPoints.filter((p) => p.value !== null).length >= 2) {
+    const bfChart = lineChartSvg(bfPoints, {
+      min: 0,
+      max: 30,
+      color: COLOR.blue,
+      xLabel: "Scan date",
+      yLabel: "Body fat (%)",
+    });
+    const vatChart = lineChartSvg(vatPoints, {
+      min: 0,
+      max: Math.max(10, ...vatPoints.map((p) => p.value ?? 0)),
+      color: COLOR.teal,
+      xLabel: "Scan date",
+      yLabel: "Visceral fat rating",
+    });
     const [a, b] = await Promise.all([
-      rasteriseChart(
-        lineChartSvg(bfPoints, {
-          min: 0,
-          max: 30,
-          color: COLOR.blue,
-          xLabel: "Scan date",
-          yLabel: "Body fat (%)",
-        }),
-        chartW
-      ),
-      rasteriseChart(
-        lineChartSvg(vatPoints, {
-          min: 0,
-          max: Math.max(10, ...vatPoints.map((p) => p.value ?? 0)),
-          color: COLOR.teal,
-          xLabel: "Scan date",
-          yLabel: "Visceral fat rating",
-        }),
-        chartW
-      ),
+      rasteriseChart(bfChart.svg, chartW),
+      rasteriseChart(vatChart.svg, chartW),
     ]);
     blocks.push(
       chartsRow([
-        { title: "Body fat (%)", png: a?.png ?? null, height: CHART.height },
-        { title: "Visceral fat", png: b?.png ?? null, height: CHART.height },
+        { title: "Body fat (%)", raster: a, height: CHART.height, texts: bfChart.texts, viewBox: bfChart.viewBox },
+        { title: "Visceral fat", raster: b, height: CHART.height, texts: vatChart.texts, viewBox: vatChart.viewBox },
       ])
     );
   } else {

@@ -98,7 +98,7 @@ Required output structure, in this exact order:
 4. Goals for next period
 5. ${recommendationsSection(audience)}
 
-LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth. Write analysis and interpretation content as SHORT BULLET POINTS — one evidence-backed sentence per bullet — rather than flowing paragraphs; the renderer presents bullets as separated, scannable points and flattens paragraphs.
 
 Citations — hard rule: only cite entries from the "Clinical + Research library entries" section in the data below, if any are provided. Never cite anything from general training knowledge, even if a relevant paper is "known" to you. If no library entries are provided, do not include any citation for that point — write it without one rather than reaching for an unverified source.
 

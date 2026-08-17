@@ -495,7 +495,9 @@ export function athleteNutritionBlocks(
   const clampedNarrative: Narrative = {
     ...narrative,
     interps: narrative.interps.map((n) =>
-      INTERP_SUB.test(n.title.trim()) ? { ...n, body: capSentences(n.body, 3) } : n
+      INTERP_SUB.test(n.title.trim())
+        ? { ...n, body: capSentences(n.body, 3), points: n.points?.slice(0, 3) }
+        : n
     ),
   };
   blocks.push(

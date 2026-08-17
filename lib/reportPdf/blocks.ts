@@ -15,6 +15,7 @@ import {
   type Tone,
 } from "./theme";
 import {
+  applyStyle,
   columnX,
   columns,
   drawBadge,
@@ -27,6 +28,7 @@ import {
   measureText,
   type TextStyle,
 } from "./primitives";
+import type { ChartText } from "./svgChart";
 
 // Block renderers for the report PDF, one per class in the templates' CSS.
 //
@@ -190,6 +192,10 @@ function accentPanel(opts: {
   kind: string;
   title?: string;
   body: string;
+  /** Separate short points; when present they render as a bulleted list and
+   *  `body` is not drawn (2026-08-17 formatting fix — a flattened section
+   *  rendered as one paragraph read as a wall of text on real reports). */
+  points?: string[];
   accent: string;
   bg: [string, string] | string;
   border?: string;
@@ -199,6 +205,22 @@ function accentPanel(opts: {
   bodyStyle: TextStyle;
 }): Block {
   const inner = (w: number) => w - opts.pad.x * 2 - STROKE.accentBar;
+  const BULLET_W = px(9);
+  const POINT_GAP = px(3);
+  const hasPoints = (opts.points?.length ?? 0) > 0;
+
+  const contentHeight = (ctx: RenderCtx, iw: number): number => {
+    if (!hasPoints) return measureText(ctx.doc, opts.body, iw, opts.bodyStyle);
+    const points = opts.points as string[];
+    return points.reduce(
+      (acc, p, i) =>
+        acc +
+        measureText(ctx.doc, p, iw - BULLET_W, opts.bodyStyle) +
+        (i < points.length - 1 ? POINT_GAP : 0),
+      0
+    );
+  };
+
   return {
     kind: opts.kind,
     gapAfter: opts.gapAfter,
@@ -206,14 +228,14 @@ function accentPanel(opts: {
       const iw = inner(ctx.width);
       let h = opts.pad.y * 2;
       if (opts.title) h += measureText(ctx.doc, opts.title, iw, opts.titleStyle ?? opts.bodyStyle) + px(3);
-      h += measureText(ctx.doc, opts.body, iw, opts.bodyStyle);
+      h += contentHeight(ctx, iw);
       return h;
     },
     draw: (ctx, y) => {
       const iw = inner(ctx.width);
       let h = opts.pad.y * 2;
       if (opts.title) h += measureText(ctx.doc, opts.title, iw, opts.titleStyle ?? opts.bodyStyle) + px(3);
-      h += measureText(ctx.doc, opts.body, iw, opts.bodyStyle);
+      h += contentHeight(ctx, iw);
 
       drawBox(ctx.doc, ctx.x, y, ctx.width, h, {
         gradient: Array.isArray(opts.bg) ? opts.bg : undefined,
@@ -228,13 +250,29 @@ function accentPanel(opts: {
       if (opts.title) {
         iy += drawText(ctx.doc, opts.title, ix, iy, iw, opts.titleStyle ?? opts.bodyStyle) + px(3);
       }
-      drawText(ctx.doc, opts.body, ix, iy, iw, opts.bodyStyle);
+      if (hasPoints) {
+        for (const p of opts.points as string[]) {
+          // Hanging indent: bullet in the gutter, text wraps against its own
+          // left edge so multi-line points stay visually one point.
+          drawLine(ctx.doc, "•", ix, iy, BULLET_W, { ...opts.bodyStyle, color: opts.accent });
+          iy += drawText(ctx.doc, p, ix + BULLET_W, iy, iw - BULLET_W, opts.bodyStyle) + POINT_GAP;
+        }
+      } else {
+        drawText(ctx.doc, opts.body, ix, iy, iw, opts.bodyStyle);
+      }
     },
   };
 }
 
-/** `.interp` — an interpretation note, toned by severity. */
-export function interp(title: string, body: string, tone: "teal" | "blue" | "amber" | "red" = "teal"): Block {
+/** `.interp` — an interpretation note, toned by severity. With `points` it
+ *  renders as separated bulleted lines; without, as prose (the injury log's
+ *  free-text clinical descriptions stay prose deliberately). */
+export function interp(
+  title: string,
+  body: string,
+  tone: "teal" | "blue" | "amber" | "red" = "teal",
+  points?: string[]
+): Block {
   const accent = {
     teal: COLOR.teal,
     blue: COLOR.blue,
@@ -245,6 +283,7 @@ export function interp(title: string, body: string, tone: "teal" | "blue" | "amb
     kind: "interp",
     title,
     body,
+    points,
     accent,
     bg: COLOR.surface3,
     border: COLOR.border,
@@ -810,12 +849,60 @@ export function table(spec: TableSpec): Block {
 }
 
 // ---------------------------------------------------------------------------
-// .charts-row / .chart-box — pre-rasterised PNGs from ./charts.ts
+// .charts-row / .chart-box — rasterised GEOMETRY from ./charts.ts, with the
+// chart's TEXT drawn here in pdfkit (see the note in ./svgChart.ts: librsvg
+// has no fonts on the production runtime, so SVG text rendered as tofu).
 // ---------------------------------------------------------------------------
 export interface ChartPanel {
   title: string;
-  png: Uint8Array | null;
+  /** The rasterised chart geometry with its display dimensions — the aspect
+   *  is needed to place the text annotations. Null renders an empty box. */
+  raster: { png: Uint8Array; width: number; height: number } | null;
   height: number;
+  /** Text annotations in the chart's viewBox space (from ./svgChart.ts). */
+  texts?: ChartText[];
+  viewBox?: { width: number; height: number };
+}
+
+/** Maps viewBox-space text annotations into page space and draws them with
+ *  pdfkit's built-in Helvetica. The SVG letterboxes its viewBox into the
+ *  raster (preserveAspectRatio "xMidYMid meet"), and doc.image fit scales the
+ *  raster into the box anchored top-left — both mappings are uniform scales,
+ *  composed here. */
+function drawChartTexts(
+  doc: PDFKit.PDFDocument,
+  texts: ChartText[],
+  viewBox: { width: number; height: number },
+  imgX: number,
+  imgY: number,
+  drawnW: number,
+  drawnH: number
+): void {
+  const s = Math.min(drawnW / viewBox.width, drawnH / viewBox.height);
+  const ox = imgX + (drawnW - viewBox.width * s) / 2;
+  const oy = imgY + (drawnH - viewBox.height * s) / 2;
+  for (const t of texts) {
+    const size = t.size * s;
+    const style: TextStyle = { size, color: COLOR.muted3 };
+    applyStyle(doc, style);
+    const w = doc.widthOfString(t.text);
+    const bx = ox + t.x * s;
+    // ChartText.y is an SVG BASELINE; pdfkit draws from the top of the line.
+    const by = oy + t.y * s;
+    const top = by - size * 0.72;
+    const left = t.anchor === "middle" ? bx - w / 2 : t.anchor === "end" ? bx - w : bx;
+    if (t.rotated) {
+      doc.save();
+      doc.rotate(-90, { origin: [bx, by] });
+      // In the rotated frame the anchor point stays (bx, by): centre the text
+      // on it along the (now vertical) baseline.
+      doc.text(t.text, bx - w / 2, by - size * 0.72, { lineBreak: false });
+      doc.restore();
+    } else {
+      doc.text(t.text, left, top, { lineBreak: false });
+    }
+  }
+  doc.fillColor(COLOR.ink);
 }
 
 export function chartsRow(panels: ChartPanel[]): Block {
@@ -843,9 +930,18 @@ export function chartsRow(panels: ChartPanel[]): Block {
         const iw = ws[i] - PAD.chartBox.x * 2;
         const ty = y + PAD.chartBox.top;
         const th = drawText(ctx.doc, p.title, ix, ty, iw, titleStyle);
-        if (p.png) {
+        if (p.raster) {
+          const imgY = ty + th + px(7);
+          // doc.image fit preserves the raster's aspect, anchored top-left —
+          // compute the drawn rect so the text mapping is exact.
+          const fit = Math.min(iw / p.raster.width, p.height / p.raster.height);
+          const drawnW = p.raster.width * fit;
+          const drawnH = p.raster.height * fit;
           try {
-            ctx.doc.image(Buffer.from(p.png), ix, ty + th + px(7), { fit: [iw, p.height] });
+            ctx.doc.image(Buffer.from(p.raster.png), ix, imgY, { fit: [iw, p.height] });
+            if (p.texts && p.texts.length > 0 && p.viewBox) {
+              drawChartTexts(ctx.doc, p.texts, p.viewBox, ix, imgY, drawnW, drawnH);
+            }
           } catch {
             // A chart that will not embed leaves its box empty; the surrounding
             // interpretation text still carries the finding.

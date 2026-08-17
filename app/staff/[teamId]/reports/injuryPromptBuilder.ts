@@ -118,7 +118,7 @@ Required output structure, in this exact order:
 6. Goals for next period
 7. ${recommendationsSection(audience)}
 
-LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth. Write analysis and interpretation content as SHORT BULLET POINTS — one evidence-backed sentence per bullet — rather than flowing paragraphs; the renderer presents bullets as separated, scannable points and flattens paragraphs.
 
 DATA-CONFIDENCE RULE: every injury carries a validity tier — club-verified, practitioner-verified or self-reported. Where a conclusion leans on a self-reported entry, say so. Do not treat tiers as interchangeable.
 

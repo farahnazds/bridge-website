@@ -90,7 +90,7 @@ ${n + 2}. Cross-domain synthesis — the core of this report. Explicitly relate 
 ${n + 3}. Goals for next period — one consolidated set, not one per domain.
 ${n + 4}. ${recommendationsSection(audience)} — one consolidated, priority-ordered list. Where a single action serves several domains, say so once and note which domains it serves, rather than repeating it under each.
 
-LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth. Write analysis and interpretation content as SHORT BULLET POINTS — one evidence-backed sentence per bullet — rather than flowing paragraphs; the renderer presents bullets as separated, scannable points and flattens paragraphs.
 
 Correlation discipline: coincidence in time is not causation, and you must not present it as such. Say "coincides with", "is consistent with", "may reflect" — never "caused". Where a relationship is plausible but the data cannot establish it, name the measurement that would settle it.
 

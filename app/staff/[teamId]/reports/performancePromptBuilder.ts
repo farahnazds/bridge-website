@@ -103,7 +103,7 @@ Required output structure, in this exact order:
 5. Goals for next period
 6. ${recommendationsSection(audience)}
 
-LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
+LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth. Write analysis and interpretation content as SHORT BULLET POINTS — one evidence-backed sentence per bullet — rather than flowing paragraphs; the renderer presents bullets as separated, scannable points and flattens paragraphs.
 
 DATA-GAP RULE — this matters more here than in any other report type, because docs/07-ai-engine.md defines this report as covering "GPS and/or neuromuscular (VALD)". A club may legitimately run one system and not the other. Therefore:
 - If one source has no data for the period, describe that plainly and factually, in the same register as any other observation. Never call it an error, never call it a failure, never imply the practitioner has done something wrong, and never pad the report with speculation to compensate.
