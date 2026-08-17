@@ -102,31 +102,26 @@ export function phaseProgress(phase: RtpPhase | null): string | null {
   return i < 0 ? null : `Phase ${i + 1} of ${RTP_PHASES.length}`;
 }
 
-export function athleteInjuryBlocks(
+/**
+ * The measured core — status cards, per-injury panels and the RTP timeline —
+ * shared by the single-type document and the combined report's Injury domain
+ * section. The prescribed-targets panel and the rehab body-composition table
+ * are opt-in: the single-type document keeps both; a combined report omits
+ * them (nutrition and body-composition context live in their own domains).
+ */
+export function injuryDomainBlocks(
   data: InjuryData,
-  identity: ReportIdentity,
-  narrative: Narrative,
-  citations: Citation[]
+  opts?: { includePrescribedTargets?: boolean; includeRehab?: boolean }
 ): Block[] {
   const blocks: Block[] = [];
   const current = data.injuries[0] ?? null;
 
-  blocks.push(
-    callout(
-      "This report covers the injury record for the period — what was sustained, where it sits on the return-to-play pathway, and the nutrition support around it."
-    )
-  );
-
   if (!current) {
-    blocks.push(
+    return [
       missingNote(
         "No injury is recorded for this athlete. Nothing here is inferred — an empty injury log means no entry exists, which is not the same as a confirmed clean bill of health."
-      )
-    );
-    blocks.push(...narrativeTail(narrative, identity, "Interpretation"));
-    blocks.push(...sourcesBlocks(citations));
-    blocks.push(...bannerBlocks(identity));
-    return blocks;
+      ),
+    ];
   }
 
   const weeks = weeksSince(current.date);
@@ -200,46 +195,81 @@ export function athleteInjuryBlocks(
   );
 
   // ---- Nutrition prescription (not derivable today) ----
-  blocks.push(sectionTitle("Nutrition prescription — current phase"));
-  blocks.push(prescribedTargetsMissing());
+  if (opts?.includePrescribedTargets ?? false) {
+    blocks.push(sectionTitle("Nutrition prescription — current phase"));
+    blocks.push(prescribedTargetsMissing());
+  }
 
   // ---- Body composition through rehab ----
-  blocks.push(sectionTitle("Body composition through rehab"));
-  const during = data.assessments.filter((a) => a.date >= current.date);
-  if (during.length === 0) {
-    blocks.push(
-      missingNote(
-        `No body-composition assessment has been taken since this injury was recorded on ${longDate(
-          current.date
-        )}. Lean-mass change through rehab therefore cannot be reported.`
-      )
-    );
-  } else {
-    blocks.push(
-      table({
-        head: ["Date", "Method", "Weight", "Body fat", "Lean mass"],
-        weights: [1.1, 1.3, 1, 1, 1.1],
-        numeric: [2, 3, 4],
-        rows: during.map((a) => [
-          shortDate(a.date),
-          // Method label is mandatory here too — a rehab trend across two
-          // instruments is exactly the comparison that must not be implied.
-          METHOD_LABELS[a.method as AssessmentMethod] ?? a.method,
-          num(a.weightKg, " kg"),
-          num(a.bodyFatPct, "%"),
-          num(a.leanMassKg, " kg"),
-        ]),
-      })
-    );
-    const methods = new Set(during.map((a) => a.method));
-    if (methods.size > 1) {
+  if (opts?.includeRehab ?? false) {
+    blocks.push(sectionTitle("Body composition through rehab"));
+    const during = data.assessments.filter((a) => a.date >= current.date);
+    if (during.length === 0) {
       blocks.push(
-        callout(
-          "≠ These scans span more than one measurement method. Differences between them include an instrument change and should not be read as rehab progress."
+        missingNote(
+          `No body-composition assessment has been taken since this injury was recorded on ${longDate(
+            current.date
+          )}. Lean-mass change through rehab therefore cannot be reported.`
         )
       );
+    } else {
+      blocks.push(
+        table({
+          head: ["Date", "Method", "Weight", "Body fat", "Lean mass"],
+          weights: [1.1, 1.3, 1, 1, 1.1],
+          numeric: [2, 3, 4],
+          rows: during.map((a) => [
+            shortDate(a.date),
+            // Method label is mandatory here too — a rehab trend across two
+            // instruments is exactly the comparison that must not be implied.
+            METHOD_LABELS[a.method as AssessmentMethod] ?? a.method,
+            num(a.weightKg, " kg"),
+            num(a.bodyFatPct, "%"),
+            num(a.leanMassKg, " kg"),
+          ]),
+        })
+      );
+      const methods = new Set(during.map((a) => a.method));
+      if (methods.size > 1) {
+        blocks.push(
+          callout(
+            "≠ These scans span more than one measurement method. Differences between them include an instrument change and should not be read as rehab progress."
+          )
+        );
+      }
     }
   }
+
+  return blocks;
+}
+
+export function athleteInjuryBlocks(
+  data: InjuryData,
+  identity: ReportIdentity,
+  narrative: Narrative,
+  citations: Citation[]
+): Block[] {
+  const blocks: Block[] = [];
+  const current = data.injuries[0] ?? null;
+
+  blocks.push(
+    callout(
+      "This report covers the injury record for the period — what was sustained, where it sits on the return-to-play pathway, and the nutrition support around it."
+    )
+  );
+
+  if (!current) {
+    blocks.push(...injuryDomainBlocks(data));
+    blocks.push(...narrativeTail(narrative, identity, "Interpretation"));
+    blocks.push(...sourcesBlocks(citations));
+    blocks.push(...bannerBlocks(identity));
+    return blocks;
+  }
+
+  blocks.push(...injuryDomainBlocks(data, { includePrescribedTargets: true, includeRehab: true }));
+
+  const weeks = weeksSince(current.date);
+  const during = data.assessments.filter((a) => a.date >= current.date);
 
   blocks.push(...prescriberBlocks(identity));
   blocks.push(...narrativeTail(narrative, identity, "Interpretation"));

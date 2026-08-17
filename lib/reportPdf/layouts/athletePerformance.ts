@@ -79,11 +79,14 @@ export function peakAsymmetry(vald: ValdRow[]): { value: number | null; row: Val
   return { value: best?.asymmetryPct ?? null, row: best };
 }
 
-export async function athletePerformanceBlocks(
+/**
+ * The measured core — status cards, charts, GPS and VALD tables — shared by
+ * the single-type document and the combined report's Performance domain
+ * section. Extracted rather than duplicated so the two cannot drift; the
+ * single-type function wraps it with its callout and narrative tail.
+ */
+export async function performanceDomainBlocks(
   data: PerformanceData,
-  identity: ReportIdentity,
-  narrative: Narrative,
-  citations: Citation[],
   contentWidth: number
 ): Promise<Block[]> {
   const blocks: Block[] = [];
@@ -92,12 +95,6 @@ export async function athletePerformanceBlocks(
   const avgDistance = mean(gps.map((r) => r.totalDistanceM));
   const maxVel = max(gps.map((r) => r.maxVelocity));
   const avgLoad = mean(gps.map((r) => r.playerLoad));
-
-  blocks.push(
-    callout(
-      "Performance data is reported as measured. External load (GPS) and neuromuscular testing (VALD) are separate measurements and are shown separately — neither is used to infer the other."
-    )
-  );
 
   blocks.push(
     statusRow([
@@ -243,6 +240,30 @@ export async function athletePerformanceBlocks(
       })
     );
   }
+
+  return blocks;
+}
+
+export async function athletePerformanceBlocks(
+  data: PerformanceData,
+  identity: ReportIdentity,
+  narrative: Narrative,
+  citations: Citation[],
+  contentWidth: number
+): Promise<Block[]> {
+  const blocks: Block[] = [];
+  const { gps, vald } = data;
+  const peak = peakAsymmetry(vald);
+  const avgDistance = mean(gps.map((r) => r.totalDistanceM));
+  const maxVel = max(gps.map((r) => r.maxVelocity));
+
+  blocks.push(
+    callout(
+      "Performance data is reported as measured. External load (GPS) and neuromuscular testing (VALD) are separate measurements and are shown separately — neither is used to infer the other."
+    )
+  );
+
+  blocks.push(...(await performanceDomainBlocks(data, contentWidth)));
 
   blocks.push(...prescriberBlocks(identity));
   blocks.push(...narrativeTail(narrative, identity, "Performance interpretation"));

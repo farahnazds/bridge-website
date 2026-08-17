@@ -100,6 +100,85 @@ async function loadCitations(): Promise<Citation[]> {
   }));
 }
 
+/** athletes.goal_body_fat_pct + the team roster averages — the body-comp
+ *  extras beyond the assessment rows themselves. */
+async function loadBodyCompExtras(
+  athleteId: string,
+  teamId: string | null
+): Promise<NonNullable<MeasuredData["bodyComp"]>> {
+  const supabase = await createClient();
+  const [{ data: athleteRow }, teamAvg] = await Promise.all([
+    supabase.from("athletes").select("goal_body_fat_pct").eq("id", athleteId).maybeSingle(),
+    teamId ? getTeamBodyCompAverages(teamId).catch(() => null) : Promise.resolve(null),
+  ]);
+  return {
+    goalBodyFatPct: (athleteRow?.goal_body_fat_pct as number | null) ?? null,
+    teamAvg,
+  };
+}
+
+async function loadPerformanceRows(athleteId: string): Promise<{ gps: GpsRow[]; vald: ValdRow[] }> {
+  const supabase = await createClient();
+  const [{ data: g }, { data: v }] = await Promise.all([
+    supabase
+      .from("gps_logs")
+      .select(
+        "date, total_distance_m, meters_per_min, high_speed_distance_m, sprint_distance_m, max_velocity, player_load, session_duration_min, validity_tier"
+      )
+      .eq("athlete_id", athleteId)
+      .order("date", { ascending: false }),
+    supabase
+      .from("vald_data")
+      .select("date, test_type, asymmetry_pct, validity_tier")
+      .eq("athlete_id", athleteId)
+      .order("date", { ascending: false }),
+  ]);
+  return {
+    gps: (g ?? []).map((r) => ({
+      date: r.date as string,
+      totalDistanceM: r.total_distance_m as number | null,
+      metersPerMin: r.meters_per_min as number | null,
+      highSpeedDistanceM: r.high_speed_distance_m as number | null,
+      sprintDistanceM: r.sprint_distance_m as number | null,
+      maxVelocity: r.max_velocity as number | null,
+      playerLoad: r.player_load as number | null,
+      sessionDurationMin: r.session_duration_min as number | null,
+      validityTier: r.validity_tier as string,
+    })),
+    vald: (v ?? []).map((r) => ({
+      date: r.date as string,
+      testType: r.test_type as string,
+      asymmetryPct: r.asymmetry_pct as number | null,
+      validityTier: r.validity_tier as string,
+    })),
+  };
+}
+
+async function loadInjuryRows(athleteId: string, periodStart: string | null): Promise<InjuryRow[]> {
+  const supabase = await createClient();
+  const { data: inj } = await supabase
+    .from("injuries")
+    .select(
+      "date, type, description, status, rtp_phase, target_return_date, cleared_date, validity_tier"
+    )
+    .eq("athlete_id", athleteId)
+    .order("date", { ascending: false });
+  return (inj ?? []).map((r) => ({
+    date: r.date as string,
+    type: ((r.type as string | null) ?? "").trim() || "Unspecified injury",
+    description: r.description as string | null,
+    status: r.status as InjuryRow["status"],
+    rtpPhase: (r.rtp_phase ?? null) as RtpPhase | null,
+    targetReturnDate: r.target_return_date as string | null,
+    clearedDate: r.cleared_date as string | null,
+    validityTier: r.validity_tier as string,
+    // Sustained before the window but still unresolved inside it — the
+    // distinction injuryPromptBuilder.ts asks to be stated explicitly.
+    carriedIn:
+      periodStart !== null && (r.date as string) < periodStart && (r.status as string) !== "cleared",
+  }));
+}
+
 export async function assembleMeasured(
   reportType: ReportType,
   athleteId: string,
@@ -108,7 +187,6 @@ export async function assembleMeasured(
   /** For the body-composition team-context cards; null renders no team row. */
   teamId: string | null = null
 ): Promise<MeasuredData> {
-  const supabase = await createClient();
   const citations = await loadCitations();
 
   if (reportType === "compliance") {
@@ -122,99 +200,54 @@ export async function assembleMeasured(
   }
 
   if (reportType === "body_composition") {
-    const [assessments, { data: athleteRow }, teamAvg] = await Promise.all([
+    const [assessments, bodyComp] = await Promise.all([
       loadAssessments(athleteId),
-      supabase.from("athletes").select("goal_body_fat_pct").eq("id", athleteId).maybeSingle(),
-      teamId ? getTeamBodyCompAverages(teamId).catch(() => null) : Promise.resolve(null),
+      loadBodyCompExtras(athleteId, teamId),
     ]);
-    return {
-      assessments,
-      bodyComp: {
-        goalBodyFatPct: (athleteRow?.goal_body_fat_pct as number | null) ?? null,
-        teamAvg,
-      },
-      citations,
-    };
+    return { assessments, bodyComp, citations };
   }
 
   if (reportType === "performance") {
-    const [{ data: g }, { data: v }] = await Promise.all([
-      supabase
-        .from("gps_logs")
-        .select(
-          "date, total_distance_m, meters_per_min, high_speed_distance_m, sprint_distance_m, max_velocity, player_load, session_duration_min, validity_tier"
-        )
-        .eq("athlete_id", athleteId)
-        .order("date", { ascending: false }),
-      supabase
-        .from("vald_data")
-        .select("date, test_type, asymmetry_pct, validity_tier")
-        .eq("athlete_id", athleteId)
-        .order("date", { ascending: false }),
-    ]);
-    return {
-      gps: (g ?? []).map((r) => ({
-        date: r.date as string,
-        totalDistanceM: r.total_distance_m as number | null,
-        metersPerMin: r.meters_per_min as number | null,
-        highSpeedDistanceM: r.high_speed_distance_m as number | null,
-        sprintDistanceM: r.sprint_distance_m as number | null,
-        maxVelocity: r.max_velocity as number | null,
-        playerLoad: r.player_load as number | null,
-        sessionDurationMin: r.session_duration_min as number | null,
-        validityTier: r.validity_tier as string,
-      })),
-      vald: (v ?? []).map((r) => ({
-        date: r.date as string,
-        testType: r.test_type as string,
-        asymmetryPct: r.asymmetry_pct as number | null,
-        validityTier: r.validity_tier as string,
-      })),
-      citations,
-    };
+    const { gps, vald } = await loadPerformanceRows(athleteId);
+    return { gps, vald, citations };
   }
 
   if (reportType === "injury") {
-    const [{ data: inj }, assessments] = await Promise.all([
-      supabase
-        .from("injuries")
-        .select(
-          "date, type, description, status, rtp_phase, target_return_date, cleared_date, validity_tier"
-        )
-        .eq("athlete_id", athleteId)
-        .order("date", { ascending: false }),
+    const [injuries, assessments] = await Promise.all([
+      loadInjuryRows(athleteId, periodStart),
       loadAssessments(athleteId),
     ]);
-    return {
-      injuries: (inj ?? []).map((r) => ({
-        date: r.date as string,
-        type: ((r.type as string | null) ?? "").trim() || "Unspecified injury",
-        description: r.description as string | null,
-        status: r.status as InjuryRow["status"],
-        rtpPhase: (r.rtp_phase ?? null) as RtpPhase | null,
-        targetReturnDate: r.target_return_date as string | null,
-        clearedDate: r.cleared_date as string | null,
-        validityTier: r.validity_tier as string,
-        // Sustained before the window but still unresolved inside it — the
-        // distinction injuryPromptBuilder.ts:116 asks to be stated explicitly.
-        carriedIn:
-          periodStart !== null &&
-          (r.date as string) < periodStart &&
-          (r.status as string) !== "cleared",
-      })),
-      assessments,
-      citations,
-    };
+    return { injuries, assessments, citations };
   }
 
   // nutrition
-  //
-  // The periodisation strip must show the days the REPORT COVERS, not simply
-  // the earliest rows on file. A nutrition report is forward-looking — its
-  // period starts in the future — so an unfiltered query ordered ascending
-  // returns the oldest planned days in the table, which are typically months
-  // before the block being prescribed. Caught while seeding demo data: the
-  // strip was showing 22 Jul against a report covering late August.
+  const [assessments, compliance] = await Promise.all([
+    loadAssessments(athleteId),
+    getComplianceDetail(athleteId, windowFor(periodStart, periodEnd)),
+  ]);
+  const nutrition = await loadNutritionCore(athleteId, periodStart, periodEnd, assessments, compliance);
+  return { nutrition, assessments, citations };
+}
+
+/**
+ * The nutrition layout's measured shape: periodisation days, active
+ * protocols, and the check-in rate.
+ *
+ * The periodisation strip must show the days the REPORT COVERS, not simply
+ * the earliest rows on file. A nutrition report is forward-looking — its
+ * period starts in the future — so an unfiltered query ordered ascending
+ * returns the oldest planned days in the table, which are typically months
+ * before the block being prescribed. Caught while seeding demo data: the
+ * strip was showing 22 Jul against a report covering late August.
+ */
+async function loadNutritionCore(
+  athleteId: string,
+  periodStart: string | null,
+  periodEnd: string | null,
+  assessments: AssessmentRow[],
+  compliance: ComplianceDetailData
+): Promise<NutritionData> {
+  const supabase = await createClient();
   let planQuery = supabase
     .from("training_load_plans")
     .select("date, intensity, session_type, rpe")
@@ -242,11 +275,9 @@ export async function assembleMeasured(
   if (periodEnd) protQuery = protQuery.lte("start_date", periodEnd);
   if (periodStart) protQuery = protQuery.or(`end_date.is.null,end_date.gte.${periodStart}`);
 
-  const [{ data: plans }, { data: prot }, assessments, compliance] = await Promise.all([
+  const [{ data: plans }, { data: prot }] = await Promise.all([
     planQuery.order("date", { ascending: true }).limit(30),
     protQuery.order("start_date", { ascending: false }),
-    loadAssessments(athleteId),
-    getComplianceDetail(athleteId, windowFor(periodStart, periodEnd)),
   ]);
 
   const days: TrainingDay[] = (plans ?? []).map((p) => ({
@@ -264,14 +295,66 @@ export async function assembleMeasured(
     endDate: p.end_date as string | null,
   }));
 
-  const nutrition: NutritionData = {
+  return {
     days,
     protocols,
     latestAssessment: assessments[0] ?? null,
     // Missing means missing: no check-ins is not a rate of zero.
-    checkinRate: compliance.logged === 0 ? null : (compliance.rateOfCalendar ?? compliance.rateOfLogged),
+    checkinRate:
+      compliance.logged === 0 ? null : (compliance.rateOfCalendar ?? compliance.rateOfLogged),
     bodyMassKg: assessments[0]?.weightKg ?? null,
     heightCm: null,
   };
-  return { nutrition, assessments, citations };
+}
+
+/**
+ * The measured half of a COMBINED report: the selected domains' data merged
+ * into one MeasuredData, loaded through the SAME loaders the single-type
+ * paths use so a combined section can never disagree with its standalone
+ * equivalent — the same one-definition rule lib/reportBundle.ts applies to
+ * the prompt side.
+ *
+ * Shared reads are deduplicated: assessments load once however many of
+ * body-composition/injury/nutrition want them, and one compliance-detail read
+ * serves both the compliance domain and nutrition's check-in rate.
+ */
+export async function assembleCombinedMeasured(
+  types: ReportType[],
+  athleteId: string,
+  periodStart: string | null,
+  periodEnd: string | null,
+  teamId: string | null = null
+): Promise<MeasuredData> {
+  const citations = await loadCitations();
+  const want = (t: ReportType) => types.includes(t);
+  const needAssessments = want("body_composition") || want("injury") || want("nutrition");
+  const needCompliance = want("compliance") || want("nutrition");
+
+  const [assessments, compliance] = await Promise.all([
+    needAssessments ? loadAssessments(athleteId) : Promise.resolve(undefined),
+    needCompliance
+      ? getComplianceDetail(athleteId, windowFor(periodStart, periodEnd))
+      : Promise.resolve(undefined),
+  ]);
+
+  const [supplementCompliance, bodyComp, performance, injuries, nutrition] = await Promise.all([
+    want("compliance") ? getSupplementCompliance(athleteId).catch(() => []) : Promise.resolve(undefined),
+    want("body_composition") ? loadBodyCompExtras(athleteId, teamId) : Promise.resolve(undefined),
+    want("performance") ? loadPerformanceRows(athleteId) : Promise.resolve(undefined),
+    want("injury") ? loadInjuryRows(athleteId, periodStart) : Promise.resolve(undefined),
+    want("nutrition") && compliance
+      ? loadNutritionCore(athleteId, periodStart, periodEnd, assessments ?? [], compliance)
+      : Promise.resolve(undefined),
+  ]);
+
+  return {
+    citations,
+    ...(assessments !== undefined ? { assessments } : {}),
+    ...(want("compliance") && compliance !== undefined ? { compliance } : {}),
+    ...(supplementCompliance !== undefined ? { supplementCompliance } : {}),
+    ...(bodyComp !== undefined ? { bodyComp } : {}),
+    ...(performance !== undefined ? { gps: performance.gps, vald: performance.vald } : {}),
+    ...(injuries !== undefined ? { injuries } : {}),
+    ...(nutrition !== undefined ? { nutrition } : {}),
+  };
 }

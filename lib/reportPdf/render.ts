@@ -4,14 +4,15 @@ import type { ReportType } from "@/lib/reportTypes";
 import { flow, type Block, type RenderCtx } from "./layout";
 import { createPageMachine } from "./chrome";
 import { CONTENT_PAD, CONTENT_WIDTH, PAGE } from "./theme";
-import { extractPrescribedTables, parseNarrative } from "./narrative";
+import { extractPrescribedTables, parseCombinedNarrative, parseNarrative } from "./narrative";
 import { periodLabel, type ReportIdentity } from "./model";
 import type { MeasuredData } from "./assemble";
-import { athleteComplianceBlocks } from "./layouts/athleteCompliance";
+import { athleteComplianceBlocks, emptyComplianceData } from "./layouts/athleteCompliance";
 import { athleteBodyCompositionBlocks } from "./layouts/athleteBodyComposition";
 import { athletePerformanceBlocks } from "./layouts/athletePerformance";
 import { athleteInjuryBlocks } from "./layouts/athleteInjury";
 import { athleteNutritionBlocks } from "./layouts/athleteNutrition";
+import { athleteCombinedBlocks } from "./layouts/athleteCombined";
 
 // Turns a report type + its measured data + its generated markdown into PDF
 // bytes.
@@ -51,7 +52,7 @@ function blocksFor(input: RenderReportInput): Block[] | Promise<Block[]> {
   switch (reportType) {
     case "compliance":
       return athleteComplianceBlocks(
-        measured.compliance ?? emptyCompliance(),
+        measured.compliance ?? emptyComplianceData(),
         identity,
         narrative,
         citations,
@@ -108,24 +109,65 @@ function blocksFor(input: RenderReportInput): Block[] | Promise<Block[]> {
   }
 }
 
-/** A compliance shape with nothing in it, for the impossible-but-typed case. */
-function emptyCompliance() {
-  return {
-    rows: [],
-    metrics: [],
-    logged: 0,
-    completed: 0,
-    skipped: 0,
-    rateOfLogged: null,
-    rateOfCalendar: null,
-    longestStreak: 0,
-    lastDate: null,
-  };
+export async function renderReportDocument(input: RenderReportInput): Promise<Uint8Array> {
+  const blocks = await blocksFor(input);
+  return paintPdf(
+    input.identity,
+    input.footerNote,
+    input.reportType === "nutrition" ? "Performance Nutrition" : null,
+    input.measured,
+    blocks
+  );
 }
 
-export async function renderReportDocument(input: RenderReportInput): Promise<Uint8Array> {
-  const { identity } = input;
+export interface RenderCombinedInput {
+  /** The 2-3 domains, in the order the practitioner selected them. */
+  types: ReportType[];
+  identity: ReportIdentity;
+  measured: MeasuredData;
+  markdown: string | null;
+  footerNote: string;
+}
 
+/**
+ * The combined report through the SAME structured pipeline as the five
+ * single-type documents: same page chrome, same block vocabulary, same
+ * measured-vs-narrative split. The composition rules live in
+ * layouts/athleteCombined.ts; the per-domain narrative routing in
+ * parseCombinedNarrative(). Any failure here is caught by the caller
+ * (lib/reportPdfDelivery.ts) and degrades to the legacy renderer, exactly as
+ * the single-type path does.
+ */
+export async function renderCombinedReportDocument(
+  input: RenderCombinedInput
+): Promise<Uint8Array> {
+  const combined = parseCombinedNarrative(input.markdown, input.types);
+  const blocks = await athleteCombinedBlocks(
+    input.types,
+    input.measured,
+    input.identity,
+    combined,
+    input.measured.citations,
+    CONTENT_WIDTH
+  );
+  return paintPdf(
+    input.identity,
+    input.footerNote,
+    input.types.includes("nutrition") ? "Performance Nutrition" : null,
+    input.measured,
+    blocks
+  );
+}
+
+/** The document painter shared by the single-type and combined entry points:
+ *  page setup, header lines, the flow engine, footer stamping. */
+async function paintPdf(
+  identity: ReportIdentity,
+  footerNote: string,
+  brandTagline: string | null,
+  measured: MeasuredData,
+  blocks: Block[]
+): Promise<Uint8Array> {
   const doc = new PDFDocument({
     size: PAGE.size,
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
@@ -151,7 +193,7 @@ export async function renderReportDocument(input: RenderReportInput): Promise<Ui
   // measured values and appear only when the type's assembled data carries
   // them (nutrition today); everything else comes from the athlete row.
   // Unknown parts are skipped, never dashed — the header states facts only.
-  const n = input.measured.nutrition;
+  const n = measured.nutrition;
   const bioParts: string[] = [];
   if (n?.heightCm != null) bioParts.push(`Height ${Math.round(n.heightCm)} cm`);
   if (n?.bodyMassKg != null) bioParts.push(`Body mass ${Math.round(n.bodyMassKg)} kg`);
@@ -173,18 +215,17 @@ export async function renderReportDocument(input: RenderReportInput): Promise<Ui
       clubName: identity.clubName,
       clubLogo: identity.clubLogo,
       teamName: identity.teamName,
-      brandTagline: input.reportType === "nutrition" ? "Performance Nutrition" : null,
+      brandTagline,
       athleteName: identity.athleteName,
       reportLabel: identity.reportLabel,
       audienceLabel: identity.audienceLabel,
       bioLine: bioParts.length > 0 ? bioParts.join(" · ") : null,
       metaLine: metaParts.join(" · "),
-      footerNote: input.footerNote,
+      footerNote,
     },
     identity.accentHex
   );
 
-  const blocks = await blocksFor(input);
   const ctx: RenderCtx = { doc, x: CONTENT_PAD.side, width: CONTENT_WIDTH };
   const startY = pages.newPage();
   flow(ctx, blocks, pages, startY);

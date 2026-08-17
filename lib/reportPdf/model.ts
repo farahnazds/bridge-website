@@ -48,7 +48,9 @@ export interface ReportIdentity {
   position: string | null;
   ageYears: number | null;
   tier: string | null;
-  reportType: ReportType;
+  /** Null for a COMBINED report, which spans several types and has no single
+   *  layout key — its label carries the identity instead. */
+  reportType: ReportType | null;
   reportLabel: string;
   /**
    * Selects register, never structure.

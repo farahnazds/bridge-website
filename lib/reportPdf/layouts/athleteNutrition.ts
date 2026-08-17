@@ -296,6 +296,93 @@ function fuelForDay(
   return { kcal: /kcal/i.test(kcal) ? kcal : `${kcal} kcal`, macros };
 }
 
+// ---------------------------------------------------------------------------
+// Domain building blocks — shared with the combined report's Nutrition section
+// ---------------------------------------------------------------------------
+// A combined report's nutrition domain carries no prescribed meal tables (the
+// combined prompt requests prose findings, not tables), so its measured
+// nutrition content is exactly these: the periodisation strip, the confirmed
+// supplement stack, and the anti-doping box — which is mandatory wherever
+// supplements appear (docs/12 §7). Extracted rather than duplicated so the
+// single-type document and the combined section cannot drift.
+
+/** Weekly periodisation strip: MEASURED days × PRESCRIBED fuel map (the fuel
+ *  map is undefined for combined reports — the squares still carry tag/RPE). */
+export function nutritionPeriodisationBlocks(
+  allDays: TrainingDay[],
+  fuelMap: PrescribedTable | undefined
+): Block[] {
+  const blocks: Block[] = [];
+  // The day squares are measured (training_load_plans); the kcal/macros
+  // inside each square join against the plan's "Day type fuel map" table by
+  // day type. The join is by the fixed type vocabulary the prompt mandates;
+  // a day whose type has no fuel row simply shows no figures — the tag and
+  // RPE are still real, and nothing is estimated in the layout.
+  blocks.push(sectionTitle("Weekly periodisation"));
+  const days = allDays.slice(0, MAX_STRIP_DAYS);
+  if (days.length === 0) {
+    blocks.push(
+      missingNote(
+        "No training load plan covers this period, so the week cannot be periodised. Carbohydrate targets move with planned session load — without a plan there is nothing to move them against."
+      )
+    );
+  } else {
+    const cells: DayCell[] = days.map((d) => {
+      const { tag, label } = dayTag(d);
+      return {
+        name: weekdayOf(d.date),
+        tag,
+        tagLabel: label,
+        value: d.rpe === null ? "—" : `RPE ${d.rpe}`,
+        caption: shortDate(d.date),
+        fuel: fuelForDay(fuelMap, tag, label),
+      };
+    });
+    blocks.push(weekStrip(cells));
+    // No explanatory callout under the grid — the 2026-08-16 feedback: the
+    // grid itself is the explanation, and now carries the per-day figures.
+  }
+  return blocks;
+}
+
+/** The confirmed supplement stack table (MEASURED — supplement_protocols). */
+export function nutritionSupplementStackBlocks(
+  protocols: ProtocolRow[],
+  periodStart: string | null,
+  periodEnd: string | null
+): Block[] {
+  const blocks: Block[] = [];
+  blocks.push(sectionTitle("Confirmed supplement stack"));
+  if (protocols.length === 0) {
+    blocks.push(
+      missingNote(
+        "No supplement protocol is active for this athlete over this period. Nothing is suggested here — a supplement stack is prescribed and confirmed by a practitioner, never inferred."
+      )
+    );
+  } else {
+    const aggregated = aggregateProtocols(protocols, periodStart, periodEnd);
+    blocks.push(
+      table({
+        head: ["Supplement", "Dose", "Timing", "Days", "Rationale"],
+        weights: [1.5, 1, 1.4, 1.2, 2.4],
+        rows: aggregated.map((p) => [
+          p.supplementName,
+          p.doses.join(" / "),
+          p.timings.join(" / "),
+          p.weekdays ? weekdayGrid(p.weekdays) : p.windowFallback,
+          oneLine(p.rationale),
+        ]),
+      })
+    );
+  }
+  return blocks;
+}
+
+/** The standing anti-doping box — never conditional wherever it appears. */
+export function antiDopingBlock(): Block {
+  return precisionBox("Anti-doping", ANTI_DOPING);
+}
+
 export function athleteNutritionBlocks(
   data: NutritionData,
   identity: ReportIdentity,
@@ -350,36 +437,7 @@ export function athleteNutritionBlocks(
     blocks.push(meansBox(summaryHeading(identity), capSentences(narrative.meansBox, 4)));
   }
 
-  // ---- Weekly periodisation (MEASURED days × PRESCRIBED fuel) ----
-  // The day squares are measured (training_load_plans); the kcal/macros
-  // inside each square join against the plan's "Day type fuel map" table by
-  // day type. The join is by the fixed type vocabulary the prompt mandates;
-  // a day whose type has no fuel row simply shows no figures — the tag and
-  // RPE are still real, and nothing is estimated in the layout.
-  blocks.push(sectionTitle("Weekly periodisation"));
-  const days = data.days.slice(0, MAX_STRIP_DAYS);
-  if (days.length === 0) {
-    blocks.push(
-      missingNote(
-        "No training load plan covers this period, so the week cannot be periodised. Carbohydrate targets move with planned session load — without a plan there is nothing to move them against."
-      )
-    );
-  } else {
-    const cells: DayCell[] = days.map((d) => {
-      const { tag, label } = dayTag(d);
-      return {
-        name: weekdayOf(d.date),
-        tag,
-        tagLabel: label,
-        value: d.rpe === null ? "—" : `RPE ${d.rpe}`,
-        caption: shortDate(d.date),
-        fuel: fuelForDay(fuelMap, tag, label),
-      };
-    });
-    blocks.push(weekStrip(cells));
-    // No explanatory callout under the grid — the 2026-08-16 feedback: the
-    // grid itself is the explanation, and now carries the per-day figures.
-  }
+  blocks.push(...nutritionPeriodisationBlocks(data.days, fuelMap));
 
   // ---- Meal timing / food examples (PRESCRIBED) ----
   const meals = prescribed.filter(
@@ -420,33 +478,12 @@ export function athleteNutritionBlocks(
     );
   }
 
-  // ---- Confirmed supplement stack (MEASURED) ----
-  blocks.push(sectionTitle("Confirmed supplement stack"));
-  if (data.protocols.length === 0) {
-    blocks.push(
-      missingNote(
-        "No supplement protocol is active for this athlete over this period. Nothing is suggested here — a supplement stack is prescribed and confirmed by a practitioner, never inferred."
-      )
-    );
-  } else {
-    const aggregated = aggregateProtocols(data.protocols, identity.periodStart, identity.periodEnd);
-    blocks.push(
-      table({
-        head: ["Supplement", "Dose", "Timing", "Days", "Rationale"],
-        weights: [1.5, 1, 1.4, 1.2, 2.4],
-        rows: aggregated.map((p) => [
-          p.supplementName,
-          p.doses.join(" / "),
-          p.timings.join(" / "),
-          p.weekdays ? weekdayGrid(p.weekdays) : p.windowFallback,
-          oneLine(p.rationale),
-        ]),
-      })
-    );
-  }
+  blocks.push(
+    ...nutritionSupplementStackBlocks(data.protocols, identity.periodStart, identity.periodEnd)
+  );
 
   // ---- Anti-doping (STANDING — never conditional) ----
-  blocks.push(precisionBox("Anti-doping", ANTI_DOPING));
+  blocks.push(antiDopingBlock());
 
   // Each of the three named interpretation subsections hard-capped at three
   // sentences — the prompt mandates the cap and the fixed titles; the clamp

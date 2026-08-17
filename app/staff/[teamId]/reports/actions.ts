@@ -1429,17 +1429,20 @@ export async function generateCombinedReport(
     };
   }
 
-  // Same branded pipeline as individual reports; only the title differs.
-  // No reportType — combined has no single structured layout and deliberately
-  // takes the legacy renderer — but audience still travels with the input so
-  // the document's register is recorded wherever the pipeline reads it.
+  // Same branded pipeline as individual reports, through the structured
+  // combined composer (reportTypes selects it; the legacy renderer remains
+  // the fallback beneath it, exactly as for the five single types). The
+  // header names the document type — the owner's naming for combined — and
+  // the domain list travels in the meta line via modeLabel.
   const pdf = await generateAndStoreReportPdf({
     reportId: insertedReport.id,
     athleteId,
     teamId,
     audience,
+    reportTypes: types,
+    modeLabel: types.map((t) => REPORT_TYPE_LABELS[t] ?? t).join(" + "),
     markdown: reportText,
-    reportTypeLabel: types.map((t) => REPORT_TYPE_LABELS[t] ?? t).join(" + "),
+    reportTypeLabel: "Combined Performance Report",
     athleteName: `${bundle.athlete.first_name} ${bundle.athlete.last_name}`,
     periodStart,
     periodEnd,

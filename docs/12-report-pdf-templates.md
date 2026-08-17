@@ -180,3 +180,11 @@ The goal is a genuinely unified document that reads as one coherent report, not
 works for combined reports (one shared narrative, not stapled-together
 sections).
 
+Implemented 2026-08-17: `lib/reportPdf/layouts/athleteCombined.ts` composes the
+document from the same per-domain measured cores the five single-type layouts
+render through (`complianceDomainBlocks`, `bodyCompDomainBlocks`, …), with
+per-domain findings and the cross-domain synthesis routed by
+`parseCombinedNarrative()` in `lib/reportPdf/narrative.ts`. The legacy
+markdown renderer remains the fallback beneath it, exactly as for the five
+single types.
+

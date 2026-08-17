@@ -89,34 +89,29 @@ export function latestDelta(rows: AssessmentRow[]): {
   };
 }
 
-export async function athleteBodyCompositionBlocks(
+/**
+ * The measured core — status cards, cross-method callouts, team context,
+ * charts and the all-scans table — shared by the single-type document and the
+ * combined report's Body Composition domain section. The prescribed-targets
+ * panel is opt-in: the single-type document keeps it in place; a combined
+ * report omits it (its nutrition domain owns prescription context).
+ */
+export async function bodyCompDomainBlocks(
   data: BodyCompositionData,
-  identity: ReportIdentity,
-  narrative: Narrative,
-  citations: Citation[],
-  contentWidth: number
+  contentWidth: number,
+  opts?: { includePrescribedTargets?: boolean }
 ): Promise<Block[]> {
   const blocks: Block[] = [];
   const rows = data.rows;
   const latest = rows[0] ?? null;
   const { delta, crossMethod, from, to } = latestDelta(rows);
 
-  blocks.push(
-    callout(
-      "Body composition is read against the method it was measured with. Figures from different instruments are labelled and are not compared as a trend — an instrument change is not a physiological change."
-    )
-  );
-
   if (!latest) {
-    blocks.push(
+    return [
       missingNote(
         "No body-composition assessment exists for this athlete. Nothing on this page is estimated — without a scan there is no measurement to report."
-      )
-    );
-    blocks.push(...narrativeTail(narrative, identity, "Interpretation"));
-    blocks.push(...sourcesBlocks(citations));
-    blocks.push(...bannerBlocks(identity));
-    return blocks;
+      ),
+    ];
   }
 
   // ---- status cards ----
@@ -212,8 +207,10 @@ export async function athleteBodyCompositionBlocks(
   }
 
   // Prescribed targets panel — measured data cannot supply these.
-  blocks.push(sectionTitle("Daily targets — standard training day"));
-  blocks.push(prescribedTargetsMissing());
+  if (opts?.includePrescribedTargets ?? false) {
+    blocks.push(sectionTitle("Daily targets — standard training day"));
+    blocks.push(prescribedTargetsMissing());
+  }
 
   // ---- charts ----
   blocks.push(sectionTitle("Evolution across scans"));
@@ -295,6 +292,36 @@ export async function athleteBodyCompositionBlocks(
       )
     );
   }
+
+  return blocks;
+}
+
+export async function athleteBodyCompositionBlocks(
+  data: BodyCompositionData,
+  identity: ReportIdentity,
+  narrative: Narrative,
+  citations: Citation[],
+  contentWidth: number
+): Promise<Block[]> {
+  const blocks: Block[] = [];
+  const rows = data.rows;
+  const latest = rows[0] ?? null;
+
+  blocks.push(
+    callout(
+      "Body composition is read against the method it was measured with. Figures from different instruments are labelled and are not compared as a trend — an instrument change is not a physiological change."
+    )
+  );
+
+  if (!latest) {
+    blocks.push(...(await bodyCompDomainBlocks(data, contentWidth)));
+    blocks.push(...narrativeTail(narrative, identity, "Interpretation"));
+    blocks.push(...sourcesBlocks(citations));
+    blocks.push(...bannerBlocks(identity));
+    return blocks;
+  }
+
+  blocks.push(...(await bodyCompDomainBlocks(data, contentWidth, { includePrescribedTargets: true })));
 
   blocks.push(...prescriberBlocks(identity));
   blocks.push(...narrativeTail(narrative, identity, "Performance interpretation"));

@@ -115,24 +115,41 @@ function shortDate(iso: string): string {
 /** How many log rows fit on the page before the table is just noise. */
 const LOG_ROWS = 14;
 
-export async function athleteComplianceBlocks(
+/** A compliance shape with nothing in it — the typed fallback shared by the
+ *  render dispatch and the combined composer. Lived in render.ts until the
+ *  combined layout needed it too. */
+export function emptyComplianceData(): ComplianceDetailData {
+  return {
+    rows: [],
+    metrics: [],
+    logged: 0,
+    completed: 0,
+    skipped: 0,
+    rateOfLogged: null,
+    rateOfCalendar: null,
+    longestStreak: 0,
+    lastDate: null,
+  };
+}
+
+/**
+ * The measured core — status cards, trend charts, the check-in log and the
+ * per-supplement adherence table — shared by the single-type document and the
+ * combined report's Compliance domain section. `afterStatus` is the one
+ * injection point: the single-type document places its means box between the
+ * status cards and the charts, and an injected slot keeps that order without
+ * splitting this function in two.
+ */
+export async function complianceDomainBlocks(
   data: ComplianceDetailData,
-  identity: ReportIdentity,
-  narrative: Narrative,
-  citations: Citation[],
   contentWidth: number,
-  /** Per-supplement adherence since first recommendation (lib/
-   *  supplementCompliance.ts). Defaulted so older callers keep compiling;
-   *  empty renders no table. */
-  supplementCompliance: SupplementComplianceRow[] = []
+  supplementCompliance: SupplementComplianceRow[] = [],
+  afterStatus: Block[] = []
 ): Promise<Block[]> {
   const blocks: Block[] = [];
   const adherence = supplementAdherence(data.rows);
   const rate = headlineRate(data);
   const sleep = data.metrics.find((m) => m.key === "sleep");
-  const hydration = data.metrics.find((m) => m.key === "hydration");
-
-  blocks.push(callout(STANDING_CALLOUT));
 
   // ---- status cards ----
   blocks.push(
@@ -165,11 +182,7 @@ export async function athleteComplianceBlocks(
     ])
   );
 
-  if (narrative.meansBox) {
-    blocks.push(
-      meansBox(summaryHeading(identity), capSentences(narrative.meansBox, MAX_NARRATIVE_SENTENCES))
-    );
-  }
+  blocks.push(...afterStatus);
 
   // ---- Category Trends ----
   blocks.push(sectionTitle("Category trends"));
@@ -289,6 +302,35 @@ export async function athleteComplianceBlocks(
       )
     );
   }
+
+  return blocks;
+}
+
+export async function athleteComplianceBlocks(
+  data: ComplianceDetailData,
+  identity: ReportIdentity,
+  narrative: Narrative,
+  citations: Citation[],
+  contentWidth: number,
+  /** Per-supplement adherence since first recommendation (lib/
+   *  supplementCompliance.ts). Defaulted so older callers keep compiling;
+   *  empty renders no table. */
+  supplementCompliance: SupplementComplianceRow[] = []
+): Promise<Block[]> {
+  const blocks: Block[] = [];
+  const adherence = supplementAdherence(data.rows);
+  const rate = headlineRate(data);
+  const sleep = data.metrics.find((m) => m.key === "sleep");
+  const hydration = data.metrics.find((m) => m.key === "hydration");
+
+  blocks.push(callout(STANDING_CALLOUT));
+
+  // The means box slots between the status cards and the charts — the order
+  // the template fixes — via the domain core's injection point.
+  const means: Block[] = narrative.meansBox
+    ? [meansBox(summaryHeading(identity), capSentences(narrative.meansBox, MAX_NARRATIVE_SENTENCES))]
+    : [];
+  blocks.push(...(await complianceDomainBlocks(data, contentWidth, supplementCompliance, means)));
 
   // ---- Rx strip ----
   if (identity.prescriber) {

@@ -1,5 +1,7 @@
 import "server-only";
 import { inlineText, parseReportBlocks, type Block as MdBlock } from "@/lib/reportContent";
+import { REPORT_TYPE_LABELS } from "@/lib/constants";
+import type { ReportType } from "@/lib/reportTypes";
 import { EMPTY_NARRATIVE, type InterpNote, type InterpTone, type Narrative } from "./model";
 
 // Maps the model's generated markdown onto the Narrative slots the layouts
@@ -117,7 +119,7 @@ const AMBER_WORDS = [
   "attention",
 ];
 
-function toneFor(title: string, body: string): InterpTone {
+export function toneFor(title: string, body: string): InterpTone {
   const t = `${title} ${body}`.toLowerCase();
   if (RED_WORDS.some((w) => t.includes(w))) return "red";
   if (AMBER_WORDS.some((w) => t.includes(w))) return "amber";
@@ -283,6 +285,127 @@ export function parseNarrative(markdown: string | null | undefined): Narrative {
     // reason a practitioner cannot generate a report — the measured half is
     // already correct and renders without this.
     return EMPTY_NARRATIVE;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Combined reports — per-domain sections and the cross-domain synthesis
+// ---------------------------------------------------------------------------
+// A combined report's markdown has a shape the four Narrative slots cannot
+// hold: one findings section PER DOMAIN plus a cross-domain synthesis section
+// (combinedPromptBuilder.ts). Parsed through parseNarrative() alone they all
+// collapse into an undifferentiated stack of interpretation panels — which is
+// why the combined layout could not place a domain's prose next to that
+// domain's measured tables. This parser adds exactly those two notions and
+// nothing else.
+//
+// Same contract as everything in this module: never throws, and every failure
+// degrades to the parseNarrative() result — the domain sections then render as
+// ordinary interpretation panels, which is a worse-arranged document, not a
+// lost one. parseNarrative() itself is untouched, so the five single-type
+// report paths cannot regress.
+
+export interface CombinedNarrative {
+  /** meansBox / recommendations / monitoring, plus any section that matched
+   *  neither a domain nor the synthesis — those stay interpretation panels. */
+  base: Narrative;
+  /** Matched domain sections, in the order they appear in the markdown. */
+  domains: { type: ReportType; body: string }[];
+  synthesis: string | null;
+}
+
+/** Whether a heading names one of the selected domains — matched on the
+ *  domain's display label ("Body Composition"), which the prompt's required
+ *  structure uses verbatim as the section name. */
+function domainFor(heading: string, types: ReportType[]): ReportType | null {
+  const h = norm(heading);
+  for (const t of types) {
+    const label = norm(REPORT_TYPE_LABELS[t] ?? t);
+    if (label && h.includes(label)) return t;
+  }
+  return null;
+}
+
+function isSynthesisHeading(heading: string): boolean {
+  const h = norm(heading);
+  return h.includes("synthesis") || h.includes("cross domain");
+}
+
+export function parseCombinedNarrative(
+  markdown: string | null | undefined,
+  types: ReportType[]
+): CombinedNarrative {
+  const fallback = (): CombinedNarrative => ({
+    base: parseNarrative(markdown),
+    domains: [],
+    synthesis: null,
+  });
+  try {
+    if (!markdown || markdown.trim() === "") return fallback();
+    const blocks = parseReportBlocks(markdown);
+    if (blocks.length === 0) return fallback();
+
+    const { sections } = sectionise(blocks);
+
+    let means: string | null = null;
+    let monitoring: string | null = null;
+    let synthesis: string | null = null;
+    const interps: InterpNote[] = [];
+    const recommendations: string[] = [];
+    const domains: { type: ReportType; body: string }[] = [];
+
+    for (const section of sections) {
+      if (isTitleSection(section)) continue;
+
+      // Order matters: the synthesis and domain checks run BEFORE the generic
+      // slot map, because a heading like "Compliance" would otherwise land in
+      // the interp default and lose its domain identity.
+      if (isSynthesisHeading(section.title)) {
+        const prose = proseOf(section.blocks);
+        if (!prose) continue;
+        // First synthesis wins; a second becomes an interpretation, mirroring
+        // the means/monitoring rule in parseNarrative().
+        if (synthesis === null) synthesis = prose;
+        else interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+        continue;
+      }
+      const domain = domainFor(section.title, types);
+      if (domain !== null) {
+        const prose = proseOf(section.blocks);
+        if (!prose) continue;
+        const existing = domains.find((d) => d.type === domain);
+        if (existing) existing.body = `${existing.body} ${prose}`;
+        else domains.push({ type: domain, body: prose });
+        continue;
+      }
+
+      const slot = slotFor(section.title);
+      if (slot === "recommendations") {
+        recommendations.push(...itemsOf(section.blocks));
+        continue;
+      }
+      const prose = proseOf(section.blocks);
+      if (!prose) continue;
+      if (slot === "means") {
+        if (means === null) means = prose;
+        else interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+      } else if (slot === "monitoring") {
+        if (monitoring === null) monitoring = prose;
+        else interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+      } else {
+        interps.push({ title: section.title, body: prose, tone: toneFor(section.title, prose) });
+      }
+    }
+
+    return { base: { meansBox: means, interps, recommendations, monitoring }, domains, synthesis };
+  } catch {
+    // Same deliberate swallow as parseNarrative(): a combined parse failure
+    // must never block the document — the flat parse still renders everything.
+    try {
+      return fallback();
+    } catch {
+      return { base: EMPTY_NARRATIVE, domains: [], synthesis: null };
+    }
   }
 }
 
