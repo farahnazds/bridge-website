@@ -1,14 +1,22 @@
 <!--
-  BRIDGETX INVITE EMAIL — paste into Supabase Dashboard → Authentication →
-  Emails → Templates → "Invite user" (body field).
-  Subject line to set alongside it:  You have been invited to join {{ if .Data.club_name }}{{ .Data.club_name }}{{ else }}your club{{ end }} on Bridgetx
+  BRIDGETX INVITE EMAIL - paste into Supabase Dashboard > Authentication >
+  Emails > Templates > "Invite user" (body field).
+  Subject line to set alongside it (copy the if/else construct from the
+  button row's pattern, with .Data.club_name and a "your club" fallback):
+    You have been invited to join your club on Bridgetx
 
   Notes:
-  - {{ .ConfirmationURL }} is Supabase's invite-acceptance link (redirects to
-    the athlete/staff activation page the inviting action chose).
-  - {{ .Data.club_name }} arrives via the invite call's user_metadata — all
-    four inviting actions in the codebase now pass it; the {{ if }} fallback
-    keeps older/blank invites reading naturally.
+  - GO TEMPLATE WARNING: GoTrue parses double-curly-brace actions EVERYWHERE
+    in this file, INCLUDING inside HTML comments. A malformed action in a
+    comment (2026-08-17: a bare if with no condition on line 10) is a parse
+    error that makes GoTrue silently send its DEFAULT plain-text email
+    instead. The dashboard preview does not catch this. Never write literal
+    template braces in comments; name the variables without braces instead.
+  - ConfirmationURL is Supabase's invite-acceptance link (redirects to the
+    athlete/staff activation page the inviting action chose).
+  - Data.club_name arrives via the invite call's user_metadata - all four
+    inviting actions in the codebase pass it; the if/else fallback in the
+    body keeps older/blank invites reading naturally.
   - One template serves BOTH athlete and staff invites, so the copy names no
     role. Table-based, inline styles, no web-font dependency (falls back to
     Arial), hosted PNG logo.
