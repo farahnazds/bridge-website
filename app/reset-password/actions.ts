@@ -3,9 +3,10 @@
 import { resolvePostLoginPath } from "@/lib/auth";
 
 // Called from the client after supabase.auth.updateUser() succeeds — the
-// session only exists because the client established it from the recovery
-// tokens in the URL hash, so redirect resolution has to happen after that,
-// not as part of a form submission.
+// session was established by /auth/confirm verifying the emailed token hash
+// (or, for implicit-flow links, by the client from URL hash tokens), so
+// redirect resolution has to happen after that, not as part of a form
+// submission.
 export async function getPostResetPath(): Promise<string> {
   return resolvePostLoginPath();
 }

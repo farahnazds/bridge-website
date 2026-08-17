@@ -20,6 +20,13 @@ export default function ResetPasswordForm() {
     let cancelled = false;
 
     async function establishSession() {
+      // The normal arrival path: /auth/confirm verified the emailed token
+      // hash server-side and set the session cookies before redirecting
+      // here, so this page only has to confirm a session exists. A failed
+      // verification redirects with ?error=invalid_link instead.
+      const search = new URLSearchParams(window.location.search);
+      const linkError = search.get("error");
+
       const hash = window.location.hash.startsWith("#")
         ? window.location.hash.slice(1)
         : window.location.hash;
@@ -27,18 +34,26 @@ export default function ResetPasswordForm() {
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
 
-      const sessionError = accessToken && refreshToken
-        ? (
-            await createClient().auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            })
-          ).error
-        : new Error("Missing recovery tokens");
+      let ok = false;
+      if (linkError) {
+        ok = false;
+      } else if (accessToken && refreshToken) {
+        // Implicit-flow links (hash tokens) still land here directly —
+        // e.g. a recovery email sent from the Supabase dashboard.
+        ok = !(
+          await createClient().auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          })
+        ).error;
+      } else {
+        const { data } = await createClient().auth.getUser();
+        ok = Boolean(data.user);
+      }
 
-      // Strip tokens from the URL/history regardless of outcome.
+      // Strip tokens/error params from the URL/history regardless of outcome.
       window.history.replaceState(null, "", window.location.pathname);
-      if (!cancelled) setStatus(sessionError ? "invalid" : "ready");
+      if (!cancelled) setStatus(ok ? "ready" : "invalid");
     }
 
     establishSession();

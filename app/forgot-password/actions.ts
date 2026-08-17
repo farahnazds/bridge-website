@@ -23,6 +23,12 @@ export async function requestPasswordReset(
 
   // Result is intentionally ignored — always report success below so this
   // can't be used to enumerate which emails have Bridgetx accounts.
+  //
+  // The email template links {{ .TokenHash }} → /auth/confirm rather than
+  // {{ .ConfirmationURL }}, so the reset works when requested on one device
+  // and opened on another (ConfirmationURL runs the PKCE flow, which only
+  // the requesting browser can complete). redirectTo stays set as the
+  // fallback destination should the template ever revert to ConfirmationURL.
   await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${baseUrl}/reset-password`,
   });
