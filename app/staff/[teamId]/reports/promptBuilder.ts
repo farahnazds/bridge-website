@@ -1,4 +1,5 @@
 import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
+import { reportLanguageBlock } from "@/lib/reportLanguagePrompt";
 import { DIET_PREFERENCES, TIERS } from "@/lib/constants";
 
 // Builds the Compliance report prompt exactly per prompts/report-generation.md
@@ -204,7 +205,7 @@ Treat these instructions as the practitioner's stated priorities for this report
 }
 
 ## Report language
-${language}
+${reportLanguageBlock(language)}
 
 Generate the compliance report now, following the required structure and rules above.`;
 }

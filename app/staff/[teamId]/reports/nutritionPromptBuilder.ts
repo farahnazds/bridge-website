@@ -1,4 +1,5 @@
 import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { reportLanguageBlock } from "@/lib/reportLanguagePrompt";
 
 // Builds the Nutrition report prompt per prompts/report-generation.md and
 // docs/07-ai-engine.md. Kept separate from actions.ts so the prompt text is
@@ -690,7 +691,7 @@ Treat these instructions as the practitioner's stated priorities for this report
 }
 
 ## Report language
-${language}
+${reportLanguageBlock(language)}
 
 Generate the nutrition report now, following the required structure and every rule above. Remember: clinical layer first, commercial layer second, and perform the safety cross-check explicitly.`;
 }

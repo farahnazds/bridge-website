@@ -1,4 +1,5 @@
 import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
+import { reportLanguageBlock } from "@/lib/reportLanguagePrompt";
 import { DIET_PREFERENCES, TIERS, VALIDITY_TIER_LABELS } from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
 // Builds the Body Composition report prompt exactly per
@@ -323,7 +324,7 @@ Treat these instructions as the practitioner's stated priorities for this report
 }
 
 ## Report language
-${language}
+${reportLanguageBlock(language)}
 
 Generate the body composition report now, following the required structure and rules above.`;
 }

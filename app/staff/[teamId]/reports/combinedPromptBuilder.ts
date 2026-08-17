@@ -1,4 +1,5 @@
 import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
+import { reportLanguageBlock } from "@/lib/reportLanguagePrompt";
 import {
   REPORT_TYPE_LABELS,
   RTP_PHASES,
@@ -340,7 +341,7 @@ Treat these instructions as the practitioner's stated priorities for this report
 }
 
 ## Report language
-${language}
+${reportLanguageBlock(language)}
 
 Generate the combined report now, following the required structure and rules above. Remember: one document, one executive summary, and a synthesis section that does the work only a combined generation can do.`);
 

@@ -89,7 +89,7 @@ export default function InjuryReportForm({
             style={INPUT_STYLE}
           >
             <option value="english">English</option>
-            <option value="arabic">Arabic</option>
+            <option value="spanish">Spanish</option>
           </select>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Defaults to your club&apos;s setting. Changing it here affects this report only.

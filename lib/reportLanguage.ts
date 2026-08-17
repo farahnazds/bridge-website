@@ -14,7 +14,18 @@ import { createClient } from "@/lib/supabase/server";
 // omits the field, or sends an unsupported value, must still land on the club
 // default rather than silently generating in whatever string arrived.
 
-export const SUPPORTED_LANGUAGES = ["english", "arabic"] as const;
+// ARABIC IS PARKED, NOT REMOVED (owner's direction, 2026-08-17): the
+// structured PDF renderer cannot render Arabic today — pdfkit's built-in
+// Helvetica has no Arabic glyph coverage and pdfkit does no bidi/RTL shaping
+// (docs/PROJECT-STATUS.md, "Arabic/RTL") — and zero Arabic reports were ever
+// generated. Spanish takes its selector slot until proper RTL support is
+// built. Everything Arabic-specific elsewhere stays in place: the
+// club_settings default's ('english','arabic') CHECK, the Club Manager
+// settings selector, club_branding.arabic_format_notes, and the bilingual-
+// output rules in docs/05. A stored 'arabic' club default simply fails
+// isSupported() below and resolves to English — the same safe fallback any
+// unsupported value has always had.
+export const SUPPORTED_LANGUAGES = ["english", "spanish"] as const;
 export type ReportLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 export const FALLBACK_LANGUAGE: ReportLanguage = "english";
 

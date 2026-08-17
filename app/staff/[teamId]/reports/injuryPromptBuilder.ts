@@ -1,4 +1,5 @@
 import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
+import { reportLanguageBlock } from "@/lib/reportLanguagePrompt";
 import { INJURY_STATUSES, RTP_PHASES, TIERS, VALIDITY_TIER_LABELS } from "@/lib/constants";
 
 // Builds the Injury report prompt per prompts/report-generation.md and
@@ -251,7 +252,7 @@ Treat these instructions as the practitioner's stated priorities for this report
 }
 
 ## Report language
-${language}
+${reportLanguageBlock(language)}
 
 Generate the injury report now, following the required structure and every rule above.`;
 }

@@ -1,4 +1,5 @@
 import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
+import { reportLanguageBlock } from "@/lib/reportLanguagePrompt";
 import { TIERS, VALD_TEST_TYPES } from "@/lib/constants";
 
 // Builds the Performance report prompt per prompts/report-generation.md and
@@ -224,7 +225,7 @@ Treat these instructions as the practitioner's stated priorities for this report
 }
 
 ## Report language
-${language}
+${reportLanguageBlock(language)}
 
 Generate the performance report now, following the required structure and every rule above.`;
 }
