@@ -1484,3 +1484,17 @@ through the single `isClubStaff()` helper in `lib/auth.ts` (its doc block
 carries the ruling); manager-only powers (comments' reflect_in_ai toggle,
 athlete registration, club settings) remain separate explicit checks. See
 `docs/02-roles-and-permissions.md` § Club Manager.
+
+## No new policies: manager invite/removal on existing clubs (2026-08-17)
+
+`app/super-admin/clubs/[clubId]/actions.ts` (invite an additional Club
+Manager to an existing club; remove a manager) required NO migration. Both
+actions are Super-Admin-gated in the app layer and every table write —
+`profiles` insert, `club_staff` insert/delete, `profiles.user_id` patch —
+already falls under the super_admin full-access policies that `createClub`
+has exercised since day one; `inviteUserByEmail` is the usual Auth Admin
+API service-role call. The last-manager guard (a club must always keep at
+least one `club_staff` row with `staff_role = 'club_manager'`) is enforced
+in the server action, not in SQL: it is a business rule about club
+operability, not an access-control boundary, and super_admin RLS could not
+express it anyway.

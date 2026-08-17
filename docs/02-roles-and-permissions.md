@@ -57,7 +57,7 @@ first.
 |---|---|---|
 | Super Admin | Everything | — |
 | Admin | Clubs assigned to them | Super Admin |
-| Club Manager | Their own club (can also be a practitioner) | Super Admin/Admin |
+| Club Manager | Their own club (can also be a practitioner) | Super Admin/Admin — invited with a new club, or added to / removed from an existing club on the Super Admin club page (a club always keeps at least one manager; removal only unlinks the club, it never deletes the account) |
 | Club Practitioner | Team(s) assigned, within their club(s) — can work across multiple clubs simultaneously | Club Manager |
 | Independent Practitioner | Their own guided athletes + approved club-athlete access | Self (invite-only signup) |
 | Club Athlete | Own data, view-only | Club Manager registers them |

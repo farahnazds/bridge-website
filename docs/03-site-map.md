@@ -35,7 +35,10 @@ career, not their login. The two are cross-linked, not merged.
 
 - Overview — clubs, athletes, check-ins today, alerts
 - Clubs — list, staff, subscription dates (start/end), manual
-  stop/resume with "talk to support" message on lockout
+  stop/resume with "talk to support" message on lockout; per-club page
+  also invites additional Club Managers and removes managers (guarded:
+  the last manager of a club can't be removed — invite the replacement
+  first, then remove)
 - Athletes — all, across every club/segment/independent practice
 - Assessments, Compliance, Reports (all, cross-platform)
 - Injury Log / Return to Play

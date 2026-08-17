@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import StopResumePanel from "./StopResumePanel";
+import { InviteManagerForm, RemoveManagerButton } from "./ManagerControls";
 import { BADGE, CARD } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Club — Super Admin — Bridgetx" };
@@ -217,6 +218,7 @@ export default async function SuperAdminClubDetailPage({
                   <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Name</th>
                   <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Role</th>
                   <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Email</th>
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -231,12 +233,22 @@ export default async function SuperAdminClubDetailPage({
                     <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: ".8rem" }}>
                       {s.profiles?.email ?? "—"}
                     </td>
+                    <td className="px-5 py-3 text-right">
+                      {s.staff_role === "club_manager" && (
+                        <RemoveManagerButton
+                          clubId={clubId}
+                          profileId={s.profile_id}
+                          name={`${s.profiles?.first_name ?? ""} ${s.profiles?.last_name ?? ""}`.trim() || "this manager"}
+                        />
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+        <InviteManagerForm clubId={clubId} />
       </div>
     </div>
   );
