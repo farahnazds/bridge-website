@@ -24,6 +24,15 @@ export interface ClinicalLibraryEntry {
   clinical_note: string | null;
 }
 
+/** Per-supplement adherence computed by lib/supplementCompliance.ts — the
+ *  platform's figures, handed to the model as data it must use verbatim. */
+export interface PerSupplementAdherence {
+  supplementName: string;
+  sinceDate: string;
+  observedDays: number;
+  compliancePct: number | null;
+}
+
 export interface CompliancePromptInput {
   athlete: {
     first_name: string;
@@ -40,6 +49,7 @@ export interface CompliancePromptInput {
   allergies: string[];
   intolerances: string[];
   checkins: CheckinRow[];
+  supplementCompliance: PerSupplementAdherence[];
   periodStart: string;
   periodEnd: string;
   clinicalLibraryEntries: ClinicalLibraryEntry[];
@@ -82,7 +92,7 @@ ${audienceDirective(audience)}
 
 Required output structure, in this exact order:
 1. Executive summary
-2. Compliance section — check-in adherence patterns, streaks, gaps, and how supplement-taking, nutrition, hydration, energy, and sleep scores trended across the period
+2. Compliance section — check-in adherence patterns, streaks, gaps, and how supplement-taking, nutrition, hydration, energy, and sleep scores trended across the period. Where the data below carries a per-supplement adherence table, break supplement adherence down by item using exactly those computed figures — never recompute or estimate a per-supplement rate yourself
 3. Compliance-linked analysis — explicitly connect the compliance patterns above to what they likely mean for performance/recovery outcomes. This is a differentiator for this platform — do not skip it just because no other data type (assessments, GPS, etc.) was combined into this report.
 4. Goals for next period
 5. ${recommendationsSection(audience)}
@@ -106,6 +116,7 @@ export function buildCompliancePrompt(input: CompliancePromptInput): string {
     allergies,
     intolerances,
     checkins,
+    supplementCompliance,
     periodStart,
     periodEnd,
     clinicalLibraryEntries,
@@ -140,6 +151,24 @@ export function buildCompliancePrompt(input: CompliancePromptInput): string {
           .join("\n")
       : "None found in the library for this topic — do not cite any source in this report.";
 
+  // Computed by the platform (lib/supplementCompliance.ts), not the model:
+  // per-supplement rates since each supplement's FIRST recommendation date,
+  // over the logged check-in days on which it was recorded.
+  const supplementLines =
+    supplementCompliance.length > 0
+      ? supplementCompliance
+          .map(
+            (s) =>
+              `- ${s.supplementName} | recommended since ${s.sinceDate} | ${
+                s.compliancePct === null
+                  ? "no check-in has recorded this supplement yet"
+                  : `adherence ${s.compliancePct}% across ${s.observedDays} logged check-in day(s)`
+              }`
+          )
+          .join("\n") +
+        "\n\nUse these figures exactly as given. The denominator is logged check-in days on which the supplement was recorded — NOT calendar days — so state that framing when quoting a rate. A day with no check-in is absent data, not a missed dose."
+      : "No supplement protocol rows exist for this athlete, so no per-supplement adherence can be computed. Do not invent one.";
+
   return `## Athlete
 Name: ${athlete.first_name} ${athlete.last_name}
 Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ? TIER_LABEL[athlete.tier] ?? athlete.tier : "not specified"}
@@ -155,6 +184,9 @@ ${periodStart} to ${periodEnd}
 
 ## Check-in data (${checkins.length} entries found)
 ${checkinLines}
+
+## Per-supplement adherence (computed since each supplement's first recommendation date)
+${supplementLines}
 
 ## Previous compliance report (for trend comparison)
 ${previousReportSummary ?? "None — this is the first compliance report generated for this athlete."}

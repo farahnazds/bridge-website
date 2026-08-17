@@ -15,11 +15,13 @@ import type { PlanMode } from "@/lib/supplementPlan";
 import type { AthleteClinicalContext, SupplementLibraryRow } from "@/lib/supplementPlanSafety";
 import { loadVocabularyLabels, vocabularyLabelsFor } from "@/lib/vocabularyLabels";
 import {
+  ageInYears,
   buildNutritionPrompt,
   nutritionSystemPrompt,
   type ConfirmedProtocolLine,
   type PerformanceSignalsContext,
 } from "./nutritionPromptBuilder";
+import { loadEliteBenchmark } from "@/lib/eliteBenchmarks";
 import type { AthletePlanningExtras, PlanDay } from "@/lib/nutritionPlanData";
 import type { PrescriptionContext, ClinicalLibraryEntry } from "./nutritionPromptBuilder";
 
@@ -146,7 +148,14 @@ export async function generateAndSaveNutritionReport(
   // Contraindication codes span all three clinical vocabularies; resolved here
   // so the prompt reads "Milk / Dairy", never "milk_dairy". The raw rows in
   // req.supplementLibrary keep their codes — the safety check needs them.
-  const vocab = await loadVocabularyLabels();
+  // The benchmark feeds the implied-goal fallback in goalSummaryLine — the
+  // Nutrition report never fetched one before that feature existed.
+  const [vocab, benchmark] = await Promise.all([
+    loadVocabularyLabels(),
+    loadEliteBenchmark(req.extras.sport, req.clinical.gender, ageInYears(req.clinical.dob)).catch(
+      () => null
+    ),
+  ]);
 
   const userPrompt = buildNutritionPrompt({
     subMode: req.mode,
@@ -173,6 +182,9 @@ export async function generateAndSaveNutritionReport(
     confirmedProtocol: req.confirmedProtocol,
     activeInjuries: req.extras.activeInjuries,
     performanceSignals,
+    impliedBenchmark: benchmark
+      ? { bodyFatPct: benchmark.body_fat_pct, ageBand: benchmark.age_band, sourceNote: benchmark.source_note }
+      : null,
     prescription: req.prescription,
     supplementLibrary: req.supplementLibrary.map((s) => ({
       name: s.name,

@@ -239,7 +239,8 @@ export async function generateAndStoreReportPdf(
         input.reportType,
         input.athleteId,
         input.periodStart,
-        input.periodEnd
+        input.periodEnd,
+        input.teamId ?? null
       );
       // Header line only — a lookup failure degrades to no team line, never a
       // failed render.

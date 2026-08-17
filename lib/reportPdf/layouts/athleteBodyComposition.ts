@@ -2,6 +2,7 @@ import "server-only";
 import type { Block } from "../layout";
 import { METHOD_LABELS, type AssessmentMethod } from "@/lib/assessmentMethods";
 import { VALIDITY_TIER_LABELS } from "@/lib/constants";
+import type { TeamBodyCompAverages } from "@/lib/teamRosterAverages";
 import { CHART, COLOR } from "../theme";
 import { rasteriseChart } from "../charts";
 import { lineChartSvg, type Point } from "../svgChart";
@@ -49,8 +50,12 @@ export interface AssessmentRow {
 export interface BodyCompositionData {
   /** Newest first. */
   rows: AssessmentRow[];
-  /** From athletes.body_fat_pct goal wiring, when set. */
+  /** From athletes.goal_body_fat_pct, when set. */
   goalBodyFatPct: number | null;
+  /** Current roster averages for the athlete's own team — descriptive
+   *  context, never a target (see lib/teamRosterAverages.ts). Null or a
+   *  single-athlete roster renders no team row. */
+  teamAvg?: TeamBodyCompAverages | null;
 }
 
 function methodLabel(m: AssessmentMethod): string {
@@ -165,6 +170,43 @@ export async function athleteBodyCompositionBlocks(
         )} then ${methodLabel(
           to?.method as AssessmentMethod
         )}). The difference between them is marked ≠ and should not be read as a change in the athlete.`
+      )
+    );
+  }
+
+  // ---- Team context (descriptive averages, never a target) ----
+  // Requires at least two assessed teammates — an "average" of one athlete
+  // (usually this one) is not context. Deliberately NOT titled "Squad
+  // summary": that name is reserved for the deferred squad-report feature
+  // (docs/09-roadmap.md).
+  const teamAvg = data.teamAvg ?? null;
+  if (teamAvg && teamAvg.athleteCount >= 2) {
+    blocks.push(sectionTitle("Team context"));
+    blocks.push(
+      statusRow([
+        {
+          label: "Team avg body fat",
+          value: num(teamAvg.avgBodyFatPct, "%"),
+          sub: "latest scan per teammate",
+          tone: "neutral",
+        },
+        {
+          label: "Team avg lean mass",
+          value: num(teamAvg.avgLeanMassKg, " kg"),
+          sub: "latest scan per teammate",
+          tone: "neutral",
+        },
+        {
+          label: "Teammates assessed",
+          value: String(teamAvg.athleteCount),
+          sub: "this athlete included",
+          tone: "neutral",
+        },
+      ])
+    );
+    blocks.push(
+      callout(
+        "Current roster averages for this athlete's team — descriptive context, not a target or benchmark. Averages span whatever measurement methods the roster uses and are indicative only."
       )
     );
   }

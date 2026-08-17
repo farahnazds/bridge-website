@@ -54,8 +54,13 @@ import {
   bodyCompositionSystemPrompt,
   ageInYears,
   type AssessmentRow,
+  type CompliancePeriodSummary,
   type EliteBenchmark,
 } from "./bodyCompositionPromptBuilder";
+import { getComplianceDetail } from "@/lib/complianceDetail";
+import { getTeamBodyCompAverages } from "@/lib/teamRosterAverages";
+import { loadEliteBenchmark } from "@/lib/eliteBenchmarks";
+import { getSupplementCompliance } from "@/lib/supplementCompliance";
 import {
   buildPerformancePrompt,
   performanceSystemPrompt,
@@ -197,12 +202,20 @@ export async function generateComplianceReport(
       : `No check-in data found for ${periodStart} to ${periodEnd} — the report will note this gap rather than treating it as an error.`;
 
   // ---- Build the prompt (prompts/report-generation.md) ----
+  // Per-supplement adherence since each supplement's first recommendation
+  // date — computed here (lib/supplementCompliance.ts) so the model quotes
+  // real rates instead of estimating them from the raw check-in strings. A
+  // load failure degrades to the "cannot be computed" prompt line, never a
+  // failed generation.
+  const supplementCompliance = await getSupplementCompliance(athleteId).catch(() => []);
+
   const userPrompt = buildCompliancePrompt({
     athlete,
     conditions,
     allergies,
     intolerances,
     checkins,
+    supplementCompliance,
     periodStart,
     periodEnd,
     clinicalLibraryEntries,
@@ -416,20 +429,38 @@ export async function generateBodyCompositionReport(
     }
   }
 
-  // ---- Elite benchmark match: sport (case-insensitive) + gender + age band ----
+  // ---- Elite benchmark match: one shared lookup (lib/eliteBenchmarks.ts) ----
   const age = ageInYears(athlete.dob);
-  let benchmark: EliteBenchmark | null = null;
-  if (age !== null && athlete.gender) {
-    const { data: benchmarkRow } = await supabase
-      .from("elite_benchmarks")
-      .select("age_band, body_fat_pct, lean_mass_ratio, kcal_per_kg_lean_mass, source_note")
-      .ilike("sport", athlete.sport)
-      .eq("gender", athlete.gender)
-      .lte("age_min", age)
-      .gte("age_max", age)
-      .maybeSingle();
-    benchmark = benchmarkRow ?? null;
-  }
+  const [benchmark, complianceDetail, teamAverages]: [
+    EliteBenchmark | null,
+    Awaited<ReturnType<typeof getComplianceDetail>> | null,
+    Awaited<ReturnType<typeof getTeamBodyCompAverages>>,
+  ] = await Promise.all([
+    loadEliteBenchmark(athlete.sport, athlete.gender, age),
+    // Check-in data for the same window, so the Compliance-linked analysis
+    // section works from real figures instead of noting its own starvation.
+    getComplianceDetail(athleteId, { from: periodStart, to: periodEnd }).catch(() => null),
+    // Roster context for the athlete's own team — descriptive averages only,
+    // not the deferred squad-report feature (see lib/teamRosterAverages.ts).
+    getTeamBodyCompAverages(teamId).catch(() => null),
+  ]);
+
+  const metricAvg = (key: "nutrition" | "hydration" | "energy" | "sleep"): number | null =>
+    complianceDetail?.metrics.find((m) => m.key === key)?.average ?? null;
+  const complianceSummary: CompliancePeriodSummary | null = complianceDetail
+    ? {
+        logged: complianceDetail.logged,
+        completed: complianceDetail.completed,
+        skipped: complianceDetail.skipped,
+        rateOfCalendar: complianceDetail.rateOfCalendar,
+        rateOfLogged: complianceDetail.rateOfLogged,
+        longestStreak: complianceDetail.longestStreak,
+        avgNutrition: metricAvg("nutrition"),
+        avgHydration: metricAvg("hydration"),
+        avgEnergy: metricAvg("energy"),
+        avgSleep: metricAvg("sleep"),
+      }
+    : null;
 
   const { data: previousReport } = await supabase
     .from("reports")
@@ -467,6 +498,8 @@ export async function generateBodyCompositionReport(
     assessments,
     usedFallbackAssessment,
     benchmark,
+    compliance: complianceSummary,
+    teamAverages,
     periodStart,
     periodEnd,
     clinicalLibraryEntries,

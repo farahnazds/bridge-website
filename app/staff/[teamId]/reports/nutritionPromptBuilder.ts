@@ -206,6 +206,10 @@ export interface NutritionPromptInput {
   activeInjuries: ActiveInjuryContext[];
   /** null when the practitioner did not tick the toggle — the default. */
   performanceSignals: PerformanceSignalsContext | null;
+  /** Elite-benchmark reference used as the implied body-fat goal when no
+   *  explicit goal is set — see goalSummaryLine() in lib/bodyComposition.ts.
+   *  Null when no benchmark row matches the athlete's sport/gender/age. */
+  impliedBenchmark: { bodyFatPct: number | null; ageBand: string | null; sourceNote: string | null } | null;
   prescription: PrescriptionContext | null;
   supplementLibrary: SupplementLibraryEntry[];
   clinicalLibraryEntries: ClinicalLibraryEntry[];
@@ -279,7 +283,7 @@ Clinical reference rules (docs/07-ai-engine.md):
 - Goal body weight: goal_ffm / (1 - goal_bf/100). The "Body-composition goal and gap to it" section below has already computed this and the gap from the athlete's latest assessment — use those figures rather than recalculating, and never restate them differently.
 - WHERE A GOAL IS SET, anchor the energy and macro recommendations to the GAP, not to maintenance. State the direction and size of the gap, say roughly what rate of change is appropriate, and make the calorie and protein targets follow from it — a 2 kg fat-loss gap and a 6 kg lean-gain gap are different prescriptions, and a report that ignores the gap while a goal exists has failed its main job.
 - Never prescribe an aggressive deficit for an athlete already at or past their body-fat goal, and check any deficit against the RED-S guidance below before recommending it.
-- WHERE NO GOAL IS SET, say so plainly and recommend that the practitioner set one. Do not invent a target, and do not present current values as though they were on target.
+- WHERE NO GOAL IS SET, the "Body-composition goal and gap to it" section below may supply an IMPLIED body-fat reference drawn from the elite benchmark for this athlete's sport/gender/age band. Use it only as that section instructs: body-fat context ONLY — never derive an energy target, a macro figure, a deficit, or a lean-mass target from it — always labelled as an implied, unvalidated elite-benchmark reference rather than a practitioner-set goal, and still recommend the practitioner set an explicit goal. Where no implied reference exists either, say so plainly. Never invent a target, and never present current values as though they were on target.
 - Age, diet preference and declared conditions filter what may be recommended at all.
 - Where cultural or seasonal context is relevant (regional heat, travel), apply it to timing and hydration guidance.
 - FOOD EXAMPLES default to widely available, globally recognisable foods (oats, rice, eggs, chicken, yoghurt, bananas, pasta). Use culturally or regionally specific foods (Arabic flatbread, dates, and the like) ONLY when the athlete's recorded context makes them relevant — their ethnicity, a Ramadan season phase, or the practitioner's instructions — never as a default. The platform does not record the athlete's location, so do not assume one.
@@ -507,7 +511,8 @@ DATA GAP — state this plainly in the report: this platform does not record the
     latestAssessment
       ? { bodyFatPct: latestAssessment.body_fat_pct, leanMassKg: latestAssessment.lean_mass_kg, weightKg: latestAssessment.weight_kg }
       : null,
-    { goalBodyFatPct: athlete.goal_body_fat_pct, goalLeanMassKg: athlete.goal_lean_mass_kg }
+    { goalBodyFatPct: athlete.goal_body_fat_pct, goalLeanMassKg: athlete.goal_lean_mass_kg },
+    input.impliedBenchmark
   );
 
   // Every day in the range, including the ones with nothing logged. A day with

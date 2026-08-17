@@ -1,6 +1,7 @@
 import "server-only";
 import type { Block } from "../layout";
 import type { ComplianceDetailData, ComplianceRow } from "@/lib/complianceDetail";
+import type { SupplementComplianceRow } from "@/lib/supplementCompliance";
 import { SUPPLEMENT_STATE_WEIGHT, parseSupplements } from "@/lib/checkin";
 import { CHART, COLOR } from "../theme";
 import { rasteriseChart } from "../charts";
@@ -119,7 +120,11 @@ export async function athleteComplianceBlocks(
   identity: ReportIdentity,
   narrative: Narrative,
   citations: Citation[],
-  contentWidth: number
+  contentWidth: number,
+  /** Per-supplement adherence since first recommendation (lib/
+   *  supplementCompliance.ts). Defaulted so older callers keep compiling;
+   *  empty renders no table. */
+  supplementCompliance: SupplementComplianceRow[] = []
 ): Promise<Block[]> {
   const blocks: Block[] = [];
   const adherence = supplementAdherence(data.rows);
@@ -256,6 +261,33 @@ export async function athleteComplianceBlocks(
         )
       );
     }
+  }
+
+  // ---- Supplement adherence by item ----
+  // Computed since each supplement's FIRST recommendation date, over the
+  // logged check-in days it was recorded on (lib/supplementCompliance.ts) —
+  // the breakdown behind the single "Supplement adherence" card above. Omits
+  // entirely when the athlete has no protocol rows.
+  if (supplementCompliance.length > 0) {
+    blocks.push(sectionTitle("Supplement adherence by item"));
+    blocks.push(
+      table({
+        head: ["Supplement", "Recommended since", "Logged days", "Adherence"],
+        weights: [1.7, 1.2, 0.9, 0.9],
+        numeric: [2, 3],
+        rows: supplementCompliance.map((s) => [
+          s.supplementName,
+          shortDate(s.sinceDate),
+          String(s.observedDays),
+          s.compliancePct === null ? "—" : `${s.compliancePct}%`,
+        ]),
+      })
+    );
+    blocks.push(
+      callout(
+        "Adherence runs from each supplement's first recommendation date, over the check-in days it was recorded on. A day with no check-in is absent data, not a missed dose."
+      )
+    );
   }
 
   // ---- Rx strip ----

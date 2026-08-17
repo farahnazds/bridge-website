@@ -39,6 +39,30 @@ export interface ClinicalLibraryEntry {
   clinical_note: string | null;
 }
 
+/** Period check-in figures, pre-computed by the caller from
+ *  lib/complianceDetail.ts — the Compliance-linked analysis section reads
+ *  these instead of noting its own data's absence. */
+export interface CompliancePeriodSummary {
+  logged: number;
+  completed: number;
+  skipped: number;
+  rateOfCalendar: number | null;
+  rateOfLogged: number | null;
+  longestStreak: number;
+  avgNutrition: number | null;
+  avgHydration: number | null;
+  avgEnergy: number | null;
+  avgSleep: number | null;
+}
+
+/** Current roster averages for the athlete's own team — descriptive context,
+ *  computed by lib/teamRosterAverages.ts. */
+export interface TeamRosterAveragesInput {
+  athleteCount: number;
+  avgBodyFatPct: number | null;
+  avgLeanMassKg: number | null;
+}
+
 export interface BodyCompositionPromptInput {
   athlete: {
     first_name: string;
@@ -59,6 +83,8 @@ export interface BodyCompositionPromptInput {
   assessments: AssessmentRow[];
   usedFallbackAssessment: boolean;
   benchmark: EliteBenchmark | null;
+  compliance: CompliancePeriodSummary | null;
+  teamAverages: TeamRosterAveragesInput | null;
   periodStart: string;
   periodEnd: string;
   clinicalLibraryEntries: ClinicalLibraryEntry[];
@@ -115,7 +141,7 @@ ${audienceDirective(audience)}
 Required output structure, in this exact order:
 1. Executive summary
 2. Body Composition section — current numbers, how they compare against the athlete's own history (trend across the assessments provided), and how they compare against the elite benchmark for their sport/gender/age band IF a benchmark was provided in the data below. If no benchmark was provided, say plainly that elite benchmark data isn't yet available for this athlete's sport/gender/age combination — never treat that as an error, and never invent a benchmark number.
-3. Compliance-linked analysis — if compliance/check-in data isn't part of this report's input, note briefly that a combined Compliance report would strengthen this analysis, without fabricating any check-in data
+3. Compliance-linked analysis — the data below includes a check-in/compliance summary for this period. Correlate it with the body-composition trend: whether the direction of change is consistent with the athlete's check-in rate and nutrition/hydration/energy/sleep averages over the same window. Coincidence is not causation — say "is consistent with" or "coincides with", never "caused". Where the summary shows no check-ins for the period, state that plainly and keep the section brief; never fabricate check-in data
 4. Goals for next period
 5. ${recommendationsSection(audience)}
 
@@ -127,7 +153,12 @@ Elite benchmark handling — hard rules:
 - If no benchmark row is provided, do not estimate or fabricate one — state the gap plainly instead.
 - The athlete's OWN goal is separate from the elite benchmark and matters more. Where a goal is set, the "Body-composition goal and gap to it" section gives the target body fat, target lean mass, derived goal body weight, and the gap from the latest assessment — all already computed. Use those figures rather than recalculating, and make the trend analysis and the "Goals for next period" section follow from that gap: how far off the athlete is, in which direction, and whether the trend across the assessments provided is moving toward or away from it.
 - Distinguish the two comparisons explicitly. An athlete can sit below the elite benchmark yet above their own goal, or the reverse; do not merge them into a single verdict.
-- Where no goal is set, say so plainly and recommend the practitioner set one. Never invent a target, and never present current values as though they were on target.
+- Where no goal is set, the "Body-composition goal and gap to it" section below may supply an IMPLIED body-fat reference drawn from the elite benchmark. Use it exactly as that section instructs: body fat only, always labelled as an implied, unvalidated elite-benchmark reference rather than a practitioner-set goal, and still recommend the practitioner set an explicit goal. Where neither an explicit goal nor an implied reference exists, say so plainly. Never invent a target, and never present current values as though they were on target.
+
+Team-average context — rules:
+- The "Team context" section below, when present, gives the CURRENT roster averages for the athlete's own team (latest assessment per teammate). Use it for one or two sentences of context on where this athlete sits within their squad — nothing more.
+- It is a descriptive average of teammates, not a target and not a benchmark: never treat deviation from it as a deficit or a goal, and never merge it with the elite benchmark or the athlete's own goal — three different comparisons, kept separate.
+- The averages span whatever measurement methods the roster happens to use; treat them as indicative context only.
 
 Measurement method — hard rules. Every assessment below is labelled with the METHOD that produced it, and the methods are not interchangeable:
 - NEVER present values from different methods as a continuous trend without saying so explicitly. A DEXA scan and a bioelectrical impedance reading measure different things by different means; a change between two assessments taken on different instruments may be an instrument difference rather than a change in the athlete. Where consecutive assessments use different methods, say that plainly and treat the comparison as indicative, not as a measured change.
@@ -156,6 +187,8 @@ export function buildBodyCompositionPrompt(input: BodyCompositionPromptInput): s
     assessments,
     usedFallbackAssessment,
     benchmark,
+    compliance,
+    teamAverages,
     periodStart,
     periodEnd,
     clinicalLibraryEntries,
@@ -196,6 +229,31 @@ Elite kcal/kg lean mass: ${benchmark.kcal_per_kg_lean_mass ?? "—"}
 Source note: ${benchmark.source_note ?? "—"}`
     : "No elite benchmark row found for this athlete's sport/gender/age-band combination — do not fabricate one; state the gap plainly in the report.";
 
+  // Figures computed by the platform, never by the model. A period with no
+  // check-ins renders as an explicit statement rather than an absent section,
+  // so the model states the gap instead of inventing adherence.
+  const scoreOr = (v: number | null, unit = "/10") => (v === null ? "not recorded" : `${v}${unit}`);
+  const complianceBlock = compliance
+    ? compliance.logged === 0
+      ? "No check-ins were logged in this period. State that plainly in the Compliance-linked analysis section and keep it brief — absent data is absent, not zero compliance."
+      : `Check-ins logged: ${compliance.logged} (${compliance.completed} completed, ${compliance.skipped} skipped)
+Check-in rate: ${compliance.rateOfCalendar !== null ? `${compliance.rateOfCalendar}% of calendar days` : "calendar rate unavailable"}${
+          compliance.rateOfLogged !== null ? ` | ${compliance.rateOfLogged}% of logged days completed` : ""
+        }
+Longest daily streak: ${compliance.longestStreak} day(s)
+Period averages — nutrition: ${scoreOr(compliance.avgNutrition)} | hydration: ${scoreOr(compliance.avgHydration)} | energy: ${scoreOr(compliance.avgEnergy)} | sleep: ${scoreOr(compliance.avgSleep)}
+These figures are computed by the platform from the athlete's daily check-ins over exactly this report period. Use them as given — never recompute, extrapolate, or fill gaps.`
+    : "Check-in data could not be loaded for this report. Say so plainly in the Compliance-linked analysis section; do not fabricate any check-in figure.";
+
+  const teamBlock = teamAverages
+    ? teamAverages.athleteCount >= 2
+      ? `Current roster averages for this athlete's team, from each teammate's latest assessment (${teamAverages.athleteCount} athletes assessed, this athlete included):
+Average body fat: ${teamAverages.avgBodyFatPct !== null ? `${teamAverages.avgBodyFatPct}%` : "not available"}
+Average lean mass: ${teamAverages.avgLeanMassKg !== null ? `${teamAverages.avgLeanMassKg} kg` : "not available"}
+Descriptive context only — apply the team-average rules from the system prompt.`
+      : "Not enough assessed teammates to form a meaningful roster average (fewer than two). Omit team comparison from the report rather than comparing against a single data point."
+    : "Team roster averages are not available for this report. Omit team comparison rather than estimating one.";
+
   const libraryLines =
     clinicalLibraryEntries.length > 0
       ? clinicalLibraryEntries
@@ -212,7 +270,13 @@ Source note: ${benchmark.source_note ?? "—"}`
   const newest = [...assessments].sort((a, b) => (a.date < b.date ? 1 : -1))[0] ?? null;
   const goalBlock = goalSummaryLine(
     newest ? { bodyFatPct: newest.body_fat_pct, leanMassKg: newest.lean_mass_kg, weightKg: newest.weight_kg } : null,
-    { goalBodyFatPct: athlete.goal_body_fat_pct, goalLeanMassKg: athlete.goal_lean_mass_kg }
+    { goalBodyFatPct: athlete.goal_body_fat_pct, goalLeanMassKg: athlete.goal_lean_mass_kg },
+    // The implied-goal fallback (owner-approved 2026-08-17): body-fat-only,
+    // labelled unvalidated, fires only when no explicit goal exists — the
+    // rules ride inside the returned line itself.
+    benchmark
+      ? { bodyFatPct: benchmark.body_fat_pct, ageBand: benchmark.age_band, sourceNote: benchmark.source_note }
+      : null
   );
 
   return `## Athlete
@@ -236,6 +300,12 @@ ${assessmentLines}${fallbackNote}
 
 ## Elite benchmark for this athlete's sport/gender/age band
 ${benchmarkBlock}
+
+## Check-in / compliance summary for this period
+${complianceBlock}
+
+## Team context — current roster averages (athlete's own team)
+${teamBlock}
 
 ## Previous body composition report (for trend comparison)
 ${previousReportSummary ?? "None — this is the first body composition report generated for this athlete."}

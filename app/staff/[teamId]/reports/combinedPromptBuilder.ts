@@ -142,7 +142,16 @@ ${goalSummaryLine(
             weightKg: bundle.assessments[bundle.assessments.length - 1].weight_kg,
           }
         : null,
-    { goalBodyFatPct: a.goal_body_fat_pct, goalLeanMassKg: a.goal_lean_mass_kg }
+    { goalBodyFatPct: a.goal_body_fat_pct, goalLeanMassKg: a.goal_lean_mass_kg },
+    // Implied-goal fallback (owner-approved 2026-08-17): body-fat-only,
+    // labelled unvalidated; the usage rules ride inside the returned line.
+    bundle.benchmark
+      ? {
+          bodyFatPct: bundle.benchmark.body_fat_pct,
+          ageBand: bundle.benchmark.age_band,
+          sourceNote: bundle.benchmark.source_note,
+        }
+      : null
   )}
 
 ## Report period

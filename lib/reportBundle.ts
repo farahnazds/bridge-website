@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getClinicalLibraryEntries } from "@/lib/clinicalLibrary";
+import { loadEliteBenchmark } from "@/lib/eliteBenchmarks";
 import { loadVocabularyLabels, vocabularyLabelsFor } from "@/lib/vocabularyLabels";
 import { type ReportType } from "@/lib/reportTypes";
 
@@ -177,18 +178,13 @@ export async function getReportBundle(
         usedFallbackAssessment = true;
       }
     }
-    const age = ageInYears(athlete.dob);
-    if (age !== null && athlete.gender) {
-      const { data: row } = await supabase
-        .from("elite_benchmarks")
-        .select("age_band, body_fat_pct, lean_mass_ratio, kcal_per_kg_lean_mass, source_note")
-        .ilike("sport", athlete.sport)
-        .eq("gender", athlete.gender)
-        .lte("age_min", age)
-        .gte("age_max", age)
-        .maybeSingle();
-      benchmark = (row ?? null) as EliteBenchmark | null;
-    }
+    // One shared lookup — see lib/eliteBenchmarks.ts. This was the second of
+    // two hand-copied benchmark queries; the match rule now lives once.
+    benchmark = (await loadEliteBenchmark(
+      athlete.sport,
+      athlete.gender,
+      ageInYears(athlete.dob)
+    )) as EliteBenchmark | null;
     notes.push(
       assessments.length === 0
         ? "Body composition: no assessment on file."

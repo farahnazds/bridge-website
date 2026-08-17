@@ -1,6 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getComplianceDetail, type ComplianceDetailData } from "@/lib/complianceDetail";
+import { getSupplementCompliance, type SupplementComplianceRow } from "@/lib/supplementCompliance";
+import { getTeamBodyCompAverages, type TeamBodyCompAverages } from "@/lib/teamRosterAverages";
 import type { AssessmentMethod } from "@/lib/assessmentMethods";
 import type { ReportType } from "@/lib/reportTypes";
 import type { AssessmentRow } from "./layouts/athleteBodyComposition";
@@ -36,7 +38,13 @@ import type { Citation } from "./model";
 
 export interface MeasuredData {
   compliance?: ComplianceDetailData;
+  /** Per-supplement adherence since first recommendation — compliance only. */
+  supplementCompliance?: SupplementComplianceRow[];
   assessments?: AssessmentRow[];
+  /** Body-composition extras: the athlete's stored goal (previously hardcoded
+   *  to null in render.ts — the "Goal body fat: Not set" defect) and the team
+   *  roster averages for context. */
+  bodyComp?: { goalBodyFatPct: number | null; teamAvg: TeamBodyCompAverages | null };
   gps?: GpsRow[];
   vald?: ValdRow[];
   injuries?: InjuryRow[];
@@ -96,20 +104,37 @@ export async function assembleMeasured(
   reportType: ReportType,
   athleteId: string,
   periodStart: string | null,
-  periodEnd: string | null
+  periodEnd: string | null,
+  /** For the body-composition team-context cards; null renders no team row. */
+  teamId: string | null = null
 ): Promise<MeasuredData> {
   const supabase = await createClient();
   const citations = await loadCitations();
 
   if (reportType === "compliance") {
-    return {
-      compliance: await getComplianceDetail(athleteId, windowFor(periodStart, periodEnd)),
-      citations,
-    };
+    const [compliance, supplementCompliance] = await Promise.all([
+      getComplianceDetail(athleteId, windowFor(periodStart, periodEnd)),
+      // Degrades to no table, never a failed render — same stance as every
+      // other optional read in this module.
+      getSupplementCompliance(athleteId).catch(() => []),
+    ]);
+    return { compliance, supplementCompliance, citations };
   }
 
   if (reportType === "body_composition") {
-    return { assessments: await loadAssessments(athleteId), citations };
+    const [assessments, { data: athleteRow }, teamAvg] = await Promise.all([
+      loadAssessments(athleteId),
+      supabase.from("athletes").select("goal_body_fat_pct").eq("id", athleteId).maybeSingle(),
+      teamId ? getTeamBodyCompAverages(teamId).catch(() => null) : Promise.resolve(null),
+    ]);
+    return {
+      assessments,
+      bodyComp: {
+        goalBodyFatPct: (athleteRow?.goal_body_fat_pct as number | null) ?? null,
+        teamAvg,
+      },
+      citations,
+    };
   }
 
   if (reportType === "performance") {

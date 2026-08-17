@@ -42,17 +42,55 @@ export function gap(current: number | null | undefined, goal: number | null | un
 }
 
 /**
+ * An elite-benchmark reference used as the IMPLIED goal when no explicit goal
+ * exists (owner-approved 2026-08-17). Deliberately body-fat-only: the
+ * benchmark's lean_mass_ratio is a fraction of body mass, so deriving a
+ * lean-mass or body-weight target from it would circle through the athlete's
+ * CURRENT weight — a target derived from the thing it is meant to move.
+ */
+export interface ImpliedBenchmarkRef {
+  bodyFatPct: number | null;
+  ageBand: string | null;
+  sourceNote: string | null;
+}
+
+/**
  * One line describing where the athlete sits against their goal, for use in
  * prompts. Deliberately states what is missing rather than omitting the line,
  * so the model never reads silence as "on target".
+ *
+ * When no explicit goal exists and an `impliedBenchmark` with a body-fat value
+ * is supplied, the line falls back to it as an implied BODY-FAT-ONLY reference
+ * — always labelled as an unvalidated elite-benchmark reference, never as a
+ * practitioner-set goal, with the usage rules embedded in the line itself so
+ * every caller's prompt carries them identically.
  */
 export function goalSummaryLine(
   current: { bodyFatPct: number | null; leanMassKg: number | null; weightKg: number | null } | null,
-  goal: BodyCompositionGoal
+  goal: BodyCompositionGoal,
+  impliedBenchmark?: ImpliedBenchmarkRef | null
 ): string {
   const target = goalBodyWeightKg(goal);
   if (goal.goalBodyFatPct === null && goal.goalLeanMassKg === null) {
-    return "No body-composition goal has been set for this athlete. Do not invent one, and do not present current values as though they were on target.";
+    if (impliedBenchmark && impliedBenchmark.bodyFatPct !== null) {
+      const bfGap = gap(current?.bodyFatPct ?? null, impliedBenchmark.bodyFatPct);
+      const gapLine =
+        bfGap === null
+          ? "No current body-fat value is available to compare against it — say so rather than estimating."
+          : bfGap === 0
+            ? "Current body fat sits exactly at that reference."
+            : `Current body fat sits ${Math.abs(bfGap)} pts ${bfGap > 0 ? "above" : "below"} that reference.`;
+      return [
+        "No body-composition goal has been set by the practitioner.",
+        `IMPLIED REFERENCE (automatic fallback): use the elite benchmark for this athlete's sport/gender/age band${
+          impliedBenchmark.ageBand ? ` (age band ${impliedBenchmark.ageBand})` : ""
+        } as the implied body-fat reference: ${impliedBenchmark.bodyFatPct}%.`,
+        gapLine,
+        "Rules for this implied reference — not negotiable: it applies to BODY FAT ONLY. Never derive a lean-mass target, a goal body weight, or an energy/calorie prescription from it. Every time it is used, label it as an implied reference drawn from elite benchmarks — a starting reference value, not clinically validated for this platform and NOT a practitioner-set goal — and recommend the practitioner set an explicit goal." +
+          (impliedBenchmark.sourceNote ? ` Source note: ${impliedBenchmark.sourceNote}` : ""),
+      ].join("\n");
+    }
+    return "No body-composition goal has been set for this athlete, and no elite benchmark is available for their sport/gender/age band to imply one. Do not invent one, and do not present current values as though they were on target.";
   }
   const parts: string[] = [];
   parts.push(

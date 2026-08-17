@@ -55,11 +55,18 @@ function blocksFor(input: RenderReportInput): Block[] | Promise<Block[]> {
         identity,
         narrative,
         citations,
-        CONTENT_WIDTH
+        CONTENT_WIDTH,
+        measured.supplementCompliance ?? []
       );
     case "body_composition":
       return athleteBodyCompositionBlocks(
-        { rows: measured.assessments ?? [], goalBodyFatPct: null },
+        {
+          rows: measured.assessments ?? [],
+          // Previously hardcoded null, so the "Goal body fat" card read
+          // "Not set" even for athletes with a stored goal.
+          goalBodyFatPct: measured.bodyComp?.goalBodyFatPct ?? null,
+          teamAvg: measured.bodyComp?.teamAvg ?? null,
+        },
         identity,
         narrative,
         citations,
