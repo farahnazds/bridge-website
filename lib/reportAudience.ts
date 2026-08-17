@@ -57,6 +57,28 @@ function isSupported(value: string): value is ReportAudience {
 }
 
 /**
+ * The recommendations entry of every report's required structure, by audience.
+ *
+ * The 2026-08-17 audit found every report type printing a practitioner-
+ * addressed recommendations section into athlete-audience documents — the one
+ * section of the structure that is BY DEFINITION addressed to a specific
+ * reader. The clinical content rule below is unchanged: the same actions are
+ * listed either way, at full accuracy. What changes is who the sentence is
+ * addressed to — an athlete document says "do X because Y", a practitioner
+ * document says "have the athlete do X because Y".
+ *
+ * The athlete heading is "Your next steps", which lib/reportPdf/narrative.ts
+ * already routes into the recommendations slot via its "next step" synonym —
+ * no parser change needed, and stored practitioner-audience reports keep
+ * parsing exactly as before.
+ */
+export function recommendationsSection(audience: ReportAudience): string {
+  return audience === "athlete"
+    ? `Your next steps — the same actions a practitioner-facing report would recommend, at the same clinical accuracy, but addressed to the athlete: what to do next and why it matters to them. One sentence per item. Never title this section "Practitioner recommendations", and never address items to the practitioner.`
+    : `Practitioner recommendations`;
+}
+
+/**
  * Resolved SERVER-SIDE in every report action, not trusted from the form.
  *
  * A server action is independently addressable, so a request that omits the

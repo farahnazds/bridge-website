@@ -1,4 +1,4 @@
-import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
 import { TIERS, VALD_TEST_TYPES } from "@/lib/constants";
 
 // Builds the Performance report prompt per prompts/report-generation.md and
@@ -100,7 +100,7 @@ Required output structure, in this exact order:
 3. Neuromuscular (VALD) — test results across the period, per test type, and specifically the ASYMMETRY trend. Asymmetry is the number most worth watching over time: say plainly whether it is rising, falling or stable, and what that does or does not support concluding.
 4. Combined interpretation — read the two together. This is the section that justifies the report existing: relate external load to neuromuscular response (for example, whether a spike in high-speed distance or player load is followed by a change in asymmetry or test scores). If only ONE data source is present, say so plainly and give the single-source interpretation instead — do NOT invent the missing half, and do NOT imply a relationship you cannot observe.
 5. Goals for next period
-6. Practitioner recommendations
+6. ${recommendationsSection(audience)}
 
 LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 

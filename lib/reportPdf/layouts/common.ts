@@ -29,6 +29,16 @@ export function summaryHeading(identity: ReportIdentity): string {
   return identity.audience === "athlete" ? "What this means for you" : "Interpretation summary";
 }
 
+/**
+ * The recommendations heading, by audience — the layout half of the prompt
+ * rule in lib/reportAudience.ts recommendationsSection(). An athlete document
+ * never prints a panel titled "Practitioner recommendations": the content is
+ * the same actions, addressed to the reader the document is for.
+ */
+export function recommendationsHeading(identity: ReportIdentity): string {
+  return identity.audience === "athlete" ? "Your next steps" : "Practitioner recommendations";
+}
+
 export function shortDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
@@ -105,6 +115,7 @@ export function prescriberBlocks(identity: ReportIdentity): Block[] {
  */
 export function narrativeTail(
   narrative: Narrative,
+  identity: ReportIdentity,
   interpretationTitle = "Interpretation",
   opts?: {
     /** Nutrition drops its Recommendations section per the 2026-08-16 design
@@ -123,7 +134,7 @@ export function narrativeTail(
       out.push(interp(n.title, capSentences(n.body, MAX_NARRATIVE_SENTENCES), n.tone));
   }
   if (includeRecommendations && narrative.recommendations.length > 0) {
-    out.push(sectionTitle("Recommendations"));
+    out.push(sectionTitle(recommendationsHeading(identity)));
     narrative.recommendations.forEach((r, i) =>
       out.push(recItem(i + 1, capSentences(r, MAX_NARRATIVE_SENTENCES)))
     );

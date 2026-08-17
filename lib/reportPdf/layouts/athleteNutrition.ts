@@ -462,7 +462,7 @@ export function athleteNutritionBlocks(
     ),
   };
   blocks.push(
-    ...narrativeTail(clampedNarrative, "Performance interpretation", {
+    ...narrativeTail(clampedNarrative, identity, "Performance interpretation", {
       includeRecommendations: false,
     })
   );

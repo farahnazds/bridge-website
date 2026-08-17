@@ -292,6 +292,10 @@ export async function generateAndStoreReportPdf(
     }
   }
 
+  // Captured BEFORE the fallback below can populate `bytes`: true only when
+  // the structured path actually produced the file.
+  const usedStructured = bytes !== null;
+
   if (bytes === null) {
     try {
       bytes = await renderReportPdf(input.markdown, branding, meta);
@@ -316,11 +320,18 @@ export async function generateAndStoreReportPdf(
   // persisted rather than surfaced once in a transient note. Established the
   // hard way on 2026-08-15, when answering "which renderer produced this
   // PDF?" meant fingerprinting decoded content streams.
+  //
+  // `usedStructured`, not `!fellBack`: a combined report (no reportType) skips
+  // the structured attempt entirely, so fellBack stays null even though the
+  // legacy renderer produced the file. Keying on fellBack recorded every
+  // combined PDF as "structured" — the provenance defect found 2026-08-17.
+  // A deliberate skip records "fallback" with a null reason, which is the
+  // honest state: legacy renderer, no error.
   const { error: updateError } = await supabase
     .from("reports")
     .update({
       file_url: path,
-      renderer: fellBack ? "fallback" : "structured",
+      renderer: usedStructured ? "structured" : "fallback",
       render_fallback_reason: fellBack,
     })
     .eq("id", input.reportId);

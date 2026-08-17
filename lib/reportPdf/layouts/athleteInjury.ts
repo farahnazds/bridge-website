@@ -123,7 +123,7 @@ export function athleteInjuryBlocks(
         "No injury is recorded for this athlete. Nothing here is inferred — an empty injury log means no entry exists, which is not the same as a confirmed clean bill of health."
       )
     );
-    blocks.push(...narrativeTail(narrative, "Interpretation"));
+    blocks.push(...narrativeTail(narrative, identity, "Interpretation"));
     blocks.push(...sourcesBlocks(citations));
     blocks.push(...bannerBlocks(identity));
     return blocks;
@@ -242,7 +242,7 @@ export function athleteInjuryBlocks(
   }
 
   blocks.push(...prescriberBlocks(identity));
-  blocks.push(...narrativeTail(narrative, "Interpretation"));
+  blocks.push(...narrativeTail(narrative, identity, "Interpretation"));
 
   blocks.push(
     summaryBar([

@@ -245,7 +245,7 @@ export async function athletePerformanceBlocks(
   }
 
   blocks.push(...prescriberBlocks(identity));
-  blocks.push(...narrativeTail(narrative, "Performance interpretation"));
+  blocks.push(...narrativeTail(narrative, identity, "Performance interpretation"));
 
   blocks.push(
     summaryBar([

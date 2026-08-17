@@ -261,7 +261,7 @@ THE CONFIRMED PROTOCOL IS ALREADY DECIDED — read this before anything else.
 A practitioner has already reviewed, edited where they wanted to, and CONFIRMED this athlete's supplement protocol. It appears below under "Confirmed supplement protocol", and it has already been written to the athlete's record. Your supplement section REPORTS that decision; it does not make one.
 
 - Every supplement, dose, timing and date window in your supplement section must come from that list, exactly as given. Do not change a dose, do not move a timing, do not add a supplement that is not on it, and do not drop one that is.
-- Where a supplement the athlete might be expected to take is ABSENT from the list, that is the practitioner's decision. Do not campaign for it, and do not describe it as an oversight. If there is a genuine clinical point to make, put it under "Practitioner recommendations" as a suggestion for a future review, never in the prescription section.
+- Where a supplement the athlete might be expected to take is ABSENT from the list, that is the practitioner's decision. Do not campaign for it, and do not describe it as an oversight. If there is a genuine clinical point to make, fold it into the "Goals for next period" section as a point for the practitioner's next review, never into the prescription section. (This report has NO recommendations section — see the required structure — so a point placed anywhere else is discarded by the renderer.)
 - Explain and contextualise what was confirmed: why each item fits this athlete and this period, how to take it, what to watch for. That is the value this report adds.
 - If the confirmed list is empty, say plainly that no supplement protocol was confirmed for this period and write the rest of the report normally.
 
@@ -547,7 +547,7 @@ DATA GAP — state this plainly in the report: this platform does not record the
   // model to reinterpret.
   const confirmedBlock =
     confirmedProtocol.length === 0
-      ? "The practitioner confirmed NO supplements for this period. Say so plainly in the supplement section and prescribe nothing. Any clinical suggestion belongs under Practitioner recommendations as a point for the next review."
+      ? "The practitioner confirmed NO supplements for this period. Say so plainly in the supplement section and prescribe nothing. Any clinical suggestion belongs in the \"Goals for next period\" section as a point for the next review — this report has no recommendations section, and content placed in one is discarded."
       : confirmedProtocol
           .map(
             (c) =>
@@ -564,7 +564,7 @@ DATA GAP — state this plainly in the report: this platform does not record the
         (coverageGaps && coverageGaps.length > 0
           ? `\n\nCOVERAGE GAPS — the confirmed protocol does NOT cover every day of this report's period. No supplement row covers: ${coverageGaps.join(
               "; "
-            )}. State this plainly in the supplement section. Do not fill a gap with a recommendation, do not extend any window to cover it, and do not present the plan as continuous. If a gap matters clinically, raise it under Practitioner recommendations as a point for the next planning session.`
+            )}. State this plainly in the supplement section. Do not fill a gap with a recommendation, do not extend any window to cover it, and do not present the plan as continuous. If a gap matters clinically, raise it in the "Goals for next period" section as a point for the next planning session — this report has no recommendations section, and content placed in one is discarded.`
           : "");
 
   const prescriptionBlock = prescription

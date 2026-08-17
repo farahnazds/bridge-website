@@ -1397,10 +1397,14 @@ export async function generateCombinedReport(
   }
 
   // Same branded pipeline as individual reports; only the title differs.
+  // No reportType — combined has no single structured layout and deliberately
+  // takes the legacy renderer — but audience still travels with the input so
+  // the document's register is recorded wherever the pipeline reads it.
   const pdf = await generateAndStoreReportPdf({
     reportId: insertedReport.id,
     athleteId,
     teamId,
+    audience,
     markdown: reportText,
     reportTypeLabel: types.map((t) => REPORT_TYPE_LABELS[t] ?? t).join(" + "),
     athleteName: `${bundle.athlete.first_name} ${bundle.athlete.last_name}`,

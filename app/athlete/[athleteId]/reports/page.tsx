@@ -24,12 +24,22 @@ export default async function MyReportsPage() {
   // practitioner history (mean ~10KB per report, fetched on expand instead via
   // /api/reports/[reportId]/summary). An athlete accumulates reports for as
   // long as they are with a club, so this list grows without a natural ceiling.
+  //
+  // AUDIENCE FILTER (2026-08-17 audience-boundary fix, owner-approved): this
+  // list shows only athlete-audience documents — the same filter the dashboard
+  // tile has always applied (app/athlete/[athleteId]/page.tsx). Before this,
+  // a practitioner-register report shared with the athlete surfaced here and
+  // its raw markdown — "Practitioner recommendations" heading included — was
+  // readable on expand. A practitioner-audience document a practitioner wants
+  // an athlete to see is talked through in person per docs/02; it is not
+  // self-serve reading.
   const { data: reportRows, error } = await supabase
     .from("reports")
     .select(
       "id, report_types, athlete_ids, audience, report_period_start, report_period_end, is_official, shared_with, generated_by, created_at, file_url, generator:profiles!generated_by(first_name, last_name)"
     )
     .contains("shared_with", [profile.id])
+    .eq("audience", "athlete")
     .order("created_at", { ascending: false });
 
   const reports: MyReportEntry[] = (reportRows ?? []).map((r) => ({

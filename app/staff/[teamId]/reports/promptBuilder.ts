@@ -1,4 +1,4 @@
-import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
 import { DIET_PREFERENCES, TIERS } from "@/lib/constants";
 
 // Builds the Compliance report prompt exactly per prompts/report-generation.md
@@ -85,7 +85,7 @@ Required output structure, in this exact order:
 2. Compliance section — check-in adherence patterns, streaks, gaps, and how supplement-taking, nutrition, hydration, energy, and sleep scores trended across the period
 3. Compliance-linked analysis — explicitly connect the compliance patterns above to what they likely mean for performance/recovery outcomes. This is a differentiator for this platform — do not skip it just because no other data type (assessments, GPS, etc.) was combined into this report.
 4. Goals for next period
-5. Practitioner recommendations
+5. ${recommendationsSection(audience)}
 
 LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 

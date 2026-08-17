@@ -1,4 +1,4 @@
-import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
 import { DIET_PREFERENCES, TIERS, VALIDITY_TIER_LABELS } from "@/lib/constants";
 import { goalSummaryLine } from "@/lib/bodyComposition";
 // Builds the Body Composition report prompt exactly per
@@ -117,7 +117,7 @@ Required output structure, in this exact order:
 2. Body Composition section — current numbers, how they compare against the athlete's own history (trend across the assessments provided), and how they compare against the elite benchmark for their sport/gender/age band IF a benchmark was provided in the data below. If no benchmark was provided, say plainly that elite benchmark data isn't yet available for this athlete's sport/gender/age combination — never treat that as an error, and never invent a benchmark number.
 3. Compliance-linked analysis — if compliance/check-in data isn't part of this report's input, note briefly that a combined Compliance report would strengthen this analysis, without fabricating any check-in data
 4. Goals for next period
-5. Practitioner recommendations
+5. ${recommendationsSection(audience)}
 
 LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 

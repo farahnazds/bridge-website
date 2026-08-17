@@ -108,7 +108,7 @@ export async function athleteBodyCompositionBlocks(
         "No body-composition assessment exists for this athlete. Nothing on this page is estimated — without a scan there is no measurement to report."
       )
     );
-    blocks.push(...narrativeTail(narrative, "Interpretation"));
+    blocks.push(...narrativeTail(narrative, identity, "Interpretation"));
     blocks.push(...sourcesBlocks(citations));
     blocks.push(...bannerBlocks(identity));
     return blocks;
@@ -255,7 +255,7 @@ export async function athleteBodyCompositionBlocks(
   }
 
   blocks.push(...prescriberBlocks(identity));
-  blocks.push(...narrativeTail(narrative, "Performance interpretation"));
+  blocks.push(...narrativeTail(narrative, identity, "Performance interpretation"));
 
   blocks.push(
     summaryBar([

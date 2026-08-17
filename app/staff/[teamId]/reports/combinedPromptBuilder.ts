@@ -1,4 +1,4 @@
-import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
 import {
   REPORT_TYPE_LABELS,
   RTP_PHASES,
@@ -87,7 +87,7 @@ Required output structure, in this exact order:
 ${domainSections}
 ${n + 2}. Cross-domain synthesis — the core of this report. Explicitly relate the domains to one another: where timelines coincide, where one domain plausibly explains another, and where they disagree. Anchor every link to dated observations from the data (for example "the drop in check-in completion from 12 Jul overlaps the same fortnight as the fall in high-speed distance"). If two domains genuinely have no observable relationship over this period, say that in one sentence rather than manufacturing a connection — a stated non-finding is a finding.
 ${n + 3}. Goals for next period — one consolidated set, not one per domain.
-${n + 4}. Practitioner recommendations — one consolidated, priority-ordered list. Where a single action serves several domains, say so once and note which domains it serves, rather than repeating it under each.
+${n + 4}. ${recommendationsSection(audience)} — one consolidated, priority-ordered list. Where a single action serves several domains, say so once and note which domains it serves, rather than repeating it under each.
 
 LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 
@@ -268,8 +268,8 @@ ${
             }`
         )
         .join("\n") +
-      "\nThese rows ARE the prescription for this period, already written to the athlete's record by the practitioner. The supplement part of your Nutrition section reports them exactly — no additions, no removals, no changed doses or timings. Where something is absent from this list, that is the practitioner's decision; a genuine clinical point about it belongs under practitioner recommendations for a future review."
-    : "No confirmed supplement plan covers this period. Say so plainly in the Nutrition section and prescribe nothing — any supplement suggestion belongs under practitioner recommendations as a point for the next planning session, never as a prescription."
+      "\nThese rows ARE the prescription for this period, already written to the athlete's record by the practitioner. The supplement part of your Nutrition section reports them exactly — no additions, no removals, no changed doses or timings. Where something is absent from this list, that is the practitioner's decision; a genuine clinical point about it belongs in the final recommendations/next-steps section of the required structure, framed as a point for a future review."
+    : "No confirmed supplement plan covers this period. Say so plainly in the Nutrition section and prescribe nothing — any supplement suggestion belongs in the final recommendations/next-steps section of the required structure as a point for the next planning session, never as a prescription."
 }
 
 ### Latest assessment (anchor for energy and protein targets)

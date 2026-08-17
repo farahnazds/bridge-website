@@ -1,4 +1,4 @@
-import { audienceDirective, type ReportAudience } from "@/lib/reportAudience";
+import { audienceDirective, recommendationsSection, type ReportAudience } from "@/lib/reportAudience";
 import { INJURY_STATUSES, RTP_PHASES, TIERS, VALIDITY_TIER_LABELS } from "@/lib/constants";
 
 // Builds the Injury report prompt per prompts/report-generation.md and
@@ -115,7 +115,7 @@ Required output structure, in this exact order:
 4. Recovery timeline — target return date versus actual cleared date where both exist. State overruns or early clearances as durations in days. Where an injury has a target date but no cleared date, state that it is still outstanding and how it sits relative to that target as of the end of the reporting period. Do not project a clearance date that is not in the data.
 5. Patterns and risk — recurrence, injuries to the same or contralateral site, injuries clustering in time, and concurrent injury burden. Be explicit about how thin the evidence is when it is thin.
 6. Goals for next period
-7. Practitioner recommendations
+7. ${recommendationsSection(audience)}
 
 LENGTH — hard rule: no narrative paragraph anywhere in this report runs past FOUR short sentences, and each recommendation is one sentence, straight to its point. Numbers-first, evidence-based, no filler. The renderer truncates anything longer, so an overrun loses content rather than gaining depth.
 

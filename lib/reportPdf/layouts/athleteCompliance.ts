@@ -27,7 +27,12 @@ import {
   type Narrative,
   type ReportIdentity,
 } from "../model";
-import { capSentences, MAX_NARRATIVE_SENTENCES, summaryHeading } from "./common";
+import {
+  capSentences,
+  MAX_NARRATIVE_SENTENCES,
+  recommendationsHeading,
+  summaryHeading,
+} from "./common";
 
 // Layout for lib/reportPdf/templates/athlete/compliance.html.
 //
@@ -278,7 +283,7 @@ export async function athleteComplianceBlocks(
 
   // ---- Recommendations ----
   if (narrative.recommendations.length > 0) {
-    blocks.push(sectionTitle("Practitioner recommendations"));
+    blocks.push(sectionTitle(recommendationsHeading(identity)));
     narrative.recommendations.forEach((r, i) =>
       blocks.push(recItem(i + 1, capSentences(r, MAX_NARRATIVE_SENTENCES)))
     );
