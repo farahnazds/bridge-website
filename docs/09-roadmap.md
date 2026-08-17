@@ -137,6 +137,48 @@ race stops being theoretical.
 **Not urgent today:** it only fires when an athlete is on two teams — no athlete
 currently is — and only when planning several athletes at once.
 
+## Known issue, scheduled separately: long day-specific Nutrition reports can hit the 300-second timeout
+
+**Raised 2026-08-17 while verifying Spanish report generation in production.
+Observed live, not theoretical.**
+
+A day-specific Nutrition report writes one meal-timing subsection per day type
+plus the day-by-day reasoning, so its generation time grows with the period.
+The generate page pins `export const maxDuration = 300` (`app/staff/[teamId]/
+reports/generate/page.tsx`) — five minutes. A **7-day** day-specific Spanish
+generation for Test Athlete exceeded that ceiling: Vercel killed the function
+mid-model-call and the page dropped into its error boundary ("Something went
+wrong"). The same request at a **4-day** period completed comfortably.
+
+**What is already handled.** The failure is clean: the report row is inserted
+only *after* the model responds, so a timeout writes nothing — no orphan row,
+no partial report, no stray PDF. The practitioner loses only their wait.
+
+**Why it is worth fixing before real practitioners run longer plans.** The
+form allows periods up to a fortnight, and a fortnight of day subsections is
+roughly double the generation that already died at seven days. A practitioner
+who waits five minutes and gets a generic error — with no saved output and no
+explanation that period length was the cause — will reasonably retry the same
+request and hit the same wall.
+
+### The two ways to fix it, and the real trade-off
+
+**Option A — raise `maxDuration`.** Vercel Fluid Compute functions can run
+longer than 300s; a higher cap likely absorbs a fortnight. *Cost:* the
+practitioner still holds a form open for many minutes, and the ceiling is
+moved rather than removed — a slow generation day still finds it.
+
+**Option B — background generation.** Generate off-request and notify when
+ready. This is the same infrastructure the combined-report cap
+(`MAX_COMBINED_TYPES` in `lib/reportTypes.ts`) and the squad-level report
+deferral below are both already waiting on: a job runner, a notification, a
+place for an in-flight report to live. Three features now point at the same
+missing piece, which is the usual sign it has earned being built.
+
+**Meanwhile:** keep day-specific periods to roughly a week or less, or use
+General mode for standing plans. Non-nutrition report types and shorter
+periods are unaffected.
+
 ## Deferred feature, scheduled separately: squad-level practitioner reports
 
 **Raised 2026-08-14 while building the report PDF generator. This is a new
