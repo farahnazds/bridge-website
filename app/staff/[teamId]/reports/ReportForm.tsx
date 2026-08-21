@@ -64,7 +64,7 @@ export default function ReportForm({
             id="ReportForm_language"
             name="language"
             defaultValue={defaultLanguage}
-            className={INPUT}
+            className={`w-full ${INPUT}`}
             style={INPUT_STYLE}
           >
             <option value="english">English</option>

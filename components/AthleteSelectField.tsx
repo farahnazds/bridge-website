@@ -93,7 +93,7 @@ export default function AthleteSelectField({
         name={name}
         required
         {...(controlled ? { value, onChange: (e) => onChange!(e.target.value) } : { defaultValue })}
-        className={INPUT}
+        className={`w-full ${INPUT}`}
         style={INPUT_STYLE}
       >
         {/* Only offered when nothing is preselected — a form that defaults to a

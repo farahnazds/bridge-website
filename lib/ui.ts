@@ -89,7 +89,7 @@ export const BTN_TERTIARY =
  * is why that is not wrapped up here: which children span is a property of each
  * form, not of the grid.
  */
-export const FORM_GRID = "grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(19rem,1fr))]";
+export const FORM_GRID = "grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr))]";
 
 /**
  * The small status pill used in tables and list rows: a tinted background

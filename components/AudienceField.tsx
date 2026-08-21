@@ -36,7 +36,7 @@ export default function AudienceField({ idPrefix }: { idPrefix: string }) {
         name="audience"
         value={audience}
         onChange={(e) => setAudience(e.target.value as ReportAudience)}
-        className={INPUT}
+        className={`w-full ${INPUT}`}
         style={INPUT_STYLE}
       >
         {REPORT_AUDIENCES.map((value) => (

@@ -78,7 +78,7 @@ export default function NutritionReportForm({
             id="NutritionReportForm_language"
             name="language"
             defaultValue={defaultLanguage}
-            className={INPUT}
+            className={`w-full ${INPUT}`}
             style={INPUT_STYLE}
           >
             <option value="english">English</option>
@@ -95,7 +95,7 @@ export default function NutritionReportForm({
           <label htmlFor="nut_mode" className={labelClass} style={{ color: "var(--text)" }}>
             Plan mode
           </label>
-          <select id="nut_mode" name="mode" defaultValue="day_specific" className={INPUT} style={INPUT_STYLE}>
+          <select id="nut_mode" name="mode" defaultValue="day_specific" className={`w-full ${INPUT}`} style={INPUT_STYLE}>
             <option value="day_specific">Day-specific (uses Training Load Plans)</option>
             <option value="general">General / standing</option>
           </select>
