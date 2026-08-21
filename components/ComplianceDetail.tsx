@@ -128,7 +128,7 @@ export default function ComplianceDetail({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Check-ins logged" value={String(data.logged)} />
         <StatCard label="Completed" value={String(data.completed)} hint={rateHint} />
         <StatCard label="Longest streak"

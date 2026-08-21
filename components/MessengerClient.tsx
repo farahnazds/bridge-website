@@ -125,7 +125,7 @@ export function NewThreadForm({
         ) : (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {contacts.map((c) => (
-              <label key={c.id} className="flex items-center gap-2 text-sm" style={{ color: "var(--text)" }}>
+              <label key={c.id} className="flex min-w-0 flex-wrap items-center gap-2 text-sm" style={{ color: "var(--text)" }}>
                 <input
                   type="checkbox"
                   name="recipient_ids"
@@ -152,7 +152,7 @@ export function NewThreadForm({
         style={INPUT_STYLE}
       />
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <SendButton label="Send" />
         <button
           type="button"

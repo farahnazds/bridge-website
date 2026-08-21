@@ -149,7 +149,7 @@ function SessionCard({ row, isPast }: { row: PlanRow; isPast: boolean }) {
 
       {/* "Not recorded" rather than a guessed default, matching how migration
           027 and the nutrition prompt treat these three fields. */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <Detail
           label="Session type"
           value={row.session_type ? SESSION_TYPE_LABEL[row.session_type] ?? row.session_type : "Not recorded"}

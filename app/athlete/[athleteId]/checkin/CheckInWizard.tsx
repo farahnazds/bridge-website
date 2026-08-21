@@ -346,7 +346,10 @@ export default function CheckInWizard({
             See you tomorrow. Consistency is what moves the numbers.
           </p>
         </div>
-        <div className="grid w-full grid-cols-3 gap-3">
+        {/* Stacked on phones: three-across leaves ~53px of card content at a
+            360px viewport once the wizard's own p-6 and the cards' p-4 are
+            paid, and "Hydration" alone is wider than that. */}
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
           {([
             ["Compliance", s.compliance === null ? "—" : `${s.compliance}%`],
             ["Energy", s.energy === null ? "—" : `${s.energy}/10`],
@@ -497,7 +500,11 @@ export default function CheckInWizard({
                                 role="radio"
                                 aria-checked={on}
                                 onClick={() => setSupplements((p) => ({ ...p, [name]: opt.value }))}
-                                className="flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition-colors duration-150"
+                                // gap-1/px-1.5 (was 1.5/2): keeps the row of
+                                // three fitting down to 320px-class phones —
+                                // stacking would triple the height of the
+                                // athlete's most-used control.
+                                className="flex min-w-0 items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-xs font-medium transition-colors duration-150"
                                 style={{
                                   borderColor: on ? tone : "var(--border)",
                                   backgroundColor: on ? `color-mix(in srgb, ${tone} 12%, transparent)` : "var(--bg)",
