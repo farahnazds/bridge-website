@@ -2,6 +2,11 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
+import {
+  REPORT_SEARCH_MAX_MATCHES,
+  REPORT_SEARCH_MIN_QUERY_LENGTH,
+  escapeLikePattern,
+} from "@/lib/reportSearch";
 
 // Content search for Report History — the half of the search box that cannot
 // run in the browser, because the browser deliberately does not hold the report
@@ -28,28 +33,9 @@ import { getCurrentProfile } from "@/lib/auth";
 // become a way to read report prose it would not otherwise hand over — the
 // prose stays server-side and comes back as a boolean, in effect.
 
-/** Below this length a substring search is more noise than signal, and would
- *  match nearly every report. The client skips the round trip too; this is the
- *  server-side half of the same rule so a hand-rolled request cannot bypass it. */
-const MIN_QUERY_LENGTH = 2;
-
-/** A pathological query would scan every summary for this caller. Reports per
- *  team are in the hundreds, so this is generous, but it bounds the work. */
-const MAX_MATCHES = 500;
-
-/**
- * `%` and `_` are LIKE wildcards; a user typing them means the literal
- * character, not "match anything". Escaping keeps results honest — without it,
- * searching for "50%" would match every report containing "50".
- *
- * PostgREST's own delimiters (comma, parenthesis, dot) are NOT escaped here:
- * supabase-js quotes the value when it builds `ai_summary=ilike.<value>`, so
- * they arrive as literals. Confirmed live with a query containing a comma and
- * a percent sign rather than trusted from the docs.
- */
-function escapeLikePattern(input: string): string {
-  return input.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-}
+// MIN_QUERY_LENGTH, MAX_MATCHES and the LIKE-pattern escaping used to live
+// here; they moved to lib/reportSearch.ts on 2026-08-21 so the web client, this
+// action and the mobile app share ONE implementation of the search-input rules.
 
 export interface ReportContentSearchResult {
   /** Ids of reports whose stored summary matched. */
@@ -64,7 +50,7 @@ export async function searchReportContent(
   scope: { teamId?: string | null; sharedWithMe?: boolean } = {}
 ): Promise<ReportContentSearchResult> {
   const q = query.trim();
-  if (q.length < MIN_QUERY_LENGTH) return { ids: [], skipped: true };
+  if (q.length < REPORT_SEARCH_MIN_QUERY_LENGTH) return { ids: [], skipped: true };
 
   const supabase = await createClient();
 
@@ -72,7 +58,7 @@ export async function searchReportContent(
     .from("reports")
     .select("id")
     .ilike("ai_summary", `%${escapeLikePattern(q)}%`)
-    .limit(MAX_MATCHES);
+    .limit(REPORT_SEARCH_MAX_MATCHES);
 
   // Scope narrowing mirrors whatever the calling page listed, so the search
   // cannot return an id the list does not hold — which would silently drop a

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { searchReportContent } from "@/app/actions/reportSearch";
 import {
   EMPTY_REPORT_FILTERS,
+  REPORT_SEARCH_MIN_QUERY_LENGTH as MIN_QUERY_LENGTH,
   filterAndSortReports,
   type ReportFilterState,
   type ReportListItem,
@@ -21,9 +22,9 @@ import {
  *  per letter, short enough that results feel attached to the typing. */
 const DEBOUNCE_MS = 250;
 
-/** Matches MIN_QUERY_LENGTH in app/actions/reportSearch.ts. Below this the
- *  round trip is skipped entirely and matching stays metadata-only. */
-const MIN_QUERY_LENGTH = 2;
+// Below REPORT_SEARCH_MIN_QUERY_LENGTH (imported above as MIN_QUERY_LENGTH —
+// the same constant the server action enforces) the round trip is skipped
+// entirely and matching stays metadata-only.
 
 /**
  * The last content-search response, TAGGED with what it was a response to.

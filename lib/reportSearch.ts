@@ -149,6 +149,38 @@ export const EMPTY_REPORT_FILTERS: ReportFilterState = {
   sort: "date_desc",
 };
 
+// ---------------------------------------------------------------------------
+// Content-search input handling. ONE implementation, shared by the web server
+// action (app/actions/reportSearch.ts), the web hook (lib/useReportSearch.ts)
+// and the mobile app (which vendors this file). Moved here 2026-08-21 from the
+// action: search-input sanitisation sits close enough to an access boundary
+// that two copies which could drift was not acceptable.
+// ---------------------------------------------------------------------------
+
+/** Below this length a substring search is more noise than signal, and would
+ *  match nearly every report. The client skips the round trip and the server
+ *  refuses it — the same number on both sides so a hand-rolled request cannot
+ *  bypass the rule. */
+export const REPORT_SEARCH_MIN_QUERY_LENGTH = 2;
+
+/** A pathological query would scan every summary for this caller. Reports per
+ *  team are in the hundreds, so this is generous, but it bounds the work. */
+export const REPORT_SEARCH_MAX_MATCHES = 500;
+
+/**
+ * `%` and `_` are LIKE wildcards; a user typing them means the literal
+ * character, not "match anything". Escaping keeps results honest — without it,
+ * searching for "50%" would match every report containing "50".
+ *
+ * PostgREST's own delimiters (comma, parenthesis, dot) are NOT escaped here:
+ * supabase-js quotes the value when it builds `ai_summary=ilike.<value>`, so
+ * they arrive as literals. Confirmed live with a query containing a comma and
+ * a percent sign rather than trusted from the docs.
+ */
+export function escapeLikePattern(input: string): string {
+  return input.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 /** Human label for a report's type(s) — the single place that renders a
  *  combined report's name, so the list, the sort key and the search haystack
  *  can never disagree about what a report is called. */
