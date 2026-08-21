@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { computeComplianceDetail, type ComplianceRow, type ComplianceWindow, type ComplianceDetailData } from "@/lib/complianceMath";
 
 // One compliance read, three consumers:
 //
@@ -10,6 +11,11 @@ import { createClient } from "@/lib/supabase/server";
 // practitioner sees exactly the figures the athlete sees. Nothing about the
 // athlete page's behaviour changed in the move.
 //
+// 2026-08-22: the MATHS moved again, to lib/complianceMath.ts (pure, no
+// database), because the mobile app vendors that file and must show the same
+// numbers. This module is now the web's fetch + compute wrapper, and re-exports
+// the types and windowDayCount so its existing importers are untouched.
+//
 // ACCESS: runs on the CALLER's client, so `checkins` RLS decides what comes
 // back. An athlete reads their own rows ("athlete reads own checkins"); a
 // practitioner reads their team's ("linked practitioners read"). This function
@@ -17,75 +23,8 @@ import { createClient } from "@/lib/supabase/server";
 // athlete gets an empty history, not an error, which is the same shape as an
 // athlete who has never checked in.
 
-export interface ComplianceRow {
-  date: string;
-  status: string;
-  nutritionLabel: string | null;
-  nutritionValue: number | null;
-  hydration: number | null;
-  energy: number | null;
-  sleep: number | null;
-  supplements: string | null;
-  notes: string | null;
-  compliance: number | null;
-}
-
-export interface MetricSeries {
-  key: "nutrition" | "hydration" | "energy" | "sleep";
-  title: string;
-  color: string;
-  latest: number | null;
-  average: number | null;
-  points: { label: string; value: number | null }[];
-}
-
-export interface ComplianceDetailData {
-  rows: ComplianceRow[];
-  /** Oldest first — the order the sparklines are drawn in. */
-  metrics: MetricSeries[];
-  logged: number;
-  completed: number;
-  skipped: number;
-  /** Completed ÷ days LOGGED. The athlete-facing definition, kept because that
-   *  page documents it deliberately: a day with no row is "not logged", which
-   *  is a different thing from an explicit skip. */
-  rateOfLogged: number | null;
-  /** Completed ÷ CALENDAR days in the window. What a practitioner scanning a
-   *  team actually wants — an athlete who logged three days out of thirty is
-   *  not 100% compliant, which is what rateOfLogged would say. Null when no
-   *  window was requested, since it is meaningless over "all time". */
-  rateOfCalendar: number | null;
-  longestStreak: number;
-  lastDate: string | null;
-}
-
-function avg(values: (number | null)[]): number | null {
-  const nums = values.filter((v): v is number => typeof v === "number");
-  if (nums.length === 0) return null;
-  return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
-}
-
-// Nutrition joins the other three now that migration 034 gave it a numeric
-// twin. Before that it was text and could not be plotted, which is why the
-// athlete page only ever had three panels.
-const METRIC_SPEC = [
-  { key: "nutrition", title: "Nutrition", color: "var(--warning)", pick: (r: ComplianceRow) => r.nutritionValue },
-  { key: "hydration", title: "Hydration", color: "var(--brand-sky)", pick: (r: ComplianceRow) => r.hydration },
-  { key: "energy", title: "Energy", color: "var(--brand-blue)", pick: (r: ComplianceRow) => r.energy },
-  { key: "sleep", title: "Sleep", color: "var(--brand-teal)", pick: (r: ComplianceRow) => r.sleep },
-] as const;
-
-/** Either "the last N days" or an explicit inclusive range. The modal and the
- *  athlete page use the first; the team page's date picker uses the second. */
-export type ComplianceWindow = number | { from: string; to: string };
-
-/** Inclusive day count, so a from===to range is 1 day rather than 0 and cannot
- *  produce a divide-by-zero in the calendar rate. */
-export function windowDayCount(w: ComplianceWindow): number {
-  if (typeof w === "number") return w;
-  const ms = new Date(w.to).getTime() - new Date(w.from).getTime();
-  return Math.max(1, Math.round(ms / 86_400_000) + 1);
-}
+export type { ComplianceRow, MetricSeries, ComplianceDetailData, ComplianceWindow } from "@/lib/complianceMath";
+export { windowDayCount } from "@/lib/complianceMath";
 
 export async function getComplianceDetail(
   athleteId: string,
@@ -129,46 +68,5 @@ export async function getComplianceDetail(
     compliance: r.compliance_score as number | null,
   }));
 
-  const oldestFirst = [...rows].reverse();
-  const completedRows = rows.filter((r) => r.status === "completed");
-
-  const metrics: MetricSeries[] = METRIC_SPEC.map((m) => ({
-    key: m.key,
-    title: m.title,
-    color: m.color,
-    latest: completedRows.length > 0 ? m.pick(completedRows[0]) : null,
-    average: avg(oldestFirst.map(m.pick)),
-    points: oldestFirst.map((r) => ({ label: r.date.slice(5), value: m.pick(r) })),
-  }));
-
-  // Longest run of consecutive completed CALENDAR days. Lifted from the athlete
-  // page unchanged, including the detail that matters: `consecutive` compares
-  // the previous row's date, so a gap with no row at all breaks the run — a
-  // missing day is not silently treated as continuous.
-  let longestStreak = 0;
-  let run = 0;
-  let prev: Date | null = null;
-  for (const r of oldestFirst) {
-    const d = new Date(r.date);
-    const consecutive = prev !== null && (d.getTime() - prev.getTime()) / 86_400_000 === 1;
-    run = r.status === "completed" ? (consecutive ? run + 1 : 1) : 0;
-    if (run > longestStreak) longestStreak = run;
-    prev = d;
-  }
-
-  return {
-    rows,
-    metrics,
-    logged: rows.length,
-    completed: completedRows.length,
-    skipped: rows.filter((r) => r.status === "skipped").length,
-    rateOfLogged: rows.length > 0 ? Math.round((completedRows.length / rows.length) * 100) : null,
-    // Denominator is the window itself, so days with no row count against it.
-    rateOfCalendar:
-      window !== undefined
-        ? Math.round((completedRows.length / windowDayCount(window)) * 100)
-        : null,
-    longestStreak,
-    lastDate: rows[0]?.date ?? null,
-  };
+  return computeComplianceDetail(rows, window);
 }
