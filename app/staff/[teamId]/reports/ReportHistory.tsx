@@ -84,12 +84,17 @@ const AVATARS_SHOWN = 3;
 function ReportCard({
   teamId,
   report,
+  athleteProfileId,
   practitioners,
   unseenNotificationId,
   focused,
 }: {
   teamId: string;
   report: ReportListItem;
+  /** profiles.id of the report's athlete — what reports.shared_with holds for an
+   *  athlete recipient. Null when the athlete has left the roster or has no
+   *  account yet; then the athlete is not offered as a recipient. */
+  athleteProfileId: string | null;
   practitioners: RecipientCandidate[];
   /** Id of this viewer's unread report_ready/report_shared notification for
    *  this report, if any — its presence is what "new" means here. */
@@ -121,8 +126,12 @@ function ReportCard({
   };
 
   const typeLabel = reportTypeLabel(report.reportTypes);
-  const recipients: RecipientCandidate[] = report.athleteId
-    ? [{ id: report.athleteId, label: `${report.athleteName} (athlete)` }, ...practitioners]
+  // The athlete recipient is their PROFILE id, not the athletes row id — that is
+  // what every reader of shared_with matches on (RLS, My Reports, Home, mobile).
+  // Until 2026-08-22 this used report.athleteId, so sharing from history never
+  // reached the athlete.
+  const recipients: RecipientCandidate[] = athleteProfileId
+    ? [{ id: athleteProfileId, label: `${report.athleteName} (athlete)` }, ...practitioners]
     : practitioners;
 
   const sharedLabels = recipients.filter((r) => report.sharedWith.includes(r.id)).map((r) => r.label);
@@ -317,13 +326,14 @@ function ReportCard({
 export default function ReportHistory({
   teamId,
   reports,
+  athletes,
   practitioners,
   unseenByReport = {},
   focusReportId = null,
 }: {
   teamId: string;
   reports: ReportListItem[];
-  athletes: { id: string; first_name: string; last_name: string; code: string }[];
+  athletes: { id: string; profile_id: string | null; first_name: string; last_name: string; code: string }[];
   practitioners: RecipientCandidate[];
   /** report id -> this viewer's unread notification id (see history/page.tsx). */
   unseenByReport?: Record<string, string>;
@@ -331,6 +341,9 @@ export default function ReportHistory({
   focusReportId?: string | null;
 }) {
   const { filters, setFilters, visible, searching } = useReportSearch(reports, { teamId });
+
+  // athletes.id -> profiles.id, for the share panel on each card.
+  const athleteProfileById = new Map(athletes.map((a) => [a.id, a.profile_id]));
 
   // Only offer chips for types actually present, so the bar never advertises a
   // filter that can only ever return nothing. Combined reports contribute each
@@ -375,6 +388,7 @@ export default function ReportHistory({
               key={report.id}
               teamId={teamId}
               report={report}
+              athleteProfileId={report.athleteId ? athleteProfileById.get(report.athleteId) ?? null : null}
               practitioners={practitioners}
               unseenNotificationId={unseenByReport[report.id] ?? null}
               focused={report.id === focusReportId}

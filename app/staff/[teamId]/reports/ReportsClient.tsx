@@ -31,7 +31,7 @@ export default function ReportsClient({
   lookbackByType,
 }: {
   teamId: string;
-  athletes: { id: string; first_name: string; last_name: string; code: string }[];
+  athletes: { id: string; profile_id: string | null; first_name: string; last_name: string; code: string }[];
   practitioners: RecipientCandidate[];
   defaultLanguage: string;
   /** Athlete Profile quick-add: every tab's form is pre-scoped to this athlete

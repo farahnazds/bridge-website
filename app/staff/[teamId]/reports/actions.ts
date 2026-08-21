@@ -19,6 +19,7 @@
 // sharing appears to do nothing until a hard reload.
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createAnthropicClient,
   REPORT_MODEL,
@@ -685,6 +686,76 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
     return { error: "You can only share reports you generated.", warning: null, success: false };
   }
 
+  // EVERY recipient must be a real, readable profiles.id — resolved BEFORE the
+  // write, and the share is refused outright if any id does not resolve.
+  //
+  // Why this is a hard gate and not a best-effort lookup (which is what it was
+  // until 2026-08-22): reports.shared_with holds PROFILE ids, and every reader
+  // matches on them — RLS "shared recipient reads" / "athlete reads own shared
+  // report", the report-pdfs storage policy, the athlete's My Reports and Home,
+  // and the mobile app. The share panels used to pass the athletes.id for an
+  // athlete recipient; it was appended verbatim, matched nothing anywhere, the
+  // profiles lookup below silently found no one to notify, and the action still
+  // reported success — so a report "shared with an athlete" was never visible
+  // to that athlete. Resolving first means a stale client, or any future
+  // regression of that kind, fails loudly here instead of writing a dead id.
+  //
+  // Resolution runs under the caller's session in TWO halves, because a club
+  // practitioner can read fellow STAFF profiles ("club staff reads linked staff
+  // profiles") but NOT an athlete's profiles row — only the athlete's athletes
+  // row ("club staff access club athletes"). So:
+  //   staff recipient   -> a profiles row the caller can read
+  //   athlete recipient -> the profile_id of an athletes row the caller can
+  //                        read, AND that athlete must be THIS report's athlete
+  //                        (an athlete only ever receives reports about
+  //                        themselves — RLS "athlete reads own shared report"
+  //                        would hide anything else anyway).
+  // Anything else is rejected. (This is also why the athlete was never
+  // notified or emailed before: the single profiles lookup could not see them.)
+  const [{ data: staffProfiles, error: staffError }, { data: athleteRows, error: athleteError }] = await Promise.all([
+    supabase.from("profiles").select("id, first_name, last_name, email").in("id", recipientIds),
+    supabase.from("athletes").select("id, profile_id, first_name, last_name").in("profile_id", recipientIds),
+  ]);
+  if (staffError || athleteError) {
+    return {
+      error: `Couldn't resolve the recipients: ${(staffError ?? athleteError)?.message ?? "unknown error"}`,
+      warning: null,
+      success: false,
+    };
+  }
+  type Recipient = { id: string; first_name: string | null; last_name: string | null; email: string | null };
+  const reportAthleteIds = new Set((report.athlete_ids as string[]) ?? []);
+  const staffRecipients: Recipient[] = staffProfiles ?? [];
+  const staffIds = new Set(staffRecipients.map((r) => r.id));
+  const athleteRecipients: Recipient[] = (athleteRows ?? [])
+    .filter((a) => a.profile_id !== null && reportAthleteIds.has(a.id) && !staffIds.has(a.profile_id))
+    .map((a) => ({ id: a.profile_id as string, first_name: a.first_name, last_name: a.last_name, email: null }));
+  // An athlete's email lives on a profiles row the caller cannot read. It is
+  // looked up with the service-role client ONLY for athlete profile ids that
+  // have just been verified through the caller's own RLS above — a narrow,
+  // post-authorisation read, which is the one thing lib/supabase/admin.ts
+  // allows the admin client for.
+  if (athleteRecipients.length > 0) {
+    const { data: athleteEmails } = await createAdminClient()
+      .from("profiles")
+      .select("id, email")
+      .in("id", athleteRecipients.map((a) => a.id));
+    const emailById = new Map((athleteEmails ?? []).map((p) => [p.id, p.email]));
+    for (const a of athleteRecipients) a.email = emailById.get(a.id) ?? null;
+  }
+  const recipients: Recipient[] = [...staffRecipients, ...athleteRecipients];
+  const resolvedIds = new Set(recipients.map((r) => r.id));
+  const unresolved = recipientIds.filter((id) => !resolvedIds.has(id));
+  if (unresolved.length > 0) {
+    return {
+      error:
+        "One or more recipients could not be matched to an account, so nothing was shared. " +
+        "If this is an athlete, they may not have activated their account yet.",
+      warning: null,
+      success: false,
+    };
+  }
+
   // Append, don't overwrite — a report can be shared again later with
   // additional recipients without dropping who already has access.
   const mergedSharedWith = [...new Set([...(report.shared_with ?? []), ...recipientIds])];
@@ -696,11 +767,6 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
   if (updateError) {
     return { error: `Couldn't share the report: ${updateError.message}`, warning: null, success: false };
   }
-
-  const { data: recipients } = await supabase
-    .from("profiles")
-    .select("id, first_name, last_name, email")
-    .in("id", recipientIds);
 
   const reportTypeLabel = ((report.report_types as string[]) ?? [])
     .map((t) => REPORT_TYPE_LABELS[t] ?? t)
@@ -746,9 +812,12 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
 
   // ---- Email via Resend — best-effort; a failed email never undoes the share ----
   let emailWarning: string | null = null;
-  if (recipients && recipients.length > 0) {
+  // Only recipients whose email could be resolved (see the athlete note above);
+  // a recipient without one still gets the in-app notification.
+  const emailable = recipients.filter((r): r is Recipient & { email: string } => typeof r.email === "string" && r.email.length > 0);
+  if (emailable.length > 0) {
     const results = await Promise.allSettled(
-      recipients.map((r) =>
+      emailable.map((r) =>
         sendReportSharedEmail({
           to: r.email,
           recipientName: r.first_name ?? "there",
@@ -763,8 +832,8 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
     );
     const failures = results.filter((r) => r.status === "rejected").length;
     if (failures > 0) {
-      emailWarning = `Report shared and notified in-app, but ${failures} of ${recipients.length} email${
-        recipients.length === 1 ? "" : "s"
+      emailWarning = `Report shared and notified in-app, but ${failures} of ${emailable.length} email${
+        emailable.length === 1 ? "" : "s"
       } failed to send${!process.env.RESEND_API_KEY ? " (RESEND_API_KEY isn't configured yet)" : ""}.`;
     }
   }

@@ -13,7 +13,11 @@ import type { RecipientCandidate } from "./ShareReportPanel";
 // Nothing here is an access boundary. Every query runs under the caller's own
 // session, so RLS decides what comes back; these functions only shape it.
 
-export type RosterAthlete = { id: string; first_name: string; last_name: string; code: string };
+// profile_id is what `reports.shared_with` holds (profile ids — see the share
+// panels): an athlete is shared WITH as a profile, not as an athletes row. Null
+// until the athlete has activated an account, in which case they cannot be a
+// recipient yet.
+export type RosterAthlete = { id: string; profile_id: string | null; first_name: string; last_name: string; code: string };
 type PractitionerEmbed = { id: string; first_name: string | null; last_name: string | null };
 type AssignmentRow = { staff_profile_id: string; profiles: PractitionerEmbed | null };
 
@@ -23,7 +27,7 @@ export async function teamRoster(teamId: string): Promise<RosterAthlete[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("athlete_teams")
-    .select("athletes(id, first_name, last_name, code)")
+    .select("athletes(id, profile_id, first_name, last_name, code)")
     .eq("team_id", teamId);
 
   // Single object, not array — many-to-one FK, same verified pattern as

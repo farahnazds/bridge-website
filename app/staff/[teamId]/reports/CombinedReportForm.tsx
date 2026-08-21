@@ -52,7 +52,7 @@ export default function CombinedReportForm({
   defaultLanguage,
 }: {
   teamId: string;
-  athletes: { id: string; first_name: string; last_name: string; code: string }[];
+  athletes: { id: string; profile_id: string | null; first_name: string; last_name: string; code: string }[];
   /** Athlete Profile quick-add: fixes the report to that athlete. */
   lockedAthleteId?: string | null;
   /** Deep link from an Athlete Profile carries a suggested period start —

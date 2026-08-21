@@ -44,7 +44,7 @@ export default function NutritionReportForm({
   defaultLanguage,
 }: {
   teamId: string;
-  athletes: { id: string; first_name: string; last_name: string; code: string }[];
+  athletes: { id: string; profile_id: string | null; first_name: string; last_name: string; code: string }[];
   /** Athlete Profile quick-add: fixes the report to that athlete. */
   lockedAthleteId?: string | null;
   /** End of this athlete's last nutrition report, so a new one picks up where
