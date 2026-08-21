@@ -258,10 +258,17 @@ line — the sidebar rail exists at `lg` and above, the drawer below.
 `md:` is vestigial (a handful of legacy uses); don't add new ones.
 
 **Dashboard shell.** `components/DashboardShell.tsx` renders the 256px
-rail ≥lg and a slide-in drawer behind a sticky Menu bar below it. The
-athlete layout uses it; the other four dashboards still carry the static
-rail and should adopt the same one-line wrap when their mobile turn
-comes. Never render a fixed-width rail without it.
+rail ≥lg and a slide-in drawer behind a sticky Menu bar below it. As of
+the 2026-08-21 rollout, **all five dashboards use it** — athlete, staff,
+club, admin, super-admin — and no static-rail layout exists anywhere
+(verified: the only `w-64` in the codebase is inside the shell itself).
+Sidebar content passes through as a ReactNode, switchers included; note
+the shell mounts the sidebar twice while the drawer is open, so sidebar
+components must tolerate a second (hidden) instance. Verification
+status: the athlete dashboard's pages are live-verified at 360/375/390px
+end to end; the other four have the shell plus their known table/floor
+fixes, with page-level live audits still to run per dashboard. Never
+render a fixed-width rail without the shell.
 
 **Grids.** Mobile-first bases: `grid-cols-1` (or a deliberate 2) with
 `sm:`/`lg:` expansions. For auto-fit grids with a track floor, the floor
