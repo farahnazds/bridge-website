@@ -67,9 +67,21 @@ function bridgePaths() {
     const x = 30 + p * 360;
     return { cx: +x.toFixed(1), cy: +(deckY(x) - 8).toFixed(1) };
   });
-  return { deck, arch, hangers, lit, dots, perfY: +(deckY(390) + 26).toFixed(1) };
+  // The mobile dots' travel route: the deck curve raised 8px, the same line
+  // the desktop frame loop moves its dots along. Fed to CSS motion-path via
+  // a custom property; see .lp-dot in globals.css.
+  let travel = "";
+  for (let x = 30; x <= 390; x += 8) travel += (travel ? "L" : "M") + x + " " + (deckY(x) - 8).toFixed(1);
+  return { deck, arch, hangers, lit, dots, travel, perfY: +(deckY(390) + 26).toFixed(1) };
 }
 const BRIDGE = bridgePaths();
+// Slow, distinct periods per dot; negative delays start each dot mid-route at
+// the same fractions the desktop version distributes its travelers (p values
+// in LandingMotion.tsx), so nothing bunches at the start of the loop.
+const DOT_TRAVEL = [0.02, 0.27, 0.52, 0.77].map((p, i) => {
+  const dur = [16, 19, 22, 25][i];
+  return { dur: `${dur}s`, delay: `${(-p * dur).toFixed(1)}s` };
+});
 const RISE = (delay = 0, cover = 26): React.CSSProperties => ({
   animation: `lp-rise ${delay ? ".9s " + delay + "s" : "1s"} both cubic-bezier(.22,.7,.25,1)`,
   animationTimeline: "view()",
@@ -184,7 +196,22 @@ export default function Home() {
                 <path data-hangerlit="1" className="lp-fadein" d={BRIDGE.lit} fill="none" stroke="#4FD8CE" strokeWidth="1.6" opacity=".45" />
                 <path data-deck="1" className="lp-draw" pathLength={1} d={BRIDGE.deck} fill="none" stroke="url(#bxDeck)" strokeWidth="2.8" strokeLinecap="round" />
                 {BRIDGE.dots.map((dot, i) => (
-                  <circle key={i} data-adot={i} className="lp-dot" cx={dot.cx} cy={dot.cy} r={[4, 3.6, 3.4, 3][i]} fill={["#4FD8CE", "#59C4F5", "#4B86FF", "#8FB4FF"][i]} />
+                  <circle
+                    key={i}
+                    data-adot={i}
+                    className="lp-dot"
+                    cx={dot.cx}
+                    cy={dot.cy}
+                    r={[4, 3.6, 3.4, 3][i]}
+                    fill={["#4FD8CE", "#59C4F5", "#4B86FF", "#8FB4FF"][i]}
+                    // Inert custom properties — only the ≤640px .lp-dot rules
+                    // read them, so desktop's JS-driven dots are unaffected.
+                    style={{
+                      ["--dot-path" as string]: `path("${BRIDGE.travel}")`,
+                      ["--dot-dur" as string]: DOT_TRAVEL[i].dur,
+                      ["--dot-delay" as string]: DOT_TRAVEL[i].delay,
+                    }}
+                  />
                 ))}
                 <text data-potlabel="1" x="24" y="326" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", fill: "rgba(255,255,255,.34)" }}>POTENTIAL</text>
                 <text data-perflabel="1" x="330" y={BRIDGE.perfY} style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", fill: "rgba(255,255,255,.5)" }}>PERFORMANCE</text>

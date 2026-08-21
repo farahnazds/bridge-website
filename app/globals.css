@@ -285,8 +285,11 @@ body:has(.bx-modal[open]) {
 /* Nav: full link row on desktop, burger + dropdown panel below 760px. Layout
    styles live HERE (not inline) so display can be media-switched. */
 .lp-nav-links { display: flex; align-items: center; gap: 26px; font-size: 14px; white-space: nowrap; }
+/* Mobile header cluster: Sign in + burger. Sign in lives HERE, not in the
+   dropdown, so it is always visible without opening the menu. */
+.lp-nav-mobile { display: none; align-items: center; gap: 10px; }
 .lp-nav-burger {
-  display: none; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   width: 40px; height: 40px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, .16);
   background: none; color: rgba(255, 255, 255, .86); cursor: pointer;
 }
@@ -299,7 +302,7 @@ body:has(.bx-modal[open]) {
 .lp-nav-menu a { padding: 12px 4px; font-size: 16px; }
 @media (max-width: 759px) {
   .lp-nav-links { display: none; }
-  .lp-nav-burger { display: flex; }
+  .lp-nav-mobile { display: flex; }
 }
 
 /* The how-it-works connector line is positioned for exactly three columns;
@@ -323,12 +326,31 @@ body:has(.bx-modal[open]) {
 
   /* Mobile hero treatment: the bridge is server-rendered in its settled
      state (no rAF on phones — see LandingMotion.tsx) and draws itself in
-     once via stroke-dashoffset; the athlete dots pulse gently. Reduced
-     motion collapses both to their final state via the .lp * rules below. */
+     once via stroke-dashoffset. The dots then travel the deck continuously
+     via CSS motion-path (owner refinement 2026-08-21): pure declarative
+     animation, compositor-driven, zero JS — the ambient motion the removed
+     frame loop provided, at the marquee's cost class instead. The path,
+     period and phase arrive as inert custom properties from page.tsx.
+     Reduced motion holds the server-rendered dots still; browsers without
+     motion-path keep the static pulsing dots (no broken halfway state). */
   .lp-draw { stroke-dasharray: 1; animation: lp-drawIn 1.6s .25s both cubic-bezier(.22, .7, .25, 1); }
   .lp-fadein { animation: lp-fade 1.1s .9s both; }
   .lp-dot { transform-box: fill-box; transform-origin: center; animation: lp-dotpulse 2.8s ease-in-out infinite; }
+  @supports (offset-path: path("M0 0")) {
+    @media (prefers-reduced-motion: no-preference) {
+      .lp-dot {
+        cx: 0;
+        cy: 0;
+        offset-path: var(--dot-path);
+        offset-rotate: 0deg;
+        animation:
+          lp-dot-travel var(--dot-dur) linear var(--dot-delay) infinite,
+          lp-dotpulse 2.8s ease-in-out infinite;
+      }
+    }
+  }
 }
+@keyframes lp-dot-travel { from { offset-distance: 0%; } to { offset-distance: 100%; } }
 @keyframes lp-dotpulse { 0%, 100% { opacity: .6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.35); } }
 
 @keyframes lp-rise { from { opacity: 0; transform: translateY(var(--rv, 22px)); } to { opacity: 1; transform: none; } }
