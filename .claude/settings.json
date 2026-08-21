@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git push origin main*)",
+      "Bash(git push -u origin main*)",
+      "Bash(git push origin HEAD:main*)",
+      "Bash(git push origin dev:main*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(vercel --prod*)",
+      "Bash(vercel deploy --prod*)",
+      "Bash(vercel promote*)",
+      "Bash(npx vercel --prod*)",
+      "Bash(npx vercel deploy --prod*)",
+      "Bash(npx vercel promote*)",
+      "PowerShell(git push origin main*)",
+      "PowerShell(vercel --prod*)",
+      "PowerShell(vercel deploy --prod*)",
+      "PowerShell(vercel promote*)"
+    ],
+    "ask": [
+      "Bash(git push*)",
+      "PowerShell(git push*)",
+      "Bash(gh pr merge*)",
+      "Bash(vercel *)",
+      "Bash(npx vercel *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const c=(JSON.parse(s).tool_input||{}).command||'';const out=(decision,reason)=>{console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:decision,permissionDecisionReason:reason}}));process.exit(0)};if(/\\bgit\\b[^&|;]*\\bpush\\b/i.test(c)&&(/\\bmain\\b/.test(c)||/--force|(^|\\s)-f(\\s|$)/.test(c)))out('deny','Push to main / force push is blocked — deploys to production happen only with explicit go-ahead.');if(/\\bvercel\\b/i.test(c)&&/--prod|\\bpromote\\b/i.test(c))out('deny','Production Vercel deploy is blocked — deploys happen only with explicit go-ahead.');if(/supabase\\.co/i.test(c)&&/(-X|--request)[= ]*(POST|PUT|PATCH|DELETE)|--data|(^|\\s)-d\\s|--form|(^|\\s)-F\\s|--upload-file/i.test(c))out('ask','Non-GET call to Supabase — shared prod DB writes need explicit approval.')})\"",
+            "timeout": 15,
+            "statusMessage": "Checking for Supabase writes"
+          }
+        ]
+      }
+    ]
+  }
+}
