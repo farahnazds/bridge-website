@@ -4,6 +4,7 @@ import { getAssignedClubs } from "@/lib/adminScope";
 import ContextSwitcher from "@/components/ContextSwitcher";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
+import DashboardShell from "@/components/DashboardShell";
 import { getCurrentProfile } from "@/lib/auth";
 
 // Mirrors the Super Admin section list (docs/03-site-map.md) minus the two
@@ -75,29 +76,28 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         context={isSuperAdmin ? "All clubs" : "Assigned clubs"}
         homeHref={isSuperAdmin ? "/super-admin" : "/admin"}
       />
-      <div className="flex flex-1">
-      <aside
-        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--surface)" }}
-      >
-        {/* A JUMP-TO control rather than a current-context one — an Admin is
-            not "inside" a club here — so collapseSingle stays false. Same
-            sidebar position as the others regardless. */}
-        <ContextSwitcher
-          currentId={null}
-          options={switcherClubs.map((c) => ({ id: c.id, label: c.name, sublabel: null }))}
-          fallbackBase="/club"
-          label="Open a club"
-          emptyLabel="Open a club…"
-          collapseSingle={false}
-        />
+      {/* Responsive shell (dashboard rollout Phase C, 2026-08-21). */}
+      <DashboardShell
+        sidebar={
+          <>
+            {/* A JUMP-TO control rather than a current-context one — an Admin
+                is not "inside" a club here — so collapseSingle stays false.
+                Same sidebar position as the others regardless. */}
+            <ContextSwitcher
+              currentId={null}
+              options={switcherClubs.map((c) => ({ id: c.id, label: c.name, sublabel: null }))}
+              fallbackBase="/club"
+              label="Open a club"
+              emptyLabel="Open a club…"
+              collapseSingle={false}
+            />
 
-        <SidebarNav groups={NAV_GROUPS} />
-      </aside>
-        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
-          {children}
-        </main>
-      </div>
+            <SidebarNav groups={NAV_GROUPS} />
+          </>
+        }
+      >
+        {children}
+      </DashboardShell>
     </div>
   );
 }

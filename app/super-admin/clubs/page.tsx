@@ -74,7 +74,7 @@ export default async function ClubsPage() {
 
       {!error && clubs && clubs.length > 0 && (
         <div
-          className={`overflow-hidden ${CARD}`}
+          className={`overflow-x-auto ${CARD}`}
           style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
         >
           <table className="w-full text-left text-sm">

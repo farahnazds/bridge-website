@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { BookOpen, Building2, LayoutDashboard, Palette, Telescope } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
+import DashboardShell from "@/components/DashboardShell";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import SuperAdminClubSwitcher from "./SuperAdminClubSwitcher";
@@ -47,28 +48,27 @@ export default async function SuperAdminLayout({
         context="All clubs"
         homeHref="/super-admin"
       />
-      <div className="flex flex-1">
-        <aside
-          className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-          style={{ backgroundColor: "var(--surface)" }}
-        >
-          {/* Super Admin's club jump-to. Not in the brief's list, but it is a
-              switcher in the same slot, and leaving it in the header would have
-              made this the one dashboard that disagreed. */}
-          <SuperAdminClubSwitcher
-            clubs={(clubs ?? []).map((c) => ({
-              id: c.id as string,
-              label: c.name as string,
-              sublabel: (c.sport as string) ?? null,
-            }))}
-          />
+      {/* Responsive shell (dashboard rollout Phase C, 2026-08-21). */}
+      <DashboardShell
+        sidebar={
+          <>
+            {/* Super Admin's club jump-to. Not in the brief's list, but it is
+                a switcher in the same slot, and leaving it in the header would
+                have made this the one dashboard that disagreed. */}
+            <SuperAdminClubSwitcher
+              clubs={(clubs ?? []).map((c) => ({
+                id: c.id as string,
+                label: c.name as string,
+                sublabel: (c.sport as string) ?? null,
+              }))}
+            />
 
-          <SidebarNav groups={NAV_GROUPS} />
-        </aside>
-        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
-          {children}
-        </main>
-      </div>
+            <SidebarNav groups={NAV_GROUPS} />
+          </>
+        }
+      >
+        {children}
+      </DashboardShell>
     </div>
   );
 }

@@ -183,7 +183,7 @@ export default async function SuperAdminClubDetailPage({
         {(teams ?? []).length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>No teams yet.</p>
         ) : (
-          <div className={`overflow-hidden ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`overflow-x-auto ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -211,7 +211,7 @@ export default async function SuperAdminClubDetailPage({
         {staffRows.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>No staff registered yet.</p>
         ) : (
-          <div className={`overflow-hidden ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+          <div className={`overflow-x-auto ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
             <table className="w-full text-left text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>

@@ -22,7 +22,10 @@ export default function SuperAdminClubSwitcher({ clubs }: { clubs: SwitcherOptio
   if (clubs.length === 0) return null;
 
   return (
-    <div className="w-56">
+    // w-full (was a hard w-56 sized against the 256px rail): inside
+    // DashboardShell's drawer the switcher now fills its container like the
+    // nav beneath it; on the desktop rail the rendered width is identical.
+    <div className="w-full">
       <ContextSwitcher
         currentId={currentId}
         options={clubs}
