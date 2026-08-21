@@ -74,7 +74,7 @@ export interface BodyCompositionPromptInput {
     dob: string | null;
     gender: string | null;
     ethnicity: string | null;
-    diet_preference: string;
+    diet_preference: string | null;
     goal_body_fat_pct: number | null;
     goal_lean_mass_kg: number | null;
   };
@@ -284,7 +284,7 @@ Descriptive context only — apply the team-average rules from the system prompt
 Name: ${athlete.first_name} ${athlete.last_name}
 Sport: ${athlete.sport} | Position: ${athlete.position ?? "not specified"} | Tier: ${athlete.tier ? TIER_LABEL[athlete.tier] ?? athlete.tier : "not specified"}
 Age: ${ageFromDob(athlete.dob)} | Gender: ${athlete.gender ?? "not specified"}
-Diet preference: ${DIET_LABEL[athlete.diet_preference] ?? athlete.diet_preference}
+Diet preference: ${DIET_LABEL[athlete.diet_preference ?? ""] ?? athlete.diet_preference ?? "Not recorded"}
 Declared allergies: ${listOrNone(allergies)}
 Declared intolerances: ${listOrNone(intolerances)}
 Declared medical/operational conditions: ${listOrNone(conditions)}

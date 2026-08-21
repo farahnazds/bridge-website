@@ -221,14 +221,14 @@ export default async function AthleteHomePage({
             className="inline-flex items-center gap-1.5 text-lg font-semibold"
             style={{
               fontFamily: "var(--font-heading)",
-              color: INJURY_STATUS_STYLE[latestInjury.status]?.color ?? "var(--text)",
+              color: INJURY_STATUS_STYLE[latestInjury.status ?? ""]?.color ?? "var(--text)",
             }}
           >
             <span
               className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: INJURY_STATUS_STYLE[latestInjury.status]?.color ?? "var(--text-muted)" }}
+              style={{ backgroundColor: INJURY_STATUS_STYLE[latestInjury.status ?? ""]?.color ?? "var(--text-muted)" }}
             />
-            {INJURY_STATUS_STYLE[latestInjury.status]?.label ?? latestInjury.status}
+            {INJURY_STATUS_STYLE[latestInjury.status ?? ""]?.label ?? latestInjury.status}
           </p>
           {latestInjury.rtp_phase && (
             <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
@@ -260,14 +260,14 @@ export default async function AthleteHomePage({
               className="mt-1 inline-flex items-center gap-1.5 text-lg font-semibold"
               style={{
                 fontFamily: "var(--font-heading)",
-                color: INTENSITY_COLOUR[nextSession.intensity] ?? "var(--text)",
+                color: INTENSITY_COLOUR[nextSession.intensity ?? ""] ?? "var(--text)",
               }}
             >
               <span
                 className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: INTENSITY_COLOUR[nextSession.intensity] ?? "var(--text-muted)" }}
+                style={{ backgroundColor: INTENSITY_COLOUR[nextSession.intensity ?? ""] ?? "var(--text-muted)" }}
               />
-              {INTENSITY_LABEL[nextSession.intensity] ?? nextSession.intensity}
+              {INTENSITY_LABEL[nextSession.intensity ?? ""] ?? nextSession.intensity}
               {nextSession.session_type
                 ? ` · ${SESSION_TYPE_LABEL[nextSession.session_type] ?? nextSession.session_type}`
                 : ""}

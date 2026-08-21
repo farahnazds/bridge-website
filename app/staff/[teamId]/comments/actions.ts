@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { TablesInsert } from "@/lib/supabase/database.types";
 import { getCurrentProfile, isClubStaff } from "@/lib/auth";
 
 export interface ActionState {
@@ -36,19 +37,15 @@ export async function createComment(_prevState: ActionState, formData: FormData)
   }
 
   const supabase = await createClient();
-  const insertData: Record<string, unknown> = {
+  const insertData: TablesInsert<"comments"> = {
     author_id: profile.id,
     comment_type: commentType,
     body,
     // reflect_in_ai only ever means something for an official comment —
     // Flow 8 step 2: marked optionally "at the moment of posting".
     reflect_in_ai: commentType === "official_comment" ? reflectInAi : false,
+    ...(target === "team" ? { team_id: teamId } : { athlete_id: target }),
   };
-  if (target === "team") {
-    insertData.team_id = teamId;
-  } else {
-    insertData.athlete_id = target;
-  }
 
   const { error } = await supabase.from("comments").insert(insertData);
   if (error) {

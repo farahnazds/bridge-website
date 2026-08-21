@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { TablesInsert } from "@/lib/supabase/database.types";
 import { hasRole } from "@/lib/auth";
 import { getCurrentProfile } from "@/lib/auth";
 
@@ -53,7 +54,7 @@ export async function saveBranding(_prev: BrandingState, formData: FormData): Pr
 
   // Only overwrite an asset path when a new file was actually supplied —
   // saving the text fields alone must not wipe an existing logo.
-  const row: Record<string, unknown> = {
+  const row: TablesInsert<"club_branding"> = {
     club_id: clubId,
     report_color_hex: reportColor,
     report_structure_rules: String(formData.get("report_structure_rules") ?? "").trim() || null,

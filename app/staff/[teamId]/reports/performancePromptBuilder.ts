@@ -52,7 +52,7 @@ export interface PerformancePromptInput {
     dob: string | null;
     gender: string | null;
     ethnicity: string | null;
-    diet_preference: string;
+    diet_preference: string | null;
   };
   conditions: string[];
   allergies: string[];

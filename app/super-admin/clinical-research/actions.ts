@@ -26,7 +26,17 @@ async function requireSuperAdmin() {
   return profile;
 }
 
-function validate(formData: FormData): { error: string } | { values: Record<string, unknown> } {
+function validate(formData: FormData): {
+  error: string;
+} | {
+  values: {
+    topic_tag: string;
+    title: string;
+    year: number | null;
+    source: string | null;
+    clinical_note: string | null;
+  };
+} {
   const topicTag = String(formData.get("topic_tag") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const yearRaw = String(formData.get("year") ?? "").trim();

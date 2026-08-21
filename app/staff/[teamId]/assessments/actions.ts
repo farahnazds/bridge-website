@@ -1,5 +1,6 @@
 "use server";
 
+import type { Json } from "@/lib/supabase/database.types";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile, isClubStaff } from "@/lib/auth";
@@ -54,14 +55,14 @@ function sharedFields(formData: FormData) {
 /** The method's own fields, read by the definition rather than by hand, so the
  *  form, the CSV importer and this action cannot disagree about what a method
  *  captures. */
-function methodDataFromForm(method: AssessmentMethod, formData: FormData): Record<string, unknown> {
+function methodDataFromForm(method: AssessmentMethod, formData: FormData): Record<string, Json> {
   if (method === "manual") return {};
   const equationId = String(formData.get("equation") ?? "").trim() || null;
   const gender = String(formData.get("athlete_gender") ?? "").trim() || null;
   const fields =
     method === "skinfold" ? skinfoldFieldsFor(equationId, gender) : METHOD_FIELDS[method];
 
-  const out: Record<string, unknown> = {};
+  const out: Record<string, Json> = {};
   for (const field of fields) {
     const raw = String(formData.get(field.key) ?? "").trim();
     if (!raw) continue;
@@ -96,7 +97,7 @@ function resolveCanonical(
   athlete: AthleteContext | null,
   equations: SkinfoldEquationRow[],
   formData?: FormData
-): { canonical: CanonicalValues; extraMethodData: Record<string, unknown>; error: string | null } {
+): { canonical: CanonicalValues; extraMethodData: Record<string, Json>; error: string | null } {
   const empty: CanonicalValues = {
     body_fat_pct: null,
     lean_mass_kg: null,
@@ -336,7 +337,7 @@ export interface AssessmentValues {
   height_cm: number | null;
   tdee: number | null;
   notes: string | null;
-  method_data: Record<string, unknown>;
+  method_data: Record<string, Json>;
   canonical: CanonicalValues;
   /** Shown in the preview so a row that cannot be derived is visible BEFORE
    *  import rather than silently skipped during it. */
@@ -361,7 +362,7 @@ function valuesFromCsv(method: AssessmentMethod) {
             )
           : METHOD_FIELDS[method];
 
-    const methodData: Record<string, unknown> = {};
+    const methodData: Record<string, Json> = {};
     for (const field of fields) {
       const cell = (raw[field.key] ?? "").trim();
       if (!cell) continue;
