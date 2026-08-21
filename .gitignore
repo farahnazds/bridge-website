@@ -47,3 +47,6 @@ next-env.d.ts
 # The vendored skill in .claude/skills/ IS committed deliberately — see
 # .claude/skills/ui-ux-pro-max/PINNED.md
 .claude/settings.local.json
+
+# Supabase CLI link artifacts (contains project connection details)
+/supabase/.temp/
