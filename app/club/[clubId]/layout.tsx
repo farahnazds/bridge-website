@@ -5,6 +5,7 @@ import { recordLastUsedContext } from "@/lib/lastUsedContext";
 import { CalendarRange, CreditCard, LayoutDashboard, Newspaper, Settings, ShoppingCart, Trophy, Users, UsersRound } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
+import DashboardShell from "@/components/DashboardShell";
 import Link from "next/link";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -136,58 +137,58 @@ export default async function ClubLayout({
         role={isOversight ? (profile.role === "super_admin" ? "Super Admin" : "Admin") : "Club Manager"}
         homeHref={isOversight ? (profile.role === "super_admin" ? "/super-admin" : "/admin") : `/club/${clubId}`}
       />
-      <div className="flex flex-1">
-      <aside
-        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--surface)" }}
+      {/* Responsive shell (dashboard rollout Phase B, 2026-08-21): rail ≥lg,
+          drawer below. Sidebar fragment is the aside's former children. */}
+      <DashboardShell
+        sidebar={
+          <>
+            {/* Top of the sidebar, above the nav — same position as /staff and
+                /admin. See the note in app/staff/[teamId]/layout.tsx.
+
+                Below the club switcher: "Jump to team", in the switcher's
+                JUMP-TO mode (currentId null — no club page is scoped to a
+                team, so there is nothing to collapse or highlight;
+                collapseSingle false — a way to get somewhere must stay
+                clickable even with one destination). Selecting a team lands on
+                /staff/<teamId> — the practitioner's exact team workspace.
+                Hidden only when the club has no teams yet. The tight wrapper
+                mirrors the team side's club-card + team-switcher stack. */}
+            <div className="flex flex-col gap-2">
+              <ContextSwitcher
+                currentId={clubId}
+                options={availableClubs}
+                fallbackBase="/club"
+                label="Switch club"
+              />
+              {jumpTeams.length > 0 && (
+                <ContextSwitcher
+                  currentId={null}
+                  options={jumpTeams}
+                  fallbackBase="/staff"
+                  label="Jump to team"
+                  emptyLabel="Jump to team…"
+                  collapseSingle={false}
+                />
+              )}
+            </div>
+
+            {isOversight && (
+              <div className="px-2">
+                <Link
+                  href={profile.role === "super_admin" ? "/super-admin/clubs" : "/admin/clubs"}
+                  className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
+                >
+                  ← All clubs
+                </Link>
+              </div>
+            )}
+
+            <SidebarNav groups={navGroups} />
+          </>
+        }
       >
-        {/* Top of the sidebar, above the nav — same position as /staff and
-            /admin. See the note in app/staff/[teamId]/layout.tsx.
-
-            Below the club switcher: "Jump to team", in the switcher's JUMP-TO
-            mode (currentId null — no club page is scoped to a team, so there
-            is nothing to collapse or highlight; collapseSingle false — a way
-            to get somewhere must stay clickable even with one destination).
-            Selecting a team lands on /staff/<teamId> — the practitioner's
-            exact team workspace. Hidden only when the club has no teams yet.
-            The tight wrapper mirrors the team side's club-card + team-switcher
-            stack. */}
-        <div className="flex flex-col gap-2">
-          <ContextSwitcher
-            currentId={clubId}
-            options={availableClubs}
-            fallbackBase="/club"
-            label="Switch club"
-          />
-          {jumpTeams.length > 0 && (
-            <ContextSwitcher
-              currentId={null}
-              options={jumpTeams}
-              fallbackBase="/staff"
-              label="Jump to team"
-              emptyLabel="Jump to team…"
-              collapseSingle={false}
-            />
-          )}
-        </div>
-
-        {isOversight && (
-          <div className="px-2">
-            <Link
-              href={profile.role === "super_admin" ? "/super-admin/clubs" : "/admin/clubs"}
-              className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
-            >
-              ← All clubs
-            </Link>
-          </div>
-        )}
-
-        <SidebarNav groups={navGroups} />
-      </aside>
-        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
-          {children}
-        </main>
-      </div>
+        {children}
+      </DashboardShell>
     </div>
   );
 }
