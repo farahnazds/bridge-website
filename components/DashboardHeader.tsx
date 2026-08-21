@@ -54,7 +54,9 @@ export default function DashboardHeader({
         // 14px 32px and a hairline bottom rule, matching the design file's top
         // bar. The old 56px fixed height with 24px sides read cramped against a
         // larger mark; height is now driven by the content and its padding.
-        padding: "14px 32px", flex: "none",
+        // Fluid side padding (2026-08-21 mobile pass): 32px desktop, easing
+        // to 16px on phones so the identity block and controls keep room.
+        padding: "14px clamp(16px, 4vw, 32px)", flex: "none",
         borderBottom: "1px solid var(--border)", backgroundColor: "var(--surface)",
       }}
     >

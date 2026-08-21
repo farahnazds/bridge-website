@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { CircleCheckBig, CircleUser, FileText, Gauge, LayoutDashboard, MessageSquare, Pill, Scale } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
+import DashboardShell from "@/components/DashboardShell";
 import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -63,19 +64,10 @@ export default async function AthleteLayout({
         role="Athlete"
         homeHref={`/athlete/${athleteId}`}
       />
-      <div className="flex flex-1">
-      <aside
-        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--surface)" }}
-      >
-
-        <SidebarNav groups={navGroups} />
-      </aside>
-
-        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
-          {children}
-        </main>
-      </div>
+      {/* Responsive shell (Phase 2, 2026-08-21): desktop keeps the familiar
+          256px rail; below lg the rail becomes a drawer, returning the full
+          viewport width to the page content on phones. */}
+      <DashboardShell sidebar={<SidebarNav groups={navGroups} />}>{children}</DashboardShell>
     </div>
   );
 }
