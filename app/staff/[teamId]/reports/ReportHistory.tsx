@@ -369,7 +369,7 @@ export default function ReportHistory({
         // auto-fill rather than auto-fit: with two reports left after a filter,
         // auto-fit would stretch each to half the page and make a narrow result
         // set look like a different page. auto-fill keeps the card size stable.
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(20.625rem, 1fr))" }}>
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 20.625rem), 1fr))" }}>
           {visible.map((report) => (
             <ReportCard
               key={report.id}

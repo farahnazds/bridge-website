@@ -5,6 +5,7 @@ import { recordLastUsedContext } from "@/lib/lastUsedContext";
 import { Activity, CircleUser, ClipboardList, FileText, Gauge, HeartPulse, MessageCircle, MessageSquare, Pill, Users, Zap, CircleCheckBig } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
+import DashboardShell from "@/components/DashboardShell";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
@@ -142,63 +143,64 @@ export default async function TeamLayout({
             here; the component then polls /api/notifications every 60s. */}
         <NotificationBell teamId={teamId} initialSummary={await getNotificationSummary(profile.id)} />
       </DashboardHeader>
-      <div className="flex flex-1">
-      <aside
-        className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"
-        style={{ backgroundColor: "var(--surface)" }}
+      {/* Responsive shell (dashboard rollout Phase A, 2026-08-21): desktop
+          keeps the familiar 256px rail; below lg it becomes the drawer. The
+          sidebar fragment is the aside's former children, unchanged. */}
+      <DashboardShell
+        sidebar={
+          <>
+            {/* Directly under the header's logo and above the nav, matching
+                the design file: the switcher states WHICH context you are in,
+                so it belongs at the top of the thing it scopes rather than off
+                in the header next to the account menu.
+
+                For a manager, the club renders ABOVE the team as a collapsed,
+                non-interactive context card — the club → team hierarchy made
+                visible from the team side, mirroring the club sidebar where
+                the club switcher sits above "Jump to team" (2026-08-17
+                navigation parity). Navigation back up is the named link below;
+                the card only states where this team belongs. (ContextSwitcher
+                with one option and collapseSingle renders exactly that static
+                card.) The tight wrapper keeps card and switcher reading as one
+                stack, not two sidebar sections. */}
+            <div className="flex flex-col gap-2">
+              {isManager && (
+                <ContextSwitcher
+                  currentId={team.club_id}
+                  options={[{ id: team.club_id, label: clubName, sublabel: "Club" }]}
+                  fallbackBase="/club"
+                  label={`${clubName} — club view`}
+                  // The card itself navigates to the club view — the same
+                  // destination as the "← club view" link below. Two intuitive
+                  // ways up, deliberately redundant (owner ruling 2026-08-17).
+                  collapsedHref={`/club/${team.club_id}`}
+                />
+              )}
+              <ContextSwitcher
+                currentId={team.id}
+                options={availableTeams.map((t) => ({ id: t.id, label: t.name, sublabel: t.clubName }))}
+                fallbackBase="/staff"
+                label="Switch team"
+              />
+            </div>
+
+            {backHref && (
+              <div className="px-2">
+                <Link
+                  href={backHref}
+                  className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
+                >
+                  {backLabel}
+                </Link>
+              </div>
+            )}
+
+            <SidebarNav groups={navGroups} />
+          </>
+        }
       >
-        {/* Directly under the header's logo and above the nav, matching the
-            design file: the switcher states WHICH context you are in, so it
-            belongs at the top of the thing it scopes rather than off in the
-            header next to the account menu.
-
-            For a manager, the club renders ABOVE the team as a collapsed,
-            non-interactive context card — the club → team hierarchy made
-            visible from the team side, mirroring the club sidebar where the
-            club switcher sits above "Jump to team" (2026-08-17 navigation
-            parity). Navigation back up is the named link below; the card only
-            states where this team belongs. (ContextSwitcher with one option
-            and collapseSingle renders exactly that static card.) The tight
-            wrapper keeps card and switcher reading as one stack, not two
-            sidebar sections. */}
-        <div className="flex flex-col gap-2">
-          {isManager && (
-            <ContextSwitcher
-              currentId={team.club_id}
-              options={[{ id: team.club_id, label: clubName, sublabel: "Club" }]}
-              fallbackBase="/club"
-              label={`${clubName} — club view`}
-              // The card itself navigates to the club view — the same
-              // destination as the "← club view" link below. Two intuitive
-              // ways up, deliberately redundant (owner ruling 2026-08-17).
-              collapsedHref={`/club/${team.club_id}`}
-            />
-          )}
-          <ContextSwitcher
-            currentId={team.id}
-            options={availableTeams.map((t) => ({ id: t.id, label: t.name, sublabel: t.clubName }))}
-            fallbackBase="/staff"
-            label="Switch team"
-          />
-        </div>
-
-        {backHref && (
-          <div className="px-2">
-            <Link
-              href={backHref}
-              className="text-xs text-white/50 transition-colors duration-150 hover:text-white/80"
-            >
-              {backLabel}
-            </Link>
-          </div>
-        )}
-
-        <SidebarNav groups={navGroups} />
-      </aside>
-        <main className="flex-1 px-8 py-8" style={{ backgroundColor: "var(--bg)" }}>
-          {children}
-        </main>
-      </div>
+        {children}
+      </DashboardShell>
     </div>
   );
 }

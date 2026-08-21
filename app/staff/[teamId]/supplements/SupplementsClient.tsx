@@ -1878,7 +1878,7 @@ export default function SupplementsClient({
           />
         );
         const grid = (items: { p: ProtocolRow; phase: ProtocolPhase }[]) => (
-          <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))" }}>
+          <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 330px), 1fr))" }}>
             {items.map(card)}
           </div>
         );
