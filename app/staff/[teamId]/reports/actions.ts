@@ -658,8 +658,29 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
   // already both-roles). The own-reports rule below is unchanged and applies
   // to both roles equally: you share what YOU generated, backed by RLS
   // ("generator manages own report").
+  //
+  // Two DISTINCT failures, two distinct messages (owner decision 2026-08-22,
+  // after a live "You don't have permission" report could not be traced
+  // without guessing which it was): no resolvable session/profile is a
+  // sign-in problem; a resolvable profile of the wrong role is a permission
+  // problem. Naming the role in the second message makes "which account was
+  // I signed in as" answerable from the message alone.
+  if (!profile) {
+    return {
+      error:
+        "Your session couldn't be verified, so nothing was shared. Please sign in again and retry.",
+      warning: null,
+      success: false,
+    };
+  }
+  // Captured before the type-predicate check below narrows `profile` away.
+  const signedInAs = `${profile.role.replace(/_/g, " ")} (${profile.email})`;
   if (!isClubStaff(profile)) {
-    return { error: "You don't have permission to do this.", warning: null, success: false };
+    return {
+      error: `Sharing is available to club practitioners and club managers only — this account is signed in as ${signedInAs}.`,
+      warning: null,
+      success: false,
+    };
   }
 
   const teamId = String(formData.get("team_id") ?? "").trim();

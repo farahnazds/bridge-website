@@ -2823,6 +2823,7 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: boolean
       }
+      shares_team_with_staff: { Args: { p_team_id: string }; Returns: boolean }
       within_checkin_window: {
         Args: { p_date: string; p_days: number }
         Returns: boolean

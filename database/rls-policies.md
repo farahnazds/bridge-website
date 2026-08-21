@@ -1498,3 +1498,23 @@ least one `club_staff` row with `staff_role = 'club_manager'`) is enforced
 in the server action, not in SQL: it is a business rule about club
 operability, not an access-control boundary, and super_admin RLS could not
 express it anyway.
+
+## Added: practitioners read their own teams' assignments (2026-08-22, migration 049)
+
+`staff_team_assignments` had one practitioner read policy — `"staff reads own
+assignments"`, own row only. The report share panel builds its "fellow
+practitioners" list from this table
+(`app/staff/[teamId]/reports/queries.ts#teamPractitioners`, excluding the
+caller), so for a practitioner the list was always empty: **a practitioner
+could never share a report with a colleague**, only with the athlete. Present
+since migration 003; surfaced 2026-08-22 when report sharing was exercised
+in earnest.
+
+Added `"staff reads assignments of own teams"` (select) using a new SECURITY
+DEFINER helper `shares_team_with_staff(team_id)` — true when the caller is
+themselves assigned to that team. Definer for the same reason migration 032
+used one on `club_staff`: the existing `is_assigned_to_team()` is invoker and
+reads this table, so inside a policy on this table it would recurse. The
+helper answers one boolean about the caller's own membership and exposes no
+other row. Additive — the own-row policy stays; manager/admin policies are
+unchanged.
