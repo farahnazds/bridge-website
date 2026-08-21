@@ -95,7 +95,7 @@ function Card({ label, value, hint }: { label: string; value: string | number; h
 // width, and given a scope-less blank label rather than a visible one.
 function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
-    <div className={`overflow-x-auto ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+    <div className={`relative overflow-x-auto ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <table className="w-full text-left text-sm">
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>

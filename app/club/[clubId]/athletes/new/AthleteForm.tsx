@@ -190,14 +190,14 @@ export default function AthleteForm({
               </span>
             )}
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <input
               id="photo"
               name="photo"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handlePhotoChange}
-              className="text-sm"
+              className="w-full min-w-0 text-sm"
               style={{ color: "var(--text)" }}
             />
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>

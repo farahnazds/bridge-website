@@ -242,7 +242,7 @@ export default function RosterClient({ teamId, rows }: { teamId: string; rows: R
       </p>
 
       <div
-        className={`overflow-x-auto ${CARD}`}
+        className={`relative overflow-x-auto ${CARD}`}
         style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}
       >
         <table className="w-full text-left text-sm">
