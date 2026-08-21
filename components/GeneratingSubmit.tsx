@@ -30,7 +30,13 @@ const ROTATE_MS = 8_000;
 function PendingLabel({ slow }: { slow: boolean }) {
   const [i, setI] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setI((v) => (v + 1) % WAIT_LINES.length), ROTATE_MS);
+    // Random order (owner request 2026-08-21), never repeating the line just
+    // shown: each tick jumps 1..len-1 ahead of the current index. The first
+    // render always opens on line 0; randomness lives in the interval
+    // callback, keeping render pure and the effect free of sync setState.
+    const randomStep = (v: number) =>
+      (v + 1 + Math.floor(Math.random() * (WAIT_LINES.length - 1))) % WAIT_LINES.length;
+    const t = setInterval(() => setI(randomStep), ROTATE_MS);
     return () => clearInterval(t);
   }, []);
   return (
