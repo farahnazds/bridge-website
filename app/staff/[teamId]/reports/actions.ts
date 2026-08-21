@@ -72,7 +72,7 @@ import {
   injurySystemPrompt,
   type InjuryRow,
 } from "./injuryPromptBuilder";
-import { MAX_PLAN_DAYS, dateRange, daysBetween, type PlanMode } from "@/lib/supplementPlan";
+import { MAX_DAY_SPECIFIC_REPORT_DAYS, dateRange, daysBetween, type PlanMode } from "@/lib/supplementPlan";
 import { loadAthleteClinicalContext, loadSupplementLibrary } from "@/lib/supplementPlanSafety";
 import {
   loadAthletePlanningExtras,
@@ -797,15 +797,18 @@ export async function generateNutritionReport(
     return { ...base, error: "Choose a valid report period." };
   }
 
-  // Period caps. Day-specific writes a subsection per day, so it keeps the
-  // planner's own ceiling — the report describes the same kind of plan. General
-  // mode has no per-day sections, but the coverage computation and the prompt
-  // both walk the period, so it is bounded too rather than accepting a year.
+  // Period caps. Day-specific writes a subsection per day, so its generation
+  // time grows with the period and must fit the 300s maxDuration — the cap is
+  // set from measured production timings (see MAX_DAY_SPECIFIC_REPORT_DAYS in
+  // lib/supplementPlan.ts; a 7-day generation has been observed exceeding the
+  // ceiling). General mode has no per-day sections, but the coverage
+  // computation and the prompt both walk the period, so it is bounded too
+  // rather than accepting a year.
   const dayCount = daysBetween(periodStart, periodEnd);
-  if (mode === "day_specific" && dayCount > MAX_PLAN_DAYS) {
+  if (mode === "day_specific" && dayCount > MAX_DAY_SPECIFIC_REPORT_DAYS) {
     return {
       ...base,
-      error: `A day-by-day report covers at most ${MAX_PLAN_DAYS} days — the same limit the planner has. Use General mode for a longer standing period, or shorten the period.`,
+      error: `A day-by-day report covers at most ${MAX_DAY_SPECIFIC_REPORT_DAYS} days — longer periods risk hitting the generation time limit before the report finishes. Use General mode for a longer standing period, or shorten the period.`,
     };
   }
   if (dayCount > 92) {

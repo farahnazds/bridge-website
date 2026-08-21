@@ -175,9 +175,17 @@ deferral below are both already waiting on: a job runner, a notification, a
 place for an in-flight report to live. Three features now point at the same
 missing piece, which is the usual sign it has earned being built.
 
-**Meanwhile:** keep day-specific periods to roughly a week or less, or use
-General mode for standing plans. Non-nutrition report types and shorter
-periods are unaffected.
+**Mitigated 2026-08-21 — the timeout window is closed.** Day-specific report
+periods are now capped at 5 days (`MAX_DAY_SPECIFIC_REPORT_DAYS` in
+`lib/supplementPlan.ts`), enforced server-side in `generateNutritionReport`
+and reflected in the form's help text and default period. The cap was set
+from measured production data: the 7-day generation above exceeded 300s, a
+4-day completed comfortably, and worst case scales at roughly 45s/day — 5
+days ≈ 225s worst case, real headroom under the ceiling. The planner keeps
+its 14-day range (its call has never approached the limit). Option B
+(background generation + notification) remains the path to lifting the cap
+itself; until then, use General mode for longer standing periods.
+Non-nutrition report types and shorter periods are unaffected.
 
 ## Deferred feature, scheduled separately: squad-level practitioner reports
 

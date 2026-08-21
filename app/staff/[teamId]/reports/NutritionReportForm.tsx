@@ -121,7 +121,8 @@ export default function NutritionReportForm({
             <option value="general">General / standing</option>
           </select>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Day-specific writes a section per day, up to 14 days; unlogged days are named, never guessed.
+            Day-specific writes a section per day, up to 5 days; unlogged days are named, never guessed.
+            Use General mode for longer standing periods.
           </p>
         </div>
 
@@ -157,7 +158,7 @@ export default function NutritionReportForm({
               name="period_end"
               type="date"
               required
-              defaultValue={dateFromToday(7)}
+              defaultValue={dateFromToday(5)}
               className={INPUT}
               style={INPUT_STYLE}
             />
