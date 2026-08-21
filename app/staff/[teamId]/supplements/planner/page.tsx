@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: "Nutrition Planner — Bridgetx" };
 // generation's model calls live. On current Vercel every plan already defaults
 // to 300s under Fluid Compute (the old "15s default" belonged to the pre-Fluid
 // runtime), so this export pins the budget explicitly rather than rescuing
-// anything: 300s is the Hobby maximum and comfortably above the ~60–90s a
-// plan actually takes.
+// anything: the Pro plan allows up to 800s, and 300 sits comfortably above
+// the ~60–90s a plan actually takes.
 export const maxDuration = 300;
 
 // The bulk day-by-day supplement planner: AI suggestion, practitioner review,

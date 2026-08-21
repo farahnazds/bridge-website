@@ -15,12 +15,14 @@ export const metadata: Metadata = { title: "Generate a report — Bridgetx" };
 // unified execution model and every plan already DEFAULTS to 300s (verified
 // against Vercel's own docs 2026-08-15 — the "default is 15s" claim that used
 // to circulate in this codebase described the pre-Fluid serverless runtime).
-// This export pins the value explicitly so a report generation (15–130s
-// measured) can never be orphaned by a future change to the platform default,
-// and so the budget is visible in the code that depends on it. 300s is the
-// Hobby-plan MAXIMUM, so this is also the ceiling. It bounds one request; it
-// does not make a slow call fast.
-export const maxDuration = 300;
+// This export pins the value explicitly so a report generation can never be
+// orphaned by a future change to the platform default, and so the budget is
+// visible in the code that depends on it. 800 is the PRO-plan maximum
+// (verified 2026-08-21 via the Vercel CLI's OIDC claims; the plan defaults to
+// 300), adopted alongside raising MAX_DAY_SPECIFIC_REPORT_DAYS to 12 in
+// lib/supplementPlan.ts — the cap's worst case (12 × ~45s/day ≈ 540s) needs
+// the larger budget. It bounds one request; it does not make a slow call fast.
+export const maxDuration = 800;
 
 export default async function GenerateReportPage({
   params,

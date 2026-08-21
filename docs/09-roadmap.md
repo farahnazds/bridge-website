@@ -186,17 +186,20 @@ buttons say honestly that leaving the page is fine. Still missing from
 Option B: the job runner and an in-flight representation — a 300s timeout
 kill still cannot write its own failure row.
 
-**Mitigated 2026-08-21 — the timeout window is closed.** Day-specific report
-periods are now capped at 5 days (`MAX_DAY_SPECIFIC_REPORT_DAYS` in
-`lib/supplementPlan.ts`), enforced server-side in `generateNutritionReport`
-and reflected in the form's help text and default period. The cap was set
-from measured production data: the 7-day generation above exceeded 300s, a
-4-day completed comfortably, and worst case scales at roughly 45s/day — 5
-days ≈ 225s worst case, real headroom under the ceiling. The planner keeps
-its 14-day range (its call has never approached the limit). Option B
-(background generation + notification) remains the path to lifting the cap
-itself; until then, use General mode for longer standing periods.
-Non-nutrition report types and shorter periods are unaffected.
+**Mitigated 2026-08-21 — the timeout window is closed, then widened on the
+real ceiling.** First pass capped day-specific periods at 5 days against the
+300s budget then believed to be the plan maximum. Later the same day, the
+Vercel CLI's OIDC claims showed the project is on the PRO plan, whose true
+maxDuration ceiling is 800s — so Option A below was partially taken: the
+generate page now pins `maxDuration = 800` and
+`MAX_DAY_SPECIFIC_REPORT_DAYS` (lib/supplementPlan.ts) is 12. The math, from
+the same measured ~45s/day worst case: 12 × 45 ≈ 540s, leaving 260s (~33%)
+headroom — more than the 25% standard the 5-day cap was built to. Held at 12
+rather than planner-parity 14 because the rate is extrapolated 2× beyond the
+observed range (owner decision). The form says long periods take several
+minutes, and the navigate-away + bell work means nobody has to sit through
+them. Option B (background generation) remains the path to removing the cap
+entirely. Non-nutrition report types are unaffected.
 
 ## Deferred feature, scheduled separately: squad-level practitioner reports
 

@@ -7,11 +7,12 @@ import { BTN_PRIMARY_FULL } from "@/lib/ui";
 // The one submit button shared by all six report generators.
 //
 // The pending copy is honest by measurement, not hope: production timings run
-// 30 seconds to ~2 minutes (the live navigate-away test clocked a Compliance
-// report at 119s), where the old per-form labels promised "15–60 seconds".
-// The note below the button states the other verified fact — generation
-// survives leaving the page — which is what makes it a promise rather than a
-// guess.
+// 30 seconds to ~2 minutes for most reports (the live navigate-away test
+// clocked a Compliance report at 119s), and since the day-specific cap rose
+// to 12 days a worst-case nutrition run is ~9 minutes — hence "longer periods
+// can take several". The note below the button states the other verified
+// fact — generation survives leaving the page — which is what makes it a
+// promise rather than a guess.
 //
 // The rotating lines are the owner's wellness-themed waiting copy (supplied
 // verbatim 2026-08-21) — practitioner self-care nudges, not a progress meter.
@@ -41,7 +42,8 @@ function PendingLabel({ slow }: { slow: boolean }) {
   }, []);
   return (
     <span>
-      Generating — usually {slow ? "1–3" : "1–2"} minutes. {WAIT_LINES[i]}
+      Generating — usually {slow ? "1–3" : "1–2"} minutes, longer periods can
+      take several. {WAIT_LINES[i]}
     </span>
   );
 }

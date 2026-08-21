@@ -845,12 +845,12 @@ export async function generateNutritionReport(
   }
 
   // Period caps. Day-specific writes a subsection per day, so its generation
-  // time grows with the period and must fit the 300s maxDuration — the cap is
-  // set from measured production timings (see MAX_DAY_SPECIFIC_REPORT_DAYS in
-  // lib/supplementPlan.ts; a 7-day generation has been observed exceeding the
-  // ceiling). General mode has no per-day sections, but the coverage
-  // computation and the prompt both walk the period, so it is bounded too
-  // rather than accepting a year.
+  // time grows with the period and must fit the generate page's 800s
+  // maxDuration — the cap is set from measured production timings (~45s/day
+  // worst case; see MAX_DAY_SPECIFIC_REPORT_DAYS in lib/supplementPlan.ts).
+  // General mode has no per-day sections, but the coverage computation and
+  // the prompt both walk the period, so it is bounded too rather than
+  // accepting a year.
   const dayCount = daysBetween(periodStart, periodEnd);
   if (mode === "day_specific" && dayCount > MAX_DAY_SPECIFIC_REPORT_DAYS) {
     return {
