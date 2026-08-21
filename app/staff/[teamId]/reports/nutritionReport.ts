@@ -10,6 +10,7 @@ import {
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
 import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
+import { notifyReportOutcome } from "@/lib/reportNotifications";
 import type { ReportAudience } from "@/lib/reportAudience";
 import type { PlanMode } from "@/lib/supplementPlan";
 import type { AthleteClinicalContext, SupplementLibraryRow } from "@/lib/supplementPlanSafety";
@@ -222,20 +223,45 @@ export async function generateAndSaveNutritionReport(
       })
       .finalMessage();
   } catch (err) {
-    return { ...base, error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}` };
+    // Bell-surfaced like every post-model outcome — the practitioner may have
+    // left the page, and generation (verified live) carries on without them.
+    const message = `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`;
+    await notifyReportOutcome({
+      profileId: req.profileId,
+      typeLabel: REPORT_TYPE_LABELS["nutrition"] ?? "Nutrition",
+      athleteName,
+      reason: message,
+    });
+    return { ...base, error: message };
   }
 
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   const responseError = reportResponseError(response.stop_reason, reportText);
-  if (responseError || !reportText) return { ...base, error: responseError };
+  if (responseError || !reportText) {
+    await notifyReportOutcome({
+      profileId: req.profileId,
+      typeLabel: REPORT_TYPE_LABELS["nutrition"] ?? "Nutrition",
+      athleteName,
+      reason: responseError ?? "The model returned no text.",
+    });
+    return { ...base, error: responseError };
+  }
 
   // Unchanged from the single-athlete generator: runs on the generated TEXT,
   // before the insert, so an unsafe report can never be stored, listed or
   // shared. This is the product-level check; the structured prescription-level
   // check has already run in the confirm action.
   const safety = await assertReportSafe(req.athleteId, reportText);
-  if (!safety.ok) return { ...base, error: safety.message };
+  if (!safety.ok) {
+    await notifyReportOutcome({
+      profileId: req.profileId,
+      typeLabel: REPORT_TYPE_LABELS["nutrition"] ?? "Nutrition",
+      athleteName,
+      reason: safety.message,
+    });
+    return { ...base, error: safety.message };
+  }
 
   const supabase = await createClient();
   const { data: inserted, error: insertError } = await supabase
@@ -272,6 +298,13 @@ export async function generateAndSaveNutritionReport(
     periodStart: req.periodStart,
     periodEnd: req.periodEnd,
     generatedByName: req.generatedByName,
+  });
+
+  await notifyReportOutcome({
+    profileId: req.profileId,
+    typeLabel: REPORT_TYPE_LABELS["nutrition"] ?? "Nutrition",
+    athleteName,
+    reportId: inserted.id,
   });
 
   return {

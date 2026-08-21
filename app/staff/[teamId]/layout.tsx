@@ -8,6 +8,8 @@ import DashboardHeader from "@/components/DashboardHeader";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
+import { getNotificationSummary } from "@/lib/notifications";
+import NotificationBell from "@/components/NotificationBell";
 import ContextSwitcher from "@/components/ContextSwitcher";
 import { ROLE_LABELS } from "@/lib/constants";
 
@@ -134,7 +136,12 @@ export default async function TeamLayout({
         email={profile.email}
         role={ROLE_LABELS[profile.role] ?? "Staff"}
         homeHref={isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : `/staff/${teamId}`}
-      />
+      >
+        {/* Staff-only for now (owner ruling 2026-08-21); athlete/admin surfaces
+            can adopt the same component later. Initial state is server-rendered
+            here; the component then polls /api/notifications every 60s. */}
+        <NotificationBell teamId={teamId} initialSummary={await getNotificationSummary(profile.id)} />
+      </DashboardHeader>
       <div className="flex flex-1">
       <aside
         className="flex w-64 flex-shrink-0 flex-col gap-6 px-4 py-6"

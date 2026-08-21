@@ -175,6 +175,17 @@ deferral below are both already waiting on: a job runner, a notification, a
 place for an in-flight report to live. Three features now point at the same
 missing piece, which is the usual sign it has earned being built.
 
+*Update 2026-08-21: the notification half of Option B now exists.* A live
+production test proved generation survives the practitioner leaving the page
+(the model call ran on ~84s past a real browser disconnect and the report
+landed in History), so the staff header now carries a notification bell:
+every generator writes a `report_ready` / `report_generation_failed` row for
+its practitioner (`lib/reportNotifications.ts`), the bell polls every 60s
+(`components/NotificationBell.tsx`, `/api/notifications`), and the generate
+buttons say honestly that leaving the page is fine. Still missing from
+Option B: the job runner and an in-flight representation — a 300s timeout
+kill still cannot write its own failure row.
+
 **Mitigated 2026-08-21 — the timeout window is closed.** Day-specific report
 periods are now capped at 5 days (`MAX_DAY_SPECIFIC_REPORT_DAYS` in
 `lib/supplementPlan.ts`), enforced server-side in `generateNutritionReport`

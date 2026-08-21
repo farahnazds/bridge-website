@@ -31,6 +31,7 @@ import { sendReportSharedEmail } from "@/lib/resend";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
 import { generateAndStoreReportPdf } from "@/lib/reportPdfDelivery";
+import { notifyReportOutcome } from "@/lib/reportNotifications";
 import { resolveReportLanguage } from "@/lib/reportLanguage";
 import { resolveReportAudience } from "@/lib/reportAudience";
 import {
@@ -242,18 +243,29 @@ export async function generateComplianceReport(
       })
       .finalMessage();
   } catch (err) {
-    return {
-      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
-      reportText: null,
-      dataCheckNote,
-      reportId: null,
-    };
+    // From the model call onward the practitioner may have left the page
+    // (generation survives that — verified live 2026-08-21), so every outcome
+    // in this section is also surfaced through the header bell.
+    const message = `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`;
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["compliance"] ?? "Compliance",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: message,
+    });
+    return { error: message, reportText: null, dataCheckNote, reportId: null };
   }
 
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   const responseError = reportResponseError(response.stop_reason, reportText);
   if (responseError || !reportText) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["compliance"] ?? "Compliance",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: responseError ?? "The model returned no text.",
+    });
     return { error: responseError, reportText: null, dataCheckNote, reportId: null };
   }
 
@@ -263,6 +275,12 @@ export async function generateComplianceReport(
   // and therefore can never be listed or shared. Model-agnostic by design.
   const safety = await assertReportSafe(athleteId, reportText);
   if (!safety.ok) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["compliance"] ?? "Compliance",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: safety.message,
+    });
     return { error: safety.message, reportText, dataCheckNote, reportId: null };
   }
   // ---- Store (reports table) ----
@@ -321,6 +339,13 @@ export async function generateComplianceReport(
     generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
   });
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
+  await notifyReportOutcome({
+    profileId: profile.id,
+    typeLabel: REPORT_TYPE_LABELS["compliance"] ?? "Compliance",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    reportId: insertedReport.id,
+  });
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id, hasPdf: pdf.path !== null };
@@ -523,18 +548,27 @@ export async function generateBodyCompositionReport(
       })
       .finalMessage();
   } catch (err) {
-    return {
-      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
-      reportText: null,
-      dataCheckNote,
-      reportId: null,
-    };
+    // Bell-surfaced like every post-model outcome — see generateComplianceReport.
+    const message = `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`;
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["body_composition"] ?? "Body Composition",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: message,
+    });
+    return { error: message, reportText: null, dataCheckNote, reportId: null };
   }
 
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   const responseError = reportResponseError(response.stop_reason, reportText);
   if (responseError || !reportText) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["body_composition"] ?? "Body Composition",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: responseError ?? "The model returned no text.",
+    });
     return { error: responseError, reportText: null, dataCheckNote, reportId: null };
   }
 
@@ -544,6 +578,12 @@ export async function generateBodyCompositionReport(
   // and therefore can never be listed or shared. Model-agnostic by design.
   const safety = await assertReportSafe(athleteId, reportText);
   if (!safety.ok) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["body_composition"] ?? "Body Composition",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: safety.message,
+    });
     return { error: safety.message, reportText, dataCheckNote, reportId: null };
   }
   // ---- Store (reports table) ---- (see generateComplianceReport for why
@@ -591,6 +631,13 @@ export async function generateBodyCompositionReport(
     generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
   });
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
+  await notifyReportOutcome({
+    profileId: profile.id,
+    typeLabel: REPORT_TYPE_LABELS["body_composition"] ?? "Body Composition",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    reportId: insertedReport.id,
+  });
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: insertedReport.id, hasPdf: pdf.path !== null };
@@ -1060,21 +1107,39 @@ export async function generatePerformanceReport(
       })
       .finalMessage();
   } catch (err) {
-    return {
-      ...base,
-      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
-      dataCheckNote,
-    };
+    // Bell-surfaced like every post-model outcome — see generateComplianceReport.
+    const message = `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`;
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["performance"] ?? "Performance",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: message,
+    });
+    return { ...base, error: message, dataCheckNote };
   }
 
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   const responseError = reportResponseError(response.stop_reason, reportText);
-  if (responseError || !reportText) return { ...base, error: responseError, dataCheckNote };
+  if (responseError || !reportText) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["performance"] ?? "Performance",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: responseError ?? "The model returned no text.",
+    });
+    return { ...base, error: responseError, dataCheckNote };
+  }
 
   // ---- Automatic pre-save safety assertion ----
   const safety = await assertReportSafe(athleteId, reportText);
   if (!safety.ok) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["performance"] ?? "Performance",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: safety.message,
+    });
     return { error: safety.message, reportText, dataCheckNote, reportId: null };
   }
 
@@ -1115,6 +1180,13 @@ export async function generatePerformanceReport(
     generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
   });
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
+  await notifyReportOutcome({
+    profileId: profile.id,
+    typeLabel: REPORT_TYPE_LABELS["performance"] ?? "Performance",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    reportId: inserted.id,
+  });
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id, hasPdf: pdf.path !== null };
@@ -1254,21 +1326,39 @@ export async function generateInjuryReport(
       })
       .finalMessage();
   } catch (err) {
-    return {
-      ...base,
-      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
-      dataCheckNote,
-    };
+    // Bell-surfaced like every post-model outcome — see generateComplianceReport.
+    const message = `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`;
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["injury"] ?? "Injury",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: message,
+    });
+    return { ...base, error: message, dataCheckNote };
   }
 
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   const responseError = reportResponseError(response.stop_reason, reportText);
-  if (responseError || !reportText) return { ...base, error: responseError, dataCheckNote };
+  if (responseError || !reportText) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["injury"] ?? "Injury",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: responseError ?? "The model returned no text.",
+    });
+    return { ...base, error: responseError, dataCheckNote };
+  }
 
   // ---- Automatic pre-save safety assertion ----
   const safety = await assertReportSafe(athleteId, reportText);
   if (!safety.ok) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: REPORT_TYPE_LABELS["injury"] ?? "Injury",
+      athleteName: `${athlete.first_name} ${athlete.last_name}`,
+      reason: safety.message,
+    });
     return { error: safety.message, reportText, dataCheckNote, reportId: null };
   }
 
@@ -1309,6 +1399,13 @@ export async function generateInjuryReport(
     generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
   });
   const noteWithPdf = pdf.error ? `${dataCheckNote} PDF: ${pdf.error}` : dataCheckNote;
+
+  await notifyReportOutcome({
+    profileId: profile.id,
+    typeLabel: REPORT_TYPE_LABELS["injury"] ?? "Injury",
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    reportId: inserted.id,
+  });
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
   return { error: null, reportText, dataCheckNote: noteWithPdf, reportId: inserted.id, hasPdf: pdf.path !== null };
@@ -1394,22 +1491,42 @@ export async function generateCombinedReport(
       })
       .finalMessage();
   } catch (err) {
-    return {
-      ...base,
-      error: `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`,
-      dataCheckNote,
-    };
+    // Bell-surfaced like every post-model outcome — see generateComplianceReport.
+    const message = `Report generation failed: ${err instanceof Error ? err.message : "unknown error"}`;
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: "Combined",
+      athleteName: `${bundle.athlete.first_name} ${bundle.athlete.last_name}`,
+      reason: message,
+    });
+    return { ...base, error: message, dataCheckNote };
   }
 
   const textBlock = response.content.find((b) => b.type === "text");
   const reportText = textBlock && "text" in textBlock ? textBlock.text : null;
   const responseError = reportResponseError(response.stop_reason, reportText);
-  if (responseError || !reportText) return { ...base, error: responseError, dataCheckNote };
+  if (responseError || !reportText) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: "Combined",
+      athleteName: `${bundle.athlete.first_name} ${bundle.athlete.last_name}`,
+      reason: responseError ?? "The model returned no text.",
+    });
+    return { ...base, error: responseError, dataCheckNote };
+  }
 
   // Same unconditional pre-save gate as every individual report — combining
   // types does not change what counts as unsafe.
   const safety = await assertReportSafe(athleteId, reportText);
-  if (!safety.ok) return { ...base, error: safety.message, reportText, dataCheckNote };
+  if (!safety.ok) {
+    await notifyReportOutcome({
+      profileId: profile.id,
+      typeLabel: "Combined",
+      athleteName: `${bundle.athlete.first_name} ${bundle.athlete.last_name}`,
+      reason: safety.message,
+    });
+    return { ...base, error: safety.message, reportText, dataCheckNote };
+  }
 
   const { data: insertedReport, error: insertError } = await supabaseInsertCombined({
     generatedBy: profile.id,
@@ -1450,6 +1567,13 @@ export async function generateCombinedReport(
     periodStart,
     periodEnd,
     generatedByName: `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || profile.email,
+  });
+
+  await notifyReportOutcome({
+    profileId: profile.id,
+    typeLabel: "Combined",
+    athleteName: `${bundle.athlete.first_name} ${bundle.athlete.last_name}`,
+    reportId: insertedReport.id,
   });
 
   revalidatePath(`/staff/${teamId}/reports`, "layout");
