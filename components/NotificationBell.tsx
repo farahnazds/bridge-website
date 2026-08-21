@@ -97,20 +97,25 @@ export default function NotificationBell({
 
   const onItemClick = (n: NotificationItem) => {
     setOpen(false);
-    // Optimistic: the row reads as seen immediately; the server catches up.
-    setSummary((s) => ({
-      unread: n.is_read ? s.unread : Math.max(0, s.unread - 1),
-      items: s.items.map((i) => (i.id === n.id ? { ...i, is_read: true } : i)),
-    }));
-    // Navigate FIRST, mark-read fire-and-forget. This used to await the
-    // server action before pushing, which put a full roundtrip of dead air
-    // between the click and any visible response — live-measured at several
-    // seconds on production, long enough to read as "nothing happened"
-    // (reported 2026-08-21). The optimistic update above already handles the
-    // local read state; the action needs no ordering relative to the push.
+    // Report notifications are NOT marked read here: their read-state doubles
+    // as the History card's "new" highlight, and the approved clearing event
+    // is OPENING THE REPORT (ReportHistory's card click), not clicking the
+    // bell. Marking here raced the history page's server render — the
+    // highlight only appeared when the render won. Everything else is marked
+    // read on click as before, optimistically first.
+    const clearsOnReportOpen = n.type === "report_ready" || n.type === "report_shared";
+    if (!clearsOnReportOpen) {
+      setSummary((s) => ({
+        unread: n.is_read ? s.unread : Math.max(0, s.unread - 1),
+        items: s.items.map((i) => (i.id === n.id ? { ...i, is_read: true } : i)),
+      }));
+    }
+    // Navigate FIRST, mark-read fire-and-forget. Awaiting the action before
+    // pushing put a full roundtrip of dead air between click and response —
+    // live-measured at several seconds on production (reported 2026-08-21).
     const href = hrefFor(teamId, n);
     if (href) router.push(href);
-    void markNotificationsRead([n.id]);
+    if (!clearsOnReportOpen) void markNotificationsRead([n.id]);
   };
 
   const onMarkAll = async () => {
