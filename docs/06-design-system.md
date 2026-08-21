@@ -245,6 +245,48 @@ is what a professional site actually ships with for logos/icons.
 Do not stretch, recolor, or rotate the logo. Maintain clear space around
 it equal to roughly the height of the icon mark on all sides.
 
+## Responsive conventions (established 2026-08-21, mobile pass)
+
+Until the mobile pass, nothing here recorded how the product behaves at
+narrow widths, and the answer in practice was "it doesn't". These are now
+the rules; they were verified live at 360/375/390px on every athlete page
+and the full landing page.
+
+**Breakpoints.** Tailwind defaults, unmodified. Two matter: `sm:` (640px)
+is the workhorse — collapse/stack below it; `lg:` (1024px) is the shell
+line — the sidebar rail exists at `lg` and above, the drawer below.
+`md:` is vestigial (a handful of legacy uses); don't add new ones.
+
+**Dashboard shell.** `components/DashboardShell.tsx` renders the 256px
+rail ≥lg and a slide-in drawer behind a sticky Menu bar below it. The
+athlete layout uses it; the other four dashboards still carry the static
+rail and should adopt the same one-line wrap when their mobile turn
+comes. Never render a fixed-width rail without it.
+
+**Grids.** Mobile-first bases: `grid-cols-1` (or a deliberate 2) with
+`sm:`/`lg:` expansions. For auto-fit grids with a track floor, the floor
+must be `minmax(min(100%, Xpx), 1fr)` — a bare `minmax(Xpx, 1fr)`
+overflows every viewport narrower than X (this exact bug clipped the
+landing hero).
+
+**Wide tables** live inside an `overflow-x-auto` container (see
+body-composition, compliance, protocol). The container scrolls; the page
+must never scroll horizontally.
+
+**Fixed px type/padding** is for desktop ceilings only — anything that
+must shrink uses `clamp()` with the desktop value as the max (landing
+headings and section paddings are the reference).
+
+**Motion on phones**: no requestAnimationFrame loops. Ambient motion is
+declarative CSS on the compositor (see the landing hero's motion-path
+dots), gated by `@supports` where the property is newer, and disabled
+under `prefers-reduced-motion` in favour of the settled state — which
+must therefore be server-rendered, never left for JS to fill in.
+
+**Media queries** cannot live in inline styles: when a style must switch
+at a breakpoint, give the element a class in `globals.css` (the `.lp-*`
+landing rules are the pattern) or use Tailwind responsive prefixes.
+
 ## What NOT to carry over from the old prototype dashboards
 
 The existing `bridge-practitioner.html` / `bridge-athlete-checkin.html`
