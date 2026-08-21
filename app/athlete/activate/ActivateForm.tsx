@@ -27,14 +27,22 @@ export default function ActivateForm() {
       const accessToken = params.get("access_token");
       const refreshToken = params.get("refresh_token");
 
-      const sessionError = accessToken && refreshToken
-        ? (
-            await createClient().auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            })
-          ).error
-        : new Error("Missing invite tokens");
+      // Two valid arrivals since the scanner-proof flow (2026-08-21):
+      // legacy hash tokens in the URL fragment, or a cookie session set by
+      // /auth/confirm when the invitee clicked its Continue button. No hash
+      // and no session means a genuinely dead link.
+      let sessionError: Error | null = null;
+      if (accessToken && refreshToken) {
+        sessionError = (
+          await createClient().auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          })
+        ).error;
+      } else {
+        const { data } = await createClient().auth.getSession();
+        sessionError = data.session ? null : new Error("Missing invite tokens");
+      }
 
       // Strip tokens from the URL/history regardless of outcome.
       window.history.replaceState(null, "", window.location.pathname);
