@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { markNotificationsRead } from "@/app/actions/notifications";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import DataModal from "@/components/DataModal";
 import ReportPdfModal from "@/components/ReportPdfModal";
@@ -84,13 +85,40 @@ function ReportCard({
   teamId,
   report,
   practitioners,
+  unseenNotificationId,
+  focused,
 }: {
   teamId: string;
   report: ReportListItem;
   practitioners: RecipientCandidate[];
+  /** Id of this viewer's unread report_ready/report_shared notification for
+   *  this report, if any — its presence is what "new" means here. */
+  unseenNotificationId: string | null;
+  /** True when a bell click deep-linked to this card (?focus=) — scroll it
+   *  into view once. */
+  focused: boolean;
 }) {
   const [viewing, setViewing] = useState(false);
   const [sharing, setSharing] = useState(false);
+  // Cleared locally the first time the report is opened; the server-side
+  // clear is the notification read-state, so it stays cleared on reload.
+  const [openedOnce, setOpenedOnce] = useState(false);
+  const isNew = Boolean(unseenNotificationId) && !openedOnce;
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (focused) cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focused]);
+
+  const openReport = () => {
+    setViewing(true);
+    if (unseenNotificationId && !openedOnce) {
+      setOpenedOnce(true);
+      // Fire-and-forget: the modal must open instantly; the read-state write
+      // needs no ordering (same contract as the bell's own item clicks).
+      void markNotificationsRead([unseenNotificationId]);
+    }
+  };
 
   const typeLabel = reportTypeLabel(report.reportTypes);
   const recipients: RecipientCandidate[] = report.athleteId
@@ -102,8 +130,19 @@ function ReportCard({
 
   return (
     <div
+      ref={cardRef}
       className={`${CARD} flex flex-col transition-colors duration-200 ease-out hover:border-[color:var(--brand-blue)]`}
-      style={{ borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }}
+      // "New" (an unread report notification for this viewer) brightens the
+      // card — teal-tinted surface and border — until the report is first
+      // opened. Approved design 2026-08-21.
+      style={
+        isNew
+          ? {
+              borderColor: "color-mix(in srgb, var(--brand-teal) 45%, var(--border))",
+              backgroundColor: "color-mix(in srgb, var(--brand-teal) 7%, var(--surface-raised))",
+            }
+          : { borderColor: "var(--border)", backgroundColor: "var(--surface-raised)" }
+      }
     >
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
@@ -202,7 +241,7 @@ function ReportCard({
       >
         <button
           type="button"
-          onClick={() => setViewing(true)}
+          onClick={openReport}
           className="inline-flex flex-1 items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand-blue)]"
           style={{
             borderColor: "color-mix(in srgb, var(--brand-blue) 40%, transparent)",
@@ -279,11 +318,17 @@ export default function ReportHistory({
   teamId,
   reports,
   practitioners,
+  unseenByReport = {},
+  focusReportId = null,
 }: {
   teamId: string;
   reports: ReportListItem[];
   athletes: { id: string; first_name: string; last_name: string; code: string }[];
   practitioners: RecipientCandidate[];
+  /** report id -> this viewer's unread notification id (see history/page.tsx). */
+  unseenByReport?: Record<string, string>;
+  /** From ?focus= — the card a bell click should scroll to. */
+  focusReportId?: string | null;
 }) {
   const { filters, setFilters, visible, searching } = useReportSearch(reports, { teamId });
 
@@ -326,7 +371,14 @@ export default function ReportHistory({
         // set look like a different page. auto-fill keeps the card size stable.
         <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(20.625rem, 1fr))" }}>
           {visible.map((report) => (
-            <ReportCard key={report.id} teamId={teamId} report={report} practitioners={practitioners} />
+            <ReportCard
+              key={report.id}
+              teamId={teamId}
+              report={report}
+              practitioners={practitioners}
+              unseenNotificationId={unseenByReport[report.id] ?? null}
+              focused={report.id === focusReportId}
+            />
           ))}
         </div>
       )}

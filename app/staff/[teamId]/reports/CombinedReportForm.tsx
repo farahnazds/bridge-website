@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import GeneratingSubmit from "@/components/GeneratingSubmit";
 import AthleteSelectField from "@/components/AthleteSelectField";
 import AudienceField from "@/components/AudienceField";
-import { generateCombinedReport, type GenerateReportState } from "./actions";
+import { useReportGeneration } from "@/lib/useReportGeneration";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import GeneratedReportViewer from "./GeneratedReportViewer";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
@@ -16,13 +16,6 @@ import { MIN_COMBINED_TYPES, MAX_COMBINED_TYPES } from "@/lib/reportTypes";
 // Same Athlete / Report Period / Audience / Language controls as the five
 // single-type forms — this is a different SHAPE of report, not a different
 // product, so it should not feel like a different screen.
-
-const initialState: GenerateReportState = {
-  error: null,
-  reportText: null,
-  dataCheckNote: null,
-  reportId: null,
-};
 
 const labelClass = "text-sm font-medium";
 
@@ -36,10 +29,10 @@ function defaultDate(daysAgo: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function SubmitButton({ count }: { count: number }) {
+function SubmitButton({ count, pending }: { count: number; pending: boolean }) {
   return (
     <GeneratingSubmit
-      slow
+      pending={pending}
       disabled={count < MIN_COMBINED_TYPES || count > MAX_COMBINED_TYPES}
       idleLabel={
         count < MIN_COMBINED_TYPES
@@ -69,7 +62,7 @@ export default function CombinedReportForm({
   practitioners: RecipientCandidate[];
   defaultLanguage: string;
 }) {
-  const [state, formAction] = useActionState(generateCombinedReport, initialState);
+  const { state, pending, onSubmit } = useReportGeneration("combined");
   const [athleteId, setAthleteId] = useState(lockedAthleteId ?? "");
 
   // Athlete Profile quick-add: the athlete is fixed and the picker becomes a
@@ -97,7 +90,7 @@ export default function CombinedReportForm({
 
   return (
     <div className="flex flex-col gap-6">
-      <form action={formAction} className={FORM_GRID} noValidate>
+      <form onSubmit={onSubmit} className={FORM_GRID} noValidate>
         <input type="hidden" name="team_id" value={teamId} />
 
         {/* The type chips wrap across a row, so this spans rather than being
@@ -247,7 +240,7 @@ export default function CombinedReportForm({
         {/* SubmitButton is still BTN_PRIMARY_FULL — it fills this wrapper, not
             the card. Left unwrapped it would have become a ~1100px button. */}
         <div className="col-span-full sm:max-w-xs">
-          <SubmitButton count={selected.length} />
+          <SubmitButton count={selected.length} pending={pending} />
         </div>
       </form>
 

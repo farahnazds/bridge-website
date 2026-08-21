@@ -24,7 +24,12 @@ function hrefFor(teamId: string, n: NotificationItem): string | null {
   switch (n.type) {
     case "report_ready":
     case "report_shared":
-      return `/staff/${teamId}/reports/history`;
+      // ?focus deep-links to the specific report: History scrolls that card
+      // into view, and its unread highlight marks it — the destination says
+      // "here is YOUR report" instead of presenting the whole grid.
+      return `/staff/${teamId}/reports/history${
+        n.related_id ? `?focus=${encodeURIComponent(n.related_id)}` : ""
+      }`;
     case "report_generation_failed":
       return `/staff/${teamId}/reports/generate`;
     case "compliance_missed_days":
@@ -90,16 +95,22 @@ export default function NotificationBell({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  const onItemClick = async (n: NotificationItem) => {
+  const onItemClick = (n: NotificationItem) => {
     setOpen(false);
     // Optimistic: the row reads as seen immediately; the server catches up.
     setSummary((s) => ({
       unread: n.is_read ? s.unread : Math.max(0, s.unread - 1),
       items: s.items.map((i) => (i.id === n.id ? { ...i, is_read: true } : i)),
     }));
-    await markNotificationsRead([n.id]);
+    // Navigate FIRST, mark-read fire-and-forget. This used to await the
+    // server action before pushing, which put a full roundtrip of dead air
+    // between the click and any visible response — live-measured at several
+    // seconds on production, long enough to read as "nothing happened"
+    // (reported 2026-08-21). The optimistic update above already handles the
+    // local read state; the action needs no ordering relative to the push.
     const href = hrefFor(teamId, n);
     if (href) router.push(href);
+    void markNotificationsRead([n.id]);
   };
 
   const onMarkAll = async () => {
@@ -221,14 +232,19 @@ export default function NotificationBell({
               <button
                 key={n.id}
                 type="button"
-                onClick={() => void onItemClick(n)}
+                aria-label={n.title}
+                onClick={() => onItemClick(n)}
+                // Hover/focus affordance via classes — inline styles can't
+                // express :hover, which is why these rows shipped reading as
+                // static text (reported 2026-08-21). Background must live in
+                // classes too: an inline `background` would outrank hover:*.
+                className="bg-transparent transition-colors duration-150 hover:bg-white/5 focus-visible:bg-white/5"
                 style={{
                   display: "flex",
                   gap: 10,
                   width: "100%",
                   textAlign: "left",
                   padding: "11px 14px",
-                  background: "none",
                   border: "none",
                   borderBottom: "1px solid var(--border)",
                   cursor: "pointer",

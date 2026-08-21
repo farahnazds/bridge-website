@@ -7,8 +7,17 @@ import type { ReportListItem } from "@/lib/reportSearch";
 
 export const metadata: Metadata = { title: "Report history — Bridgetx" };
 
-export default async function ReportHistoryPage({ params }: { params: Promise<{ teamId: string }> }) {
+export default async function ReportHistoryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ teamId: string }>;
+  /** `focus` carries a report id from a bell notification click — the list
+   *  scrolls that card into view. See components/NotificationBell.tsx. */
+  searchParams: Promise<{ focus?: string }>;
+}) {
   const { teamId } = await params;
+  const { focus } = await searchParams;
   const supabase = await createClient();
   // Reuses the layout's cached context query — no extra round trip.
   const profile = (await getStaffTeamContext(teamId))?.profile ?? null;
@@ -18,6 +27,28 @@ export default async function ReportHistoryPage({ params }: { params: Promise<{ 
     teamPractitioners(teamId, profile?.id ?? null),
   ]);
   const athleteById = new Map(athletes.map((a) => [a.id, a]));
+
+  // Reports this viewer hasn't looked at yet, derived from the bell's own
+  // read-state rather than a new "seen" table: an UNREAD report_ready /
+  // report_shared notification pointing at a report marks that report's card
+  // as new, and opening the report marks the notification read, clearing the
+  // highlight for this user permanently. Per-user for free, no migration.
+  // A report generated while watching the form also highlights until first
+  // opened — deliberate (owner ruling 2026-08-21): "new since you last
+  // looked" is the honest meaning.
+  const { data: unreadReportNotifs } = profile
+    ? await supabase
+        .from("notifications")
+        .select("id, related_id")
+        .eq("profile_id", profile.id)
+        .eq("is_read", false)
+        .in("type", ["report_ready", "report_shared"])
+    : { data: null };
+  const unseenByReport: Record<string, string> = Object.fromEntries(
+    (unreadReportNotifs ?? [])
+      .filter((n) => n.related_id)
+      .map((n) => [n.related_id as string, n.id])
+  );
 
   // Report history — RLS ("generator manages own report" /
   // "shared recipient reads" / "team practitioners read official reports")
@@ -79,7 +110,14 @@ export default async function ReportHistoryPage({ params }: { params: Promise<{ 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
         Colleagues&apos; unshared drafts aren&apos;t included.
       </p>
-      <ReportHistory teamId={teamId} reports={reports} athletes={athletes} practitioners={practitioners} />
+      <ReportHistory
+        teamId={teamId}
+        reports={reports}
+        athletes={athletes}
+        practitioners={practitioners}
+        unseenByReport={unseenByReport}
+        focusReportId={focus ?? null}
+      />
     </div>
   );
 }

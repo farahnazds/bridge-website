@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import { FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import GeneratingSubmit from "@/components/GeneratingSubmit";
 import AthleteSelectField from "@/components/AthleteSelectField";
 import AudienceField from "@/components/AudienceField";
-import { generateNutritionReport, type GenerateReportState } from "./actions";
+import { useReportGeneration } from "@/lib/useReportGeneration";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
 import GeneratedReportViewer from "./GeneratedReportViewer";
 
@@ -26,13 +26,6 @@ import GeneratedReportViewer from "./GeneratedReportViewer";
 // Dates default FORWARD, unlike the other four — a nutrition report is a plan
 // for a coming period (docs/04-user-flows.md), not a review of a past one.
 // No hard min: regenerating a period already underway is legitimate.
-
-const initialState: GenerateReportState = {
-  error: null,
-  reportText: null,
-  dataCheckNote: null,
-  reportId: null,
-};
 
 const labelClass = "text-sm font-medium";
 
@@ -60,7 +53,7 @@ export default function NutritionReportForm({
   practitioners: RecipientCandidate[];
   defaultLanguage: string;
 }) {
-  const [state, formAction] = useActionState(generateNutritionReport, initialState);
+  const { state, pending, onSubmit } = useReportGeneration("nutrition");
   const [athleteId, setAthleteId] = useState(lockedAthleteId ?? "");
 
   const lockedRow = lockedAthleteId ? athletes.find((a) => a.id === lockedAthleteId) : undefined;
@@ -75,7 +68,7 @@ export default function NutritionReportForm({
 
   return (
     <div className="flex flex-col gap-6">
-      <form action={formAction} className={FORM_GRID} noValidate>
+      <form onSubmit={onSubmit} className={FORM_GRID} noValidate>
         <input type="hidden" name="team_id" value={teamId} />
         <div className="flex max-w-xs flex-col gap-1.5">
           <label htmlFor="NutritionReportForm_language" className={labelClass} style={{ color: "var(--text)" }}>
@@ -194,7 +187,7 @@ export default function NutritionReportForm({
         {/* GeneratingSubmit's button is BTN_PRIMARY_FULL — it fills this wrapper,
             not the card. Left unwrapped it would have become a ~1100px button. */}
         <div className="col-span-full sm:max-w-xs">
-          <GeneratingSubmit idleLabel="Generate nutrition report" />
+          <GeneratingSubmit idleLabel="Generate nutrition report" pending={pending} />
         </div>
       </form>
 
