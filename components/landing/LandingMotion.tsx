@@ -103,7 +103,30 @@ export default function LandingMotion() {
       cleanups.push(() => io.disconnect());
     }
 
-    if (reduced) return () => cleanups.forEach((f) => f());
+    // The two requestAnimationFrame loops below are desktop-only. On touch
+    // devices their input — pointermove — effectively never fires, so a phone
+    // would burn battery animating an idle sine wave nobody is driving; the
+    // ≤640px hero instead uses the server-rendered settled bridge with a
+    // one-shot CSS draw-in (see bridgePaths() in app/page.tsx and the
+    // .lp-draw rules in globals.css). 640px matches the app's `sm:` line.
+    const desktopInteractive = window.matchMedia("(min-width: 640px)").matches;
+    if (reduced || !desktopInteractive) return () => cleanups.forEach((f) => f());
+
+    // Runs a frame loop only while `el` is on screen — both loops previously
+    // ran forever, even with their sections scrolled well out of view.
+    const whileVisible = (el: Element, tick: () => void) => {
+      let raf = 0;
+      let visible = false;
+      const loop = () => { tick(); if (visible) raf = requestAnimationFrame(loop); };
+      const io = new IntersectionObserver((es) => {
+        es.forEach((e) => {
+          if (e.isIntersecting && !visible) { visible = true; raf = requestAnimationFrame(loop); }
+          else if (!e.isIntersecting && visible) { visible = false; cancelAnimationFrame(raf); }
+        });
+      });
+      io.observe(el);
+      return () => { visible = false; cancelAnimationFrame(raf); io.disconnect(); };
+    };
 
     /* --------------------------- hero bridge field ------------------------- */
     const root = document.querySelector<HTMLElement>("[data-field]");
@@ -113,7 +136,6 @@ export default function LandingMotion() {
       const el = (sel: string) => root.querySelector(sel);
       const st = { rise: 82, mx: 210, near: 0, cx: 0, cy: 0, live: false, p: [0.02, 0.27, 0.52, 0.77] };
       let last = performance.now();
-      let raf = 0;
       const onMove = (e: PointerEvent) => {
         if (!svg) return;
         const r = svg.getBoundingClientRect();
@@ -168,11 +190,10 @@ export default function LandingMotion() {
             "translate3d(" + ((st.mx - 210) * 0.12).toFixed(1) + "px," + (-st.rise * 0.18).toFixed(1) + "px,0) scale(" +
             (1 + st.near * 0.08).toFixed(3) + ")";
         }
-        raf = requestAnimationFrame(tick);
       };
-      tick();
+      const stopLoop = whileVisible(root, tick);
       cleanups.push(() => {
-        cancelAnimationFrame(raf);
+        stopLoop();
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("blur", onLeave);
       });
@@ -183,7 +204,7 @@ export default function LandingMotion() {
     const ctaGlow = document.querySelector<HTMLElement>("[data-cta-glow]");
     const section = document.getElementById("demo");
     if (btn && section) {
-      let px = 0, py = 0, prox = 0, tx = 0, ty = 0, tp = 0, raf = 0;
+      let px = 0, py = 0, prox = 0, tx = 0, ty = 0, tp = 0;
       const t0 = performance.now();
       const onMove = (e: PointerEvent) => {
         const b = btn.getBoundingClientRect();
@@ -209,11 +230,10 @@ export default function LandingMotion() {
             "translate3d(" + px * 2.6 + "px," + (py * 2.2 - prox * 26) + "px,0) scale(" + (1 + prox * 0.12 + breathe * 0.05) + ")";
           ctaGlow.style.opacity = String(0.7 + prox * 0.45 + breathe * 0.15);
         }
-        raf = requestAnimationFrame(tick);
       };
-      tick();
+      const stopLoop = whileVisible(section, tick);
       cleanups.push(() => {
-        cancelAnimationFrame(raf);
+        stopLoop();
         window.removeEventListener("pointermove", onMove);
         section.removeEventListener("pointerleave", onLeave);
         window.removeEventListener("blur", onLeave);

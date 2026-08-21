@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import LandingMotion from "@/components/landing/LandingMotion";
+import LandingNav from "@/components/landing/LandingNav";
 
 export const metadata: Metadata = {
   title: "Bridgetx — Bridging Potential to High Performance",
@@ -29,14 +30,46 @@ export const metadata: Metadata = {
 
 const MONO = "var(--font-mono), monospace";
 const HEAD = "var(--font-heading)";
-const SHELL: React.CSSProperties = { maxWidth: 1120, margin: "0 auto", padding: "112px 32px" };
+// Fluid paddings and type (2026-08-21 mobile pass): every clamp() below keeps
+// the desktop value as its ceiling, so ≥1120px nothing changes; phones get
+// proportionate sizes instead of clipped fixed ones.
+const PAD_X = "clamp(20px, 5.5vw, 32px)";
+const SHELL: React.CSSProperties = { maxWidth: 1120, margin: "0 auto", padding: `clamp(64px, 14vw, 112px) ${PAD_X}` };
 const EYEBROW: React.CSSProperties = {
   fontFamily: MONO, fontSize: 11, letterSpacing: ".18em", textTransform: "uppercase", color: "#4FD8CE",
 };
 const H2: React.CSSProperties = {
-  margin: 0, fontFamily: HEAD, fontSize: 48, lineHeight: 1.06, letterSpacing: "-.034em",
+  margin: 0, fontFamily: HEAD, fontSize: "clamp(31px, 8vw, 48px)", lineHeight: 1.06, letterSpacing: "-.034em",
   fontWeight: 600, color: "#fff", textWrap: "pretty" as React.CSSProperties["textWrap"],
 };
+
+// The hero bridge in its settled state, computed server-side with the same
+// maths LandingMotion's frame loop uses at rest (rise 88, pointer at centre).
+// Three audiences need this markup-time render: phones (the frame loops are
+// desktop-only — the mobile treatment is a one-shot CSS draw-in of exactly
+// these paths), reduced-motion users (the loops never start), and no-JS.
+// Before this, those users saw an EMPTY sky — the paths shipped without `d`.
+function bridgePaths() {
+  const rise = 88, lowY = 284;
+  const deckY = (x: number) => { const u = (x - 30) / 360; return lowY - rise * u * u * (3 - 2 * u); };
+  const archY = (x: number) => { const u = (x - 30) / 360; return deckY(x) - 128 * Math.sin(Math.PI * u) - 8; };
+  let deck = "", arch = "", hangers = "", lit = "";
+  for (let x = 30; x <= 390; x += 8) {
+    deck += (deck ? "L" : "M") + x + " " + deckY(x).toFixed(1);
+    arch += (arch ? "L" : "M") + x + " " + archY(x).toFixed(1);
+  }
+  for (let x = 54; x <= 366; x += 26) {
+    const seg = "M" + x + " " + archY(x).toFixed(1) + "L" + x + " " + deckY(x).toFixed(1);
+    hangers += seg;
+    if (Math.exp(-Math.abs(x - 210) / 52) > 0.06) lit += seg;
+  }
+  const dots = [0.02, 0.27, 0.52, 0.77].map((p) => {
+    const x = 30 + p * 360;
+    return { cx: +x.toFixed(1), cy: +(deckY(x) - 8).toFixed(1) };
+  });
+  return { deck, arch, hangers, lit, dots, perfY: +(deckY(390) + 26).toFixed(1) };
+}
+const BRIDGE = bridgePaths();
 const RISE = (delay = 0, cover = 26): React.CSSProperties => ({
   animation: `lp-rise ${delay ? ".9s " + delay + "s" : "1s"} both cubic-bezier(.22,.7,.25,1)`,
   animationTimeline: "view()",
@@ -100,28 +133,23 @@ export default function Home() {
 
       {/* ------------------------------- nav ------------------------------- */}
       <div style={{ position: "sticky", top: 0, zIndex: 40, borderBottom: "1px solid rgba(255,255,255,.07)", background: "rgba(5,9,26,.72)", backdropFilter: "blur(14px)" }}>
-        <div style={{ maxWidth: 1120, margin: "0 auto", padding: "0 32px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ position: "relative", maxWidth: 1120, margin: "0 auto", padding: `0 ${PAD_X}`, height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Image src="/brand/logo-horizontal-dark.svg" alt="Bridgetx" width={123} height={36} style={{ height: 36, width: 123, display: "block" }} priority />
-          <div style={{ display: "flex", alignItems: "center", gap: 26, fontSize: 14, whiteSpace: "nowrap" }}>
-            <a href="#platform">Platform</a>
-            <a href="#reports">Reports</a>
-            <a href="#audiences">Who it&apos;s for</a>
-            <a href="#how-it-works">How it works</a>
-            <Link href="/login" className="lp-ghost" style={{ padding: "8px 16px", borderRadius: 9, border: "1px solid rgba(255,255,255,.16)", color: "rgba(255,255,255,.86)", fontWeight: 600, fontSize: 13 }}>Sign in</Link>
-          </div>
+          {/* Link row ≥760px, burger + dropdown below — see LandingNav.tsx. */}
+          <LandingNav />
         </div>
       </div>
 
       {/* ------------------------------- hero ------------------------------ */}
       <section style={{ position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: -320, left: "50%", marginLeft: -540, width: 1080, height: 760, background: "radial-gradient(ellipse at center,rgba(0,87,255,.26) 0%,rgba(0,179,166,.08) 42%,rgba(5,9,26,0) 70%)", filter: "blur(28px)", animation: "lp-halo 14s ease-in-out infinite" }} />
-        <div style={{ position: "relative", zIndex: 2, maxWidth: 1120, margin: "0 auto", padding: "96px 32px 72px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(380px,1fr))", gap: 40, alignItems: "center" }}>
+        <div className="lp-deco" style={{ position: "absolute", top: -320, left: "50%", marginLeft: -540, width: 1080, height: 760, background: "radial-gradient(ellipse at center,rgba(0,87,255,.26) 0%,rgba(0,179,166,.08) 42%,rgba(5,9,26,0) 70%)", filter: "blur(28px)", animation: "lp-halo 14s ease-in-out infinite" }} />
+        <div style={{ position: "relative", zIndex: 2, maxWidth: 1120, margin: "0 auto", padding: `clamp(56px, 12vw, 96px) ${PAD_X} clamp(48px, 10vw, 72px)`, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,380px),1fr))", gap: 40, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", gap: 24 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 9, padding: "6px 13px 6px 8px", borderRadius: 999, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.03)", fontSize: 13, whiteSpace: "nowrap", color: "rgba(255,255,255,.66)", animation: "lp-fade .9s both" }}>
               <span style={{ padding: "3px 8px", borderRadius: 999, fontFamily: MONO, fontSize: 10, letterSpacing: ".1em", color: "#04121A", background: "linear-gradient(135deg,#00B3A6,#0091D6)" }}>REPORTS</span>
               Various types. One platform.
             </div>
-            <h1 style={{ margin: 0, maxWidth: 620, fontFamily: HEAD, fontSize: "clamp(44px,4.6vw,68px)", lineHeight: 1.02, letterSpacing: "-.038em", fontWeight: 600, color: "#fff", textWrap: "pretty", animation: "lp-rise 1s .06s both cubic-bezier(.22,.7,.25,1)" }}>
+            <h1 style={{ margin: 0, maxWidth: 620, fontFamily: HEAD, fontSize: "clamp(33px,9vw,68px)", lineHeight: 1.02, letterSpacing: "-.038em", fontWeight: 600, color: "#fff", textWrap: "pretty", animation: "lp-rise 1s .06s both cubic-bezier(.22,.7,.25,1)" }}>
               Bridging Potential to{" "}
               <span style={{ background: "linear-gradient(135deg,#00B3A6,#0091D6,#4B86FF)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>High Performance.</span>
             </h1>
@@ -147,14 +175,19 @@ export default function Home() {
                   </linearGradient>
                 </defs>
                 <line x1="14" y1="308" x2="406" y2="308" stroke="rgba(255,255,255,.08)" strokeWidth="1" />
-                <path data-arch="1" fill="none" stroke="url(#bxArch)" strokeWidth="2" strokeLinecap="round" />
-                <path data-hangers="1" fill="none" stroke="rgba(255,255,255,.13)" strokeWidth="1" />
-                <path data-hangerlit="1" fill="none" stroke="#4FD8CE" strokeWidth="1.6" opacity=".75" />
-                <path data-deck="1" fill="none" stroke="url(#bxDeck)" strokeWidth="2.8" strokeLinecap="round" />
-                <circle data-adot="0" r="4" fill="#4FD8CE" /><circle data-adot="1" r="3.6" fill="#59C4F5" />
-                <circle data-adot="2" r="3.4" fill="#4B86FF" /><circle data-adot="3" r="3" fill="#8FB4FF" />
+                {/* Server-rendered settled state (BRIDGE) so phones, reduced
+                    motion and no-JS all see the full bridge; the desktop frame
+                    loop overwrites these attributes when it runs. lp-draw /
+                    lp-fadein / lp-dot are the ≤640px one-shot treatment. */}
+                <path data-arch="1" className="lp-draw" pathLength={1} d={BRIDGE.arch} fill="none" stroke="url(#bxArch)" strokeWidth="2" strokeLinecap="round" />
+                <path data-hangers="1" className="lp-fadein" d={BRIDGE.hangers} fill="none" stroke="rgba(255,255,255,.13)" strokeWidth="1" />
+                <path data-hangerlit="1" className="lp-fadein" d={BRIDGE.lit} fill="none" stroke="#4FD8CE" strokeWidth="1.6" opacity=".45" />
+                <path data-deck="1" className="lp-draw" pathLength={1} d={BRIDGE.deck} fill="none" stroke="url(#bxDeck)" strokeWidth="2.8" strokeLinecap="round" />
+                {BRIDGE.dots.map((dot, i) => (
+                  <circle key={i} data-adot={i} className="lp-dot" cx={dot.cx} cy={dot.cy} r={[4, 3.6, 3.4, 3][i]} fill={["#4FD8CE", "#59C4F5", "#4B86FF", "#8FB4FF"][i]} />
+                ))}
                 <text data-potlabel="1" x="24" y="326" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", fill: "rgba(255,255,255,.34)" }}>POTENTIAL</text>
-                <text data-perflabel="1" x="330" y="178" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", fill: "rgba(255,255,255,.5)" }}>PERFORMANCE</text>
+                <text data-perflabel="1" x="330" y={BRIDGE.perfY} style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", fill: "rgba(255,255,255,.5)" }}>PERFORMANCE</text>
               </svg>
             </div>
           </div>
@@ -185,7 +218,7 @@ export default function Home() {
 
       {/* ------------------------ platform / streams ----------------------- */}
       <section id="platform" style={SECTION_TOP}>
-        <div style={{ ...SHELL, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 64, alignItems: "center" }}>
+        <div style={{ ...SHELL, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,340px),1fr))", gap: 64, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 18, ...RISE() }}>
             <span style={EYEBROW}>Track everything</span>
             <h2 style={H2}>One platform. Every sport. Every insight.</h2>
@@ -194,7 +227,7 @@ export default function Home() {
             </p>
           </div>
           <div style={{ ...CARD, overflow: "hidden", ...RISE(0.06, 30) }}>
-            <div role="tablist" aria-label="Data streams" style={{ display: "flex", gap: 2, padding: 10, borderBottom: "1px solid rgba(255,255,255,.08)", background: "#0A1026" }}>
+            <div role="tablist" aria-label="Data streams" style={{ display: "flex", flexWrap: "wrap", gap: 2, padding: 10, borderBottom: "1px solid rgba(255,255,255,.08)", background: "#0A1026" }}>
               {["Composition", "GPS", "Compliance", "Injury"].map((t, i) => (
                 <span key={t} data-stab={i} role="tab" tabIndex={0} aria-selected={i === 0}
                   style={{ cursor: "pointer", padding: "8px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, color: i === 0 ? "#fff" : "rgba(255,255,255,.5)", background: i === 0 ? "rgba(255,255,255,.07)" : "transparent", transition: "background 200ms ease-out, color 200ms ease-out" }}>
@@ -249,7 +282,7 @@ export default function Home() {
               {/* injury */}
               <div data-spanel="3" style={{ gridArea: "1/1", padding: "24px 26px", display: "flex", flexDirection: "column", gap: 16, opacity: 0, pointerEvents: "none", transition: "opacity 280ms ease-out" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, letterSpacing: ".14em", color: "rgba(255,255,255,.4)" }}><span>RETURN TO PLAY</span><span>PHASE 3 OF 5</span></div>
-                <div style={{ display: "flex", alignItems: "center", gap: 26 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 26 }}>
                   <svg viewBox="0 0 120 120" style={{ width: 118, height: 118, flex: "none", display: "block" }} aria-hidden="true">
                     <defs><linearGradient id="bxgauge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#00B3A6" /><stop offset=".5" stopColor="#0091D6" /><stop offset="1" stopColor="#4B86FF" /></linearGradient></defs>
                     <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="9" />
@@ -270,7 +303,7 @@ export default function Home() {
 
       {/* ------------------------------ reports ---------------------------- */}
       <section id="reports" style={{ position: "relative", overflow: "hidden", ...SECTION_TOP }}>
-        <div style={{ position: "absolute", top: 0, left: "50%", marginLeft: -460, width: 920, height: 520, background: "radial-gradient(ellipse at top,rgba(0,87,255,.18) 0%,rgba(5,9,26,0) 70%)", filter: "blur(30px)" }} />
+        <div className="lp-deco" style={{ position: "absolute", top: 0, left: "50%", marginLeft: -460, width: 920, height: 520, background: "radial-gradient(ellipse at top,rgba(0,87,255,.18) 0%,rgba(5,9,26,0) 70%)", filter: "blur(30px)" }} />
         <div style={{ position: "relative", zIndex: 2, ...SHELL, display: "flex", flexDirection: "column", gap: 52 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 16, maxWidth: 700, margin: "0 auto", ...RISE() }}>
             <span style={EYEBROW}>Reports</span>
@@ -280,7 +313,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,280px),1fr))", gap: 18 }}>
             {REPORTS.map((r) => (
               <div key={r.id} className="lp-card" style={{ ...CARD, padding: 30, display: "flex", flexDirection: "column", gap: 12, ["--hov" as string]: r.hov, ...RISE(r.d || 0.0001, r.c) }}>
                 <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", color: r.tint }}>{r.id}</span>
@@ -292,7 +325,7 @@ export default function Home() {
 
           <div style={{ position: "relative", overflow: "hidden", ...CARD, ...RISE(0.0001, 30) }}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg,transparent,#4FD8CE,transparent)", width: "28%", animation: "lp-sweep 9s linear infinite" }} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(330px,1fr))" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,330px),1fr))" }}>
               <div style={{ padding: 44, display: "flex", flexDirection: "column", gap: 14, borderRight: "1px solid rgba(255,255,255,.08)" }}>
                 <span style={{ ...EYEBROW, fontSize: 11, letterSpacing: ".16em" }}>Citations</span>
                 <h3 style={{ margin: 0, fontFamily: HEAD, fontSize: 28, lineHeight: 1.14, letterSpacing: "-.022em", fontWeight: 600, color: "#fff", textWrap: "pretty" }}>High Performance Reports in Minutes</h3>
@@ -330,7 +363,7 @@ export default function Home() {
             <span style={EYEBROW}>Benchmarks</span>
             <h2 style={H2}>Compared to the right standard.</h2>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))", gap: 20 }}>
             {[
               ["linear-gradient(90deg,#0057FF,#0A2D8F)", "Every Sport, Real Benchmarks", "Elite benchmarks by sport, age, and gender. Your basketball player isn't compared to a cyclist's targets.", 0.0001, 26],
               ["linear-gradient(90deg,#00B3A6,#0091D6)", "Data Follows the Athlete", "Athletes keep their full history for life — changing clubs or practitioners never means starting over.", 0.08, 30],
@@ -347,7 +380,7 @@ export default function Home() {
 
       {/* ------------------------------ sports ----------------------------- */}
       <section style={{ ...SECTION_TOP, overflow: "hidden" }}>
-        <div style={{ maxWidth: 1120, margin: "0 auto", padding: "48px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
+        <div style={{ maxWidth: 1120, margin: "0 auto", padding: `48px ${PAD_X}`, display: "flex", flexDirection: "column", gap: 24 }}>
           <span style={{ alignSelf: "center", fontFamily: MONO, fontSize: 11, letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.38)" }}>Benchmarked across 20 sports</span>
           <div style={{ overflow: "hidden", WebkitMaskImage: "linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)", maskImage: "linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)" }}>
             <div style={{ display: "flex", width: "max-content", animation: "lp-marquee 72s linear infinite" }}>
@@ -364,8 +397,8 @@ export default function Home() {
       {/* ----------------------------- audiences --------------------------- */}
       <section id="audiences" style={{ position: "relative", overflow: "hidden", ...SECTION_TOP }}>
         <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px)", backgroundSize: "72px 72px", WebkitMaskImage: "radial-gradient(ellipse 70% 55% at 50% 34%,#000 0%,transparent 78%)", maskImage: "radial-gradient(ellipse 70% 55% at 50% 34%,#000 0%,transparent 78%)" }} />
-        <div style={{ position: "absolute", top: -180, left: "50%", marginLeft: -520, width: 1040, height: 700, background: "radial-gradient(ellipse at center,rgba(0,145,214,.2) 0%,rgba(0,179,166,.06) 44%,rgba(5,9,26,0) 70%)", filter: "blur(30px)", animation: "lp-halo 18s ease-in-out infinite" }} />
-        <div style={{ position: "absolute", bottom: -160, right: -120, width: 620, height: 620, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,87,255,.16) 0%,rgba(5,9,26,0) 68%)", filter: "blur(28px)" }} />
+        <div className="lp-deco" style={{ position: "absolute", top: -180, left: "50%", marginLeft: -520, width: 1040, height: 700, background: "radial-gradient(ellipse at center,rgba(0,145,214,.2) 0%,rgba(0,179,166,.06) 44%,rgba(5,9,26,0) 70%)", filter: "blur(30px)", animation: "lp-halo 18s ease-in-out infinite" }} />
+        <div className="lp-deco" style={{ position: "absolute", bottom: -160, right: -120, width: 620, height: 620, borderRadius: "50%", background: "radial-gradient(circle,rgba(0,87,255,.16) 0%,rgba(5,9,26,0) 68%)", filter: "blur(28px)" }} />
         <div style={{ position: "relative", zIndex: 2, ...SHELL, display: "flex", flexDirection: "column", gap: 48 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 16, ...RISE() }}>
             <span style={EYEBROW}>Who it&apos;s for</span>
@@ -374,7 +407,7 @@ export default function Home() {
           <div style={{ border: "1px solid rgba(255,255,255,.09)", borderRadius: 16, background: "#0A1026", overflow: "hidden" }}>
             {AUDIENCES.map((a) => (
               <div key={a.title} className="lp-row" style={{ display: "flex", flexWrap: "wrap", gap: "20px 40px", alignItems: "baseline", padding: "34px 38px", borderBottom: a.border ? "1px solid rgba(255,255,255,.08)" : undefined, ["--hovbg" as string]: a.hov, ...RISE(a.d || 0.0001, a.c) }}>
-                <div style={{ flex: "0 0 280px", display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ flex: "1 1 240px", minWidth: 0, display: "flex", alignItems: "center", gap: 14 }}>
                   <span style={{ width: 24, height: 2, borderRadius: 1, background: a.grad }} />
                   <h3 style={{ margin: 0, fontFamily: HEAD, fontSize: 22, letterSpacing: "-.02em", fontWeight: 600, color: "#fff" }}>{a.title}</h3>
                 </div>
@@ -393,8 +426,8 @@ export default function Home() {
             <h2 style={H2}>From data to decisions in three steps.</h2>
           </div>
           <div data-steps="1" style={{ position: "relative" }}>
-            <div data-seq="1" style={{ position: "absolute", top: 65, left: "calc((100% - 40px)/6)", right: "calc((100% - 40px)/6)", height: 1, background: "linear-gradient(90deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)", transformOrigin: "left", animation: "lp-growX 1.9s .1s both cubic-bezier(.22,.7,.25,1)", animationPlayState: "paused" }} />
-            <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 20, alignItems: "stretch" }}>
+            <div data-seq="1" className="lp-hiw-line" style={{ position: "absolute", top: 65, left: "calc((100% - 40px)/6)", right: "calc((100% - 40px)/6)", height: 1, background: "linear-gradient(90deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)", transformOrigin: "left", animation: "lp-growX 1.9s .1s both cubic-bezier(.22,.7,.25,1)", animationPlayState: "paused" }} />
+            <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,260px),1fr))", gap: 20, alignItems: "stretch" }}>
               {STEPS.map((s) => (
                 <div key={s.n} data-seq="1" style={{ display: "flex", flexDirection: "column", gap: 18, animation: "lp-rise .8s both cubic-bezier(.22,.7,.25,1)", animationTimeline: "view()", animationRange: `entry 0% cover ${s.cover}%` }}>
                   <h3 style={{ margin: 0, textAlign: "center", fontFamily: HEAD, fontSize: 26, letterSpacing: "-.022em", fontWeight: 600, color: "#fff" }}>{s.title}</h3>
@@ -418,7 +451,7 @@ export default function Home() {
             <h2 style={H2}>What changes on day one.</h2>
           </div>
           <div style={{ ...CARD, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
+            <div className="lp-cmp-head" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
               <div style={{ padding: "22px 32px", borderRight: "1px solid rgba(255,255,255,.08)", display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(255,255,255,.24)" }} />
                 <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(255,255,255,.44)" }}>Without Bridgetx</span>
@@ -429,12 +462,16 @@ export default function Home() {
               </div>
             </div>
             {COMPARE.map((row, i) => (
-              <div key={row.label} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: i < COMPARE.length - 1 ? "1px solid rgba(255,255,255,.08)" : undefined, animation: "lp-rise .8s both cubic-bezier(.22,.7,.25,1)", animationTimeline: "view()", animationRange: `entry 0% cover ${row.c}%` }}>
+              <div key={row.label} className="lp-cmp-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: i < COMPARE.length - 1 ? "1px solid rgba(255,255,255,.08)" : undefined, animation: "lp-rise .8s both cubic-bezier(.22,.7,.25,1)", animationTimeline: "view()", animationRange: `entry 0% cover ${row.c}%` }}>
                 <div style={{ padding: "26px 32px", borderRight: "1px solid rgba(255,255,255,.08)", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {/* The Without/With tags replace the hidden header row when
+                      the grid stacks on phones; desktop hides them instead. */}
+                  <span className="lp-cmp-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.44)" }}>Without Bridgetx</span>
                   <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.3)" }}>{row.label}</span>
                   <span style={{ fontSize: 16, lineHeight: 1.6, color: "rgba(255,255,255,.5)", textWrap: "pretty" }}>{row.without}</span>
                 </div>
                 <div style={{ padding: "26px 32px", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span className="lp-cmp-tag" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#4FD8CE" }}>With Bridgetx</span>
                   <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: row.tint }}>{row.label}</span>
                   <span style={{ fontSize: 16, lineHeight: 1.6, color: "#fff", textWrap: "pretty" }}>{row.with}</span>
                 </div>
@@ -446,9 +483,9 @@ export default function Home() {
 
       {/* ------------------------------- CTA ------------------------------- */}
       <section id="demo" style={{ position: "relative", overflow: "hidden", ...SECTION_TOP }}>
-        <div data-cta-glow="1" style={{ position: "absolute", bottom: -320, left: "50%", marginLeft: -500, width: 1000, height: 680, background: "radial-gradient(ellipse at center,rgba(0,145,214,.24) 0%,rgba(0,179,166,.07) 44%,rgba(5,9,26,0) 70%)", filter: "blur(30px)", opacity: 0.7, willChange: "transform, opacity" }} />
-        <div style={{ position: "relative", zIndex: 2, maxWidth: 1120, margin: "0 auto", padding: "130px 32px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 24 }}>
-          <h2 style={{ margin: 0, maxWidth: 760, fontFamily: HEAD, fontSize: 66, lineHeight: 1, letterSpacing: "-.04em", fontWeight: 600, color: "#fff", textWrap: "pretty", animation: "lp-rise 1s both cubic-bezier(.22,.7,.25,1)", animationTimeline: "view()", animationRange: "entry 0% cover 32%" }}>Ready to bridge the gap?</h2>
+        <div data-cta-glow="1" className="lp-deco" style={{ position: "absolute", bottom: -320, left: "50%", marginLeft: -500, width: 1000, height: 680, background: "radial-gradient(ellipse at center,rgba(0,145,214,.24) 0%,rgba(0,179,166,.07) 44%,rgba(5,9,26,0) 70%)", filter: "blur(30px)", opacity: 0.7, willChange: "transform, opacity" }} />
+        <div style={{ position: "relative", zIndex: 2, maxWidth: 1120, margin: "0 auto", padding: `clamp(72px, 16vw, 130px) ${PAD_X}`, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 24 }}>
+          <h2 style={{ margin: 0, maxWidth: 760, fontFamily: HEAD, fontSize: "clamp(36px,10vw,66px)", lineHeight: 1, letterSpacing: "-.04em", fontWeight: 600, color: "#fff", textWrap: "pretty", animation: "lp-rise 1s both cubic-bezier(.22,.7,.25,1)", animationTimeline: "view()", animationRange: "entry 0% cover 32%" }}>Ready to bridge the gap?</h2>
           <p style={{ margin: 0, maxWidth: 560, fontSize: 18, lineHeight: 1.65, color: "rgba(255,255,255,.6)", textWrap: "pretty" }}>Book a 15-minute call and see how Bridgetx fits your club, your sport, your workflow.</p>
           <div style={{ display: "flex", marginTop: 6 }}>
             <a data-cta-btn="1" href="/book" className="lp-btn" style={{ position: "relative", flex: "none", whiteSpace: "nowrap", padding: "15px 28px", borderRadius: 11, fontSize: 15, fontWeight: 600, color: "#fff", background: "linear-gradient(135deg,#00B3A6,#0091D6,#0057FF,#0A2D8F)" }}>Book a Meeting</a>
@@ -459,10 +496,10 @@ export default function Home() {
 
       {/* ------------------------------ footer ----------------------------- */}
       <footer style={SECTION_TOP}>
-        <div style={{ maxWidth: 1120, margin: "0 auto", padding: "56px 32px 40px", display: "flex", flexDirection: "column", gap: 44 }}>
+        <div style={{ maxWidth: 1120, margin: "0 auto", padding: `56px ${PAD_X} 40px`, display: "flex", flexDirection: "column", gap: 44 }}>
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 56 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 260 }}>
-              <Image src="/brand/logo-horizontal-dark.svg" alt="Bridgetx" width={277} height={81} style={{ height: 81, width: 277, display: "block" }} />
+              <Image src="/brand/logo-horizontal-dark.svg" alt="Bridgetx" width={277} height={81} style={{ height: "auto", width: "100%", maxWidth: 277, display: "block" }} />
               <span style={{ fontSize: 13, lineHeight: 1.6, color: "rgba(255,255,255,.4)" }}>Bridging Potential to High Performance.</span>
               <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                 {SOCIALS.map((s) => (
@@ -473,7 +510,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 64 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "clamp(28px, 8vw, 64px)" }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(255,255,255,.34)" }}>Platform</span>
                 <a href="#platform" style={{ fontSize: 14 }}>Track everything</a>

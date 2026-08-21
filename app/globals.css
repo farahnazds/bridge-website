@@ -274,6 +274,63 @@ body:has(.bx-modal[open]) {
   .lp-problems > :last-child { grid-column: auto; }
 }
 
+/* --------------------------------------------------------------------------
+   Landing mobile pass (2026-08-21). Classes rather than inline styles because
+   every one of these needs a media query, which inline styles cannot express.
+   Breakpoints: 640px is the app's conventional `sm:` line; 760px is where the
+   full nav row genuinely fits (~640px content + padding); 920px is where the
+   how-it-works connector's three-column geometry stops being true.
+   -------------------------------------------------------------------------- */
+
+/* Nav: full link row on desktop, burger + dropdown panel below 760px. Layout
+   styles live HERE (not inline) so display can be media-switched. */
+.lp-nav-links { display: flex; align-items: center; gap: 26px; font-size: 14px; white-space: nowrap; }
+.lp-nav-burger {
+  display: none; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, .16);
+  background: none; color: rgba(255, 255, 255, .86); cursor: pointer;
+}
+.lp-nav-menu {
+  position: absolute; top: 60px; left: 0; right: 0; z-index: 39;
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 20px 20px;
+  background: rgba(5, 9, 26, .97); backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, .09);
+}
+.lp-nav-menu a { padding: 12px 4px; font-size: 16px; }
+@media (max-width: 759px) {
+  .lp-nav-links { display: none; }
+  .lp-nav-burger { display: flex; }
+}
+
+/* The how-it-works connector line is positioned for exactly three columns;
+   below three columns it renders as a stray rule across stacked cards. */
+@media (max-width: 919px) { .lp-hiw-line { display: none; } }
+
+/* Before/After: the two-column comparison stacks to one on phones. The header
+   row disappears and each cell's own Without/With tag (hidden on desktop)
+   takes over its job. !important is needed because the grid template and the
+   divider are inline styles. */
+@media (min-width: 641px) { .lp-cmp-tag { display: none; } }
+@media (max-width: 640px) {
+  .lp-cmp-head { display: none; }
+  .lp-cmp-row { grid-template-columns: 1fr !important; }
+  .lp-cmp-row > div { border-right: none !important; }
+
+  /* The five oversized blurred glow layers are hidden on phones — three of
+     them animate forever and all are expensive to composite on mobile GPUs.
+     The hero keeps its one inner glow as the single ambient layer. */
+  .lp-deco { display: none; }
+
+  /* Mobile hero treatment: the bridge is server-rendered in its settled
+     state (no rAF on phones — see LandingMotion.tsx) and draws itself in
+     once via stroke-dashoffset; the athlete dots pulse gently. Reduced
+     motion collapses both to their final state via the .lp * rules below. */
+  .lp-draw { stroke-dasharray: 1; animation: lp-drawIn 1.6s .25s both cubic-bezier(.22, .7, .25, 1); }
+  .lp-fadein { animation: lp-fade 1.1s .9s both; }
+  .lp-dot { transform-box: fill-box; transform-origin: center; animation: lp-dotpulse 2.8s ease-in-out infinite; }
+}
+@keyframes lp-dotpulse { 0%, 100% { opacity: .6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.35); } }
+
 @keyframes lp-rise { from { opacity: 0; transform: translateY(var(--rv, 22px)); } to { opacity: 1; transform: none; } }
 @keyframes lp-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lp-growX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
