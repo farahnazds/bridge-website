@@ -1,9 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_FULL, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import { FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import GeneratingSubmit from "@/components/GeneratingSubmit";
 import AthleteSelectField from "@/components/AthleteSelectField";
-import { useFormStatus } from "react-dom";
 import AudienceField from "@/components/AudienceField";
 import { generateCombinedReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
@@ -37,21 +37,16 @@ function defaultDate(daysAgo: number): string {
 }
 
 function SubmitButton({ count }: { count: number }) {
-  const { pending } = useFormStatus();
-  const disabled = pending || count < MIN_COMBINED_TYPES || count > MAX_COMBINED_TYPES;
   return (
-    <button
-      type="submit"
-      disabled={disabled}
-      className={BTN_PRIMARY_FULL}
-      style={{ backgroundImage: "var(--brand-gradient-action)" }}
-    >
-      {pending
-        ? "Generating… a combined report takes longer, usually 40–90 seconds"
-        : count < MIN_COMBINED_TYPES
+    <GeneratingSubmit
+      slow
+      disabled={count < MIN_COMBINED_TYPES || count > MAX_COMBINED_TYPES}
+      idleLabel={
+        count < MIN_COMBINED_TYPES
           ? `Select at least ${MIN_COMBINED_TYPES} report types`
-          : `Generate combined report (${count} types)`}
-    </button>
+          : `Generate combined report (${count} types)`
+      }
+    />
   );
 }
 

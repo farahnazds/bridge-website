@@ -1,9 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { BTN_PRIMARY_FULL, FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import { FORM_GRID, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
+import GeneratingSubmit from "@/components/GeneratingSubmit";
 import AthleteSelectField from "@/components/AthleteSelectField";
-import { useFormStatus } from "react-dom";
 import AudienceField from "@/components/AudienceField";
 import { generatePerformanceReport, type GenerateReportState } from "./actions";
 import ShareReportPanel, { type RecipientCandidate } from "./ShareReportPanel";
@@ -22,20 +22,6 @@ function defaultDate(daysAgo: number): string {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
   return d.toISOString().slice(0, 10);
-}
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className={BTN_PRIMARY_FULL}
-      style={{ backgroundImage: "var(--brand-gradient-action)" }}
-    >
-      {pending ? "Generating… usually 15–60 seconds" : "Generate performance report"}
-    </button>
-  );
 }
 
 export default function PerformanceReportForm({
@@ -174,10 +160,10 @@ export default function PerformanceReportForm({
           </p>
         )}
 
-        {/* SubmitButton is still BTN_PRIMARY_FULL — it fills this wrapper, not
-            the card. Left unwrapped it would have become a ~1100px button. */}
+        {/* GeneratingSubmit's button is BTN_PRIMARY_FULL — it fills this wrapper,
+            not the card. Left unwrapped it would have become a ~1100px button. */}
         <div className="col-span-full sm:max-w-xs">
-          <SubmitButton />
+          <GeneratingSubmit idleLabel="Generate performance report" />
         </div>
       </form>
 
