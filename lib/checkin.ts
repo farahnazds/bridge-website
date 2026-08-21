@@ -196,6 +196,33 @@ export function recentDates(days = CHECKIN_STRIP_DAYS): string[] {
   return out;
 }
 
+// ------------------------------------------------------------------- streak
+
+/**
+ * Current streak: consecutive `completed` days counting back from today.
+ *
+ * If today simply hasn't been logged yet — the common case, most of the day
+ * hasn't happened — that does not break the streak; counting starts from
+ * yesterday instead. Only a missed PAST day, or an explicit `skipped` row,
+ * ends it. Lived inline on the athlete Home page until 2026-08-21; moved here
+ * so the mobile app (which vendors this file) computes the same number rather
+ * than re-deriving the rule.
+ *
+ * @param statusByDate  date -> checkins.status for every row that exists
+ * @param todayStr      the app's "today" (UTC, via toDateStr — see
+ *                      docs/09-roadmap.md on the timezone convention)
+ */
+export function computeStreak(statusByDate: ReadonlyMap<string, string>, todayStr: string): number {
+  const cursor = new Date(todayStr);
+  if (statusByDate.get(todayStr) !== "completed") cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (statusByDate.get(toDateStr(cursor)) === "completed") {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
 /**
  * Mirrors within_checkin_window() from migration 034.
  *

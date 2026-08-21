@@ -2,40 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { INTENSITIES, INTENSITY_COLOUR, SESSION_TYPES } from "@/lib/constants";
+import {
+  CHECKIN_NOT_LOGGED, CHECKIN_STATUS_STYLE, INJURY_STATUS_STYLE, INTENSITIES, INTENSITY_COLOUR,
+  REPORT_TYPE_LABELS, RTP_PHASE_LABEL, SESSION_TYPES,
+} from "@/lib/constants";
+import { computeStreak, recentDates, toDateStr } from "@/lib/checkin";
 import { BADGE, CARD } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Home — Bridgetx",
 };
 
-const STATUS_STYLE: Record<string, { label: string; color: string }> = {
-  completed: { label: "Completed", color: "var(--success)" },
-  skipped: { label: "Skipped", color: "var(--danger)" },
-};
-const NOT_LOGGED = { label: "Not yet logged", color: "var(--text-muted)" };
-
-const INJURY_STATUS_STYLE: Record<string, { label: string; color: string }> = {
-  active: { label: "Active", color: "var(--danger)" },
-  recovering: { label: "Recovering", color: "var(--brand-blue)" },
-  cleared: { label: "Cleared", color: "var(--success)" },
-};
-const RTP_PHASE_LABEL: Record<string, string> = {
-  acute: "Acute",
-  sub_acute: "Sub-acute",
-  return_to_training: "Return to Training",
-  returned: "Returned",
-};
-
+// Status vocabularies (check-in, injury, RTP phase) and the streak rule used
+// to live inline here. They moved to lib/constants.ts and lib/checkin.ts on
+// 2026-08-21 so the mobile app — which vendors those two files — shows the
+// same words, colours and streak number as this page. Behaviour unchanged.
 const INTENSITY_LABEL: Record<string, string> = Object.fromEntries(INTENSITIES.map((i) => [i.value, i.label]));
 const SESSION_TYPE_LABEL: Record<string, string> = Object.fromEntries(SESSION_TYPES.map((t) => [t.value, t.label]));
 // Intensity colours come from lib/constants.ts#INTENSITY_COLOUR. There used to
 // be a local copy here; five of them existed across the app and the practitioner
 // and athlete surfaces had drifted to different palettes for the same value.
-
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -74,31 +60,18 @@ export default async function AthleteHomePage({
 
   const checkinByDate = new Map((recentCheckins ?? []).map((c) => [c.date, c.status]));
 
-  const today = new Date();
-  const todayStr = toDateStr(today);
+  const todayStr = toDateStr(new Date());
   const todayStatus = checkinByDate.get(todayStr);
 
-  // Streak: consecutive completed days counting back from today. If
-  // today just hasn't been logged yet (the common case — most of the day
-  // hasn't happened), that doesn't break the streak; only a missed PAST
-  // day (or an explicit skip) does.
-  const cursor = new Date(today);
-  if (todayStatus !== "completed") cursor.setDate(cursor.getDate() - 1);
-  let streak = 0;
-  while (checkinByDate.get(toDateStr(cursor)) === "completed") {
-    streak++;
-    cursor.setDate(cursor.getDate() - 1);
-  }
+  // Streak rule lives in lib/checkin.ts#computeStreak (today-not-yet-logged
+  // does not break it; a missed past day or an explicit skip does).
+  const streak = computeStreak(checkinByDate, todayStr);
 
-  // Last 7 days, oldest first, for the mini history row.
-  const last7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (6 - i));
-    const dateStr = toDateStr(d);
-    return { dateStr, status: checkinByDate.get(dateStr) };
-  });
+  // Last 7 days, oldest first, for the mini history row — the same seven
+  // dates the Daily Check-In strip shows.
+  const last7 = recentDates(7).map((dateStr) => ({ dateStr, status: checkinByDate.get(dateStr) }));
 
-  const todayDisplay = todayStatus ? STATUS_STYLE[todayStatus] ?? NOT_LOGGED : NOT_LOGGED;
+  const todayDisplay = todayStatus ? CHECKIN_STATUS_STYLE[todayStatus] ?? CHECKIN_NOT_LOGGED : CHECKIN_NOT_LOGGED;
 
   const { data: latestReport } = profile
     ? await supabase
@@ -192,7 +165,7 @@ export default async function AthleteHomePage({
         </p>
         <div className="flex justify-between gap-2">
           {last7.map(({ dateStr, status }) => {
-            const display = status ? STATUS_STYLE[status] ?? NOT_LOGGED : NOT_LOGGED;
+            const display = status ? CHECKIN_STATUS_STYLE[status] ?? CHECKIN_NOT_LOGGED : CHECKIN_NOT_LOGGED;
             return (
               <div key={dateStr} className="flex flex-1 flex-col items-center gap-1.5">
                 <span
@@ -306,7 +279,12 @@ export default async function AthleteHomePage({
         </p>
         {latestReport ? (
           <div>
-            <p style={{ color: "var(--text)" }}>{latestReport.report_types.join(", ")}</p>
+            {/* Human labels rather than the raw keys ("body_composition") this
+                card used to print — the same REPORT_TYPE_LABELS every other
+                report surface uses. Fixed 2026-08-21 alongside the mobile Home. */}
+            <p style={{ color: "var(--text)" }}>
+              {latestReport.report_types.map((t) => REPORT_TYPE_LABELS[t] ?? t).join(", ")}
+            </p>
             <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
               Shared {new Date(latestReport.created_at).toLocaleDateString()}
             </p>

@@ -307,6 +307,37 @@ export const REPORT_TYPE_LABELS: Record<string, string> = {
   injury: "Injury",
 };
 
+// ---------------------------------------------------------------------------
+// Athlete-facing status vocabularies. Lived inline on the athlete Home page
+// until 2026-08-21; moved here so the mobile app (which vendors this file)
+// shows the same words and colours. Colours are CSS custom properties, like
+// INTENSITY_COLOUR below — mobile maps them to its token values.
+// ---------------------------------------------------------------------------
+
+/** checkins.status as the Home page shows it; absence of a row is "Not yet
+ *  logged". Matches the status check constraint in database/schema.sql. */
+export const CHECKIN_STATUS_STYLE: Record<string, { label: string; color: string }> = {
+  completed: { label: "Completed", color: "var(--success)" },
+  skipped: { label: "Skipped", color: "var(--danger)" },
+};
+export const CHECKIN_NOT_LOGGED = { label: "Not yet logged", color: "var(--text-muted)" } as const;
+
+/** injuries.status as shown to the athlete (status-level only — see
+ *  docs/09-roadmap.md, clinical detail is deferred). */
+export const INJURY_STATUS_STYLE: Record<string, { label: string; color: string }> = {
+  active: { label: "Active", color: "var(--danger)" },
+  recovering: { label: "Recovering", color: "var(--brand-blue)" },
+  cleared: { label: "Cleared", color: "var(--success)" },
+};
+
+/** injuries.rtp_phase → human label. */
+export const RTP_PHASE_LABEL: Record<string, string> = {
+  acute: "Acute",
+  sub_acute: "Sub-acute",
+  return_to_training: "Return to Training",
+  returned: "Returned",
+};
+
 // `vald_data.test_type` is free text (schema.sql comments it "e.g. cmj,
 // nordic_curl"), so this is an open list with an "Other" escape hatch —
 // same pattern as SPORTS / SPECIALTIES. VALD's own device lineup changes
