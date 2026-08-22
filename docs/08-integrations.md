@@ -48,6 +48,79 @@ name, DOB, gender, **ethnicity**, conditions, allergies, injuries with their
 clinical description, assessments, GPS/VALD and check-ins — to Anthropic.
 Named as a processor in `app/privacy/page.tsx` section 6.
 
+## Google Calendar — PARTIAL (OAuth wired 2026-08-22; refresh token not yet minted)
+
+Backs the public Book-a-Meeting flow. `lib/booking.ts` is the single seam —
+`getAvailability()` and `createBooking()` are the whole contract, and both
+still run their documented PLACEHOLDER logic until the refresh token exists.
+
+**OAuth, not a service account.** The Google Cloud org policy
+`constraints/iam.disableServiceAccountKeyCreation` blocks service-account key
+creation. OAuth creates no key, and lets us request two narrow scopes instead
+of sharing a calendar with a service identity. Trade-off recorded honestly: the
+refresh token is still a long-lived bearer secret, and it is tied to one
+person's Google account — revoking access, or six months of disuse, breaks
+booking until someone re-authorises.
+
+**Scopes — least privilege, and verified against the API reference:**
+
+- `https://www.googleapis.com/auth/calendar.freebusy` — opaque busy/free ranges
+  only. Cannot read any meeting's title, attendees or notes.
+- `https://www.googleapis.com/auth/calendar.events` — create the booking event.
+
+Deliberately NOT `calendar` or `calendar.readonly`, which would expose the
+content of every meeting. Google's scope-chooser page implies freebusy needs
+the broad scope; the `freebusy.query` reference lists `calendar.freebusy` among
+its accepted scopes, which is why the narrow pair works. Widening this list
+means re-consenting AND updating `app/privacy/page.tsx` §6–7.
+
+**Registered redirect URIs** (Google Auth Platform → Clients). These must match
+byte-for-byte, which is why `googleRedirectUri()` in `lib/googleOAuth.ts` is the
+only place either route builds one:
+
+```
+http://localhost:3000/api/google/oauth/callback
+https://thebridgehp.com/api/google/oauth/callback
+```
+
+Minting the token from `bridgetx.co` would need that origin registered too.
+
+**⚠️ Publishing status is load-bearing.** While the OAuth consent screen sits in
+**Testing**, Google revokes refresh tokens after **7 days** — the integration
+would work for a week and then die, every week. It must be **In production**.
+Verification is not required: exactly one person ever authorises, so the
+unverified-app warning is seen once and the 100-user cap is irrelevant.
+
+**Built (2026-08-22):**
+
+- `lib/googleOAuth.ts` — scopes, the single redirect-URI helper, the authorize
+  URL (`access_type=offline` + `prompt=consent`, which together are what
+  actually cause a refresh token to be issued), and the code→token exchange.
+  Dependency-free `fetch`, not `googleapis`.
+- `app/api/google/oauth/start` and `/callback` — the one-time consent flow.
+  **Super admin only, both halves**, httpOnly CSRF state cookie consumed on
+  every path. The callback displays the refresh token once and never logs it.
+  Kept rather than deleted after first use: re-authorising after a revoke is
+  then a two-minute job, and the route grants nothing without both a
+  super-admin session and Google consent.
+
+**Still to build:** the freebusy read and `events.insert` write inside
+`lib/booking.ts`, replacing the two PLACEHOLDER blocks; a re-check of freebusy
+immediately before insert so two visitors cannot take the same slot; and the
+confirmed-booking wording in `app/book/schedule/ScheduleClient.tsx`.
+
+**Environment** (all four registered in `lib/envManifest.ts` as OPTIONAL, so an
+unconfigured calendar degrades to the placeholder rather than failing the
+build): `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`,
+`GOOGLE_CALENDAR_ID`, `GOOGLE_OAUTH_REFRESH_TOKEN`.
+
+> **Whitespace trap.** `checkEnv` trims and dotenv trims `.env.local`, but the
+> **Vercel dashboard does not trim what you paste**. All three of the first
+> three arrived with a leading space on 2026-08-22 and were fixed locally; a
+> leading space reaches Google verbatim and returns an opaque `invalid_client`.
+> The manifest shapes are anchored so a recurrence fails as a malformed
+> variable instead of a runtime mystery.
+
 ## Stripe — NOT ACTIVE
 No live payment gateway anywhere in this build yet. Clubs are
 contract-based. Independent tier gets a Pricing/Plans config in Super

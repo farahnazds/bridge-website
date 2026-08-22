@@ -104,6 +104,51 @@ export const ENV_MANIFEST: EnvVarSpec[] = [
     shapeHint: "an absolute URL",
     level: "optional",
   },
+
+  // --- Google Calendar (Book-a-Meeting) -------------------------------------
+  // All four are OPTIONAL on purpose. lib/booking.ts ships a working
+  // placeholder — a weekday slot grid that records a REQUEST rather than a
+  // confirmed booking — so an unconfigured calendar degrades to the honest
+  // pre-integration behaviour instead of failing the build. Promote these to
+  // "required" only once the placeholder is gone and a missing variable would
+  // genuinely mean a broken booking page.
+  //
+  // NOTE ON WHITESPACE: checkEnv trims before testing, and dotenv trims
+  // .env.local, but the VERCEL dashboard does not trim what you paste. A
+  // leading space on any of these reaches Google verbatim and comes back as an
+  // opaque `invalid_client`. All three were pasted with a leading space on
+  // 2026-08-22; the shapes below are anchored so that recurring shows up as a
+  // malformed-variable failure rather than a runtime mystery.
+  {
+    name: "GOOGLE_OAUTH_CLIENT_ID",
+    usedFor:
+      "the Google Calendar consent flow (/api/google/oauth/start) and every access-token refresh",
+    shape: /^\d+-[A-Za-z0-9_]+\.apps\.googleusercontent\.com$/,
+    shapeHint: "<digits>-<id>.apps.googleusercontent.com",
+    level: "optional",
+  },
+  {
+    name: "GOOGLE_OAUTH_CLIENT_SECRET",
+    usedFor: "exchanging the authorisation code, and refreshing the access token thereafter",
+    shape: /^GOCSPX-[A-Za-z0-9_-]{10,}$/,
+    shapeHint: "GOCSPX-…",
+    level: "optional",
+  },
+  {
+    name: "GOOGLE_CALENDAR_ID",
+    usedFor: "which calendar availability is read from and booking events are written to",
+    shape: /^(primary|[^\s@]+@[^\s@]+\.[^\s@]+)$/,
+    shapeHint: '"primary" or a calendar address ending @group.calendar.google.com',
+    level: "optional",
+  },
+  {
+    name: "GOOGLE_OAUTH_REFRESH_TOKEN",
+    usedFor:
+      "acting on the owner's calendar unattended; minted ONCE via /api/google/oauth/start and pasted here. Without it, availability and booking stay on the placeholder path",
+    shape: /^1\/\/[A-Za-z0-9_/-]{20,}$/,
+    shapeHint: "1//… (issued by Google, shown once by the OAuth callback)",
+    level: "optional",
+  },
 ];
 
 export interface EnvCheckResult {
