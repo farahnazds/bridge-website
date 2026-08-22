@@ -83,15 +83,25 @@ export default async function AthleteProfilePage({
   const profile = await getCurrentProfile();
 
   // "athlete reads own row" RLS scopes this to the caller's own athlete row.
-  const { data, error } = await supabase
-    .from("athletes")
-    .select(
-      "first_name, last_name, code, country, dob, gender, ethnicity, sport, position, tier, diet_preference, height_cm, profile_photo_url, status, created_at, clubs(name)"
-    )
-    .eq("id", athleteId)
-    .maybeSingle();
+  //
+  // The club NAME comes from the athlete_own_club view (migration 050), not a
+  // `clubs(name)` embed: `clubs` has no athlete read policy, so the embed was
+  // always null and every athlete saw "No club" here. The view is the narrow,
+  // column-scoped read path — same pattern as the consultants' view in 025.
+  const [{ data, error }, { data: ownClub }] = await Promise.all([
+    supabase
+      .from("athletes")
+      .select(
+        "first_name, last_name, code, country, dob, gender, ethnicity, sport, position, tier, diet_preference, height_cm, profile_photo_url, status, created_at"
+      )
+      .eq("id", athleteId)
+      .maybeSingle(),
+    supabase.from("athlete_own_club").select("name").maybeSingle(),
+  ]);
 
-  const athlete = data as unknown as AthleteRow | null;
+  const athlete = data
+    ? ({ ...(data as unknown as Omit<AthleteRow, "clubs">), clubs: ownClub?.name ? { name: ownClub.name } : null } as AthleteRow)
+    : null;
 
   // Photo lives in the private profile-photos bucket, so it needs a
   // short-lived signed URL rather than a public link.

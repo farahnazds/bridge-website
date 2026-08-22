@@ -1518,3 +1518,18 @@ reads this table, so inside a policy on this table it would recurse. The
 helper answers one boolean about the caller's own membership and exposes no
 other row. Additive — the own-row policy stays; manager/admin policies are
 unchanged.
+
+## Added: athlete reads own club NAME via a view (2026-08-22, migration 050)
+
+`clubs` had read policies for super admin, admin, club staff and consultants —
+none for athletes — so the athlete Profile page's `clubs(name)` embed was always
+null and every athlete saw "No club". Confirmed with a test-athlete session:
+`clubs: null`; `select … from clubs` returns no rows.
+
+Fixed with the migration-025 pattern rather than a row policy (a row policy on
+`clubs` would grant every column): view `athlete_own_club (id, name)` runs with
+its owner's privileges and is filtered to the CALLER's own athlete row
+(`a.profile_id = current_profile_id()`); `grant select` to `authenticated`. The
+WHERE clause is the whole boundary — it must never accept a caller-supplied
+id. Guided/independent athletes (no club) read an empty set. The Profile page
+and the mobile app read the club name from this view.

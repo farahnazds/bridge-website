@@ -48,6 +48,13 @@ export type Database = {
             foreignKeyName: "admin_club_assignments_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_club_assignments_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
@@ -375,6 +382,13 @@ export type Database = {
             foreignKeyName: "athlete_relationship_history_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_relationship_history_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
@@ -538,6 +552,13 @@ export type Database = {
           weight_kg?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "athletes_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "athletes_club_id_fkey"
             columns: ["club_id"]
@@ -835,6 +856,13 @@ export type Database = {
             foreignKeyName: "club_brand_products_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_brand_products_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
@@ -899,6 +927,13 @@ export type Database = {
             foreignKeyName: "club_branding_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: true
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_branding_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
@@ -938,6 +973,13 @@ export type Database = {
           profile_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "club_notify_recipients_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "club_notify_recipients_club_id_fkey"
             columns: ["club_id"]
@@ -997,6 +1039,13 @@ export type Database = {
             foreignKeyName: "club_settings_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: true
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_settings_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
@@ -1039,6 +1088,13 @@ export type Database = {
           staff_role?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "club_staff_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "club_staff_club_id_fkey"
             columns: ["club_id"]
@@ -1217,6 +1273,13 @@ export type Database = {
             foreignKeyName: "competitions_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
@@ -1299,6 +1362,13 @@ export type Database = {
             columns: ["target_athlete_id"]
             isOneToOne: false
             referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_target_club_id_fkey"
+            columns: ["target_club_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_own_club"
             referencedColumns: ["id"]
           },
           {
@@ -1772,6 +1842,13 @@ export type Database = {
             foreignKeyName: "partnerships_consultant_clubs_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnerships_consultant_clubs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
@@ -1957,6 +2034,13 @@ export type Database = {
             columns: ["athlete_id"]
             isOneToOne: false
             referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_own_club"
             referencedColumns: ["id"]
           },
           {
@@ -2581,6 +2665,13 @@ export type Database = {
             foreignKeyName: "teams_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
@@ -2755,6 +2846,13 @@ export type Database = {
       }
     }
     Views: {
+      athlete_own_club: {
+        Row: {
+          id: string | null
+          name: string | null
+        }
+        Relationships: []
+      }
       consultant_referred_clubs: {
         Row: {
           id: string | null
