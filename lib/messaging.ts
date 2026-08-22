@@ -124,10 +124,9 @@ export interface Contact {
 // a club athlete: they could reply in a thread a practitioner started, but
 // never start one. Confirmed with a test-athlete session before the fix.
 //
-// The view filters to the CALLER (current_profile_id()), so athleteId is not
-// a filter here — it is kept in the signature because both messenger pages
-// pass it and the independent tree may one day need it.
-export async function getContactsForAthlete(_athleteId: string): Promise<Contact[]> {
+// The view filters to the CALLER (current_profile_id()), so no athlete id is
+// needed — the caller IS the athlete.
+export async function getContactsForAthlete(): Promise<Contact[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("athlete_message_contacts")

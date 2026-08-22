@@ -16,7 +16,7 @@ export default async function AthleteMessengerPage({
 
   const [threads, contacts] = await Promise.all([
     getThreadsForCurrentProfile(profile.id),
-    getContactsForAthlete(athleteId),
+    getContactsForAthlete(),
   ]);
 
   // Reply recipients are computed here rather than client-side because the
