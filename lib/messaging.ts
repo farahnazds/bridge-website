@@ -112,61 +112,36 @@ export interface Contact {
   role: string;
 }
 
-// The practitioners an athlete may start a conversation with. Mirrors the
-// first three branches of can_message_profile() in
-// database/migrations/013_messenger_policies.sql — the RLS policy is the
-// real boundary; this exists so the UI only offers valid choices instead of
-// letting someone pick a recipient the insert would then reject.
-export async function getContactsForAthlete(athleteId: string): Promise<Contact[]> {
+// The people an athlete may start a conversation with — read from the
+// athlete_message_contacts view (migration 051), which IS the three athlete
+// branches of can_message_profile() as a column-scoped list, so the UI can
+// only ever offer a recipient the insert policy ("sender addresses own
+// message") will accept.
+//
+// Until 2026-08-22 this walked athlete_teams -> staff_team_assignments ->
+// profiles (+ club_staff managers) under the athlete's own RLS. None of those
+// staffing tables has an athlete read policy, so the list was always EMPTY for
+// a club athlete: they could reply in a thread a practitioner started, but
+// never start one. Confirmed with a test-athlete session before the fix.
+//
+// The view filters to the CALLER (current_profile_id()), so athleteId is not
+// a filter here — it is kept in the signature because both messenger pages
+// pass it and the independent tree may one day need it.
+export async function getContactsForAthlete(_athleteId: string): Promise<Contact[]> {
   const supabase = await createClient();
-
-  const { data: teamRows } = await supabase
-    .from("athlete_teams")
-    .select("team_id")
-    .eq("athlete_id", athleteId);
-  const teamIds = (teamRows ?? []).map((t) => t.team_id as string);
+  const { data } = await supabase
+    .from("athlete_message_contacts")
+    .select("id, first_name, last_name, specialty, role");
 
   const contacts = new Map<string, Contact>();
-
-  if (teamIds.length > 0) {
-    const { data: assigned } = await supabase
-      .from("staff_team_assignments")
-      .select("staff_profile_id, profiles(id, first_name, last_name, specialty)")
-      .in("team_id", teamIds);
-    for (const row of assigned ?? []) {
-      const p = row.profiles as unknown as
-        | { id: string; first_name: string | null; last_name: string | null; specialty: string | null }
-        | null;
-      if (p) {
-        contacts.set(p.id, {
-          id: p.id,
-          name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Practitioner",
-          role: p.specialty ?? "Practitioner",
-        });
-      }
-    }
+  for (const p of data ?? []) {
+    if (!p.id || contacts.has(p.id)) continue;
+    const isManager = p.role === "club_manager";
+    contacts.set(p.id, {
+      id: p.id,
+      name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || (isManager ? "Club Manager" : "Practitioner"),
+      role: isManager ? "Club Manager" : p.specialty ?? "Practitioner",
+    });
   }
-
-  const { data: athlete } = await supabase.from("athletes").select("club_id").eq("id", athleteId).single();
-  if (athlete?.club_id) {
-    const { data: managers } = await supabase
-      .from("club_staff")
-      .select("profile_id, profiles(id, first_name, last_name)")
-      .eq("club_id", athlete.club_id)
-      .eq("staff_role", "club_manager");
-    for (const row of managers ?? []) {
-      const p = row.profiles as unknown as
-        | { id: string; first_name: string | null; last_name: string | null }
-        | null;
-      if (p && !contacts.has(p.id)) {
-        contacts.set(p.id, {
-          id: p.id,
-          name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Club Manager",
-          role: "Club Manager",
-        });
-      }
-    }
-  }
-
   return [...contacts.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

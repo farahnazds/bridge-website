@@ -1533,3 +1533,21 @@ its owner's privileges and is filtered to the CALLER's own athlete row
 WHERE clause is the whole boundary — it must never accept a caller-supplied
 id. Guided/independent athletes (no club) read an empty set. The Profile page
 and the mobile app read the club name from this view.
+
+## Added: athlete lists who they may message via a view (2026-08-22, migration 051)
+
+The athlete Messenger's "New message" contact list was built by reading
+`athlete_teams` → `staff_team_assignments` → `profiles` (+ `club_staff`
+managers) under the athlete's own RLS; none of those tables has an athlete read
+policy, so the list was always EMPTY for a club athlete — they could reply in a
+thread a practitioner started but never start one. Confirmed with a
+test-athlete session: all three reads return no rows.
+
+Fixed with the 025/050 pattern: view `athlete_message_contacts (id,
+first_name, last_name, specialty, role)` runs with its owner's privileges and
+is filtered to the CALLER via exactly the three athlete branches of
+`can_message_profile()` (team practitioners, club managers, live independent
+practitioners), excluding the caller; `grant select` to `authenticated`. The
+WHERE is the whole boundary. The insert policy "sender addresses own message"
+remains the enforcement — the view only lists what that policy would accept.
+Both messenger surfaces (web athlete page, mobile) read it.
