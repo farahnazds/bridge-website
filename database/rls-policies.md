@@ -1551,3 +1551,49 @@ practitioners), excluding the caller; `grant select` to `authenticated`. The
 WHERE is the whole boundary. The insert policy "sender addresses own message"
 remains the enforcement — the view only lists what that policy would accept.
 Both messenger surfaces (web athlete page, mobile) read it.
+
+## Hardened: `security_barrier` on all four SECURITY DEFINER views (2026-08-22, migration 052)
+
+The four caller-scoped definer views — `injuries_athlete_view`,
+`athlete_own_club`, `consultant_referred_clubs`, `athlete_message_contacts`
+— all now carry `security_barrier = true` in addition to their WHERE-clause
+boundary.
+
+**Supabase's `security_definer_view` lint (0010) is NOT what prompted this.**
+That lint detects the definer *property* and cannot distinguish a correctly
+predicated view from a broken one; it still reports all four as ERROR after
+this migration, and that is expected and correct. The design it flags was
+re-verified first, against the live database, using the athlete who genuinely
+has four injury rows — the non-vacuous test 018 demands. Both athletes tested
+saw exactly their own row, zero rows from the `injuries` base table, and empty
+`description`/`type`.
+
+**What did prompt it** is a second issue the lint does not name. Without
+`security_barrier`, Postgres may push a caller-supplied qual BELOW the view's
+own predicate. Demonstrated, not theorised — run as an athlete who may see only
+their own row, this raised `ERROR 22012: division by zero`:
+
+```sql
+select * from injuries_athlete_view
+where 1 / (case when athlete_id = '<another athlete id>' then 0 else 1 end) = 1;
+```
+
+The error can only fire if the qual was evaluated against a row the caller must
+never see — a working boolean oracle over the view's columns. After 052 the
+identical probe returns normally and yields only the caller's own row.
+
+**Real-world exploitability was low, and each reason was checked rather than
+assumed:** client roles cannot create a leaky function
+(`has_schema_privilege('authenticated','public','CREATE')` = false);
+PostgREST's `column=op.value` filter grammar cannot express a conditionally
+erroring expression, and PostgREST is the only surface an athlete has; and the
+blast radius was capped at `athlete_id,status,rtp_phase` — never `description`
+or `type`. It was closed anyway because the fix is one reloption per view with
+no behavioural change for legitimate callers, re-verified by re-running both
+athlete simulations after applying.
+
+The migration guards assert all four views exist and carry the barrier, and
+that 018's two invariants survive: `injuries_athlete_view` still has
+`security_invoker = false`, and still exposes exactly three columns.
+
+See `database/migrations/052_definer_views_security_barrier.sql`.

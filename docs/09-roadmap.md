@@ -348,6 +348,81 @@ rather than patched.
 **Not urgent:** the panel currently states its own absence clearly, so no report
 is wrong today — only thinner than the spec intends.
 
+## Infrastructure, scheduled together: compute upgrade + the staging/production split
+
+**Raised 2026-08-22. Not urgent — grouped deliberately, because each of these
+needs a maintenance window on the same database and doing them separately buys
+two outages instead of one.**
+
+The database separation is already prioritised in `docs/PROJECT-STATUS.md` §3b:
+one Supabase project currently serves both `bridgetx.co` (production) and
+`thebridgehp.com` (staging), so every dev session writes beside a live
+client's data. That work stands as written there. **Do the compute upgrade in
+the same window.**
+
+### Why compute is on this list at all
+
+Measured against the live database on 2026-08-22, not estimated. The instance
+is `t3.nano` in `ap-southeast-2`, and by the ordinary numbers it is healthy:
+
+| Metric | Value |
+|---|---|
+| Database size | 16 MB (1,062 rows across `public`) |
+| Cache hit ratio | 0.99995 |
+| Connections | 19 / 60 |
+| Deadlocks | 0 |
+
+Nothing there argues for spending money today. Three things do argue for
+not leaving it on the smallest instance Supabase sells once a second club
+onboards:
+
+1. **`t3` is burstable.** Average CPU is the wrong metric; what matters is
+   sustained bursts against a credit balance. Report generation is exactly
+   that shape — `lib/athleteProfile.ts` pulls assessments, GPS, VALD, injuries
+   and check-ins in one go. Exhausting credits throttles to a nano baseline.
+2. **The scaling cliff is the RLS access pattern, not the data volume.**
+   `profiles` has taken 305,096 sequential scans against 18 rows,
+   `admin_club_assignments` 119,215 against 1 row, `athletes` 99,802 against 4.
+   At these sizes a seq scan is correct and free. Every policy calls helper
+   functions that scan those tables *per row, per check*, so at 5,000 profiles
+   and 50,000 athletes it stops being free. It will bite on any instance; it
+   bites first and hardest on a nano.
+3. **69 GB written to temp files, across 32,530 events, on a 16 MB database.**
+   Traced through `pg_stat_statements`: it is **not** application queries. The
+   only spilling statement is PostgREST's own schema-cache introspection —
+   148 calls, 382 ms mean, 1.3 GB temp. This schema has 76+ RLS policies and a
+   large set of helper functions, and introspecting that exceeds the 2.1 MB
+   `work_mem` a nano allows. **The cost driver here is schema complexity, not
+   rows**, and this project is 52 migrations in and still growing.
+
+### Fold into the same window
+
+- **Pin `search_path` on nine functions.** The linter reports
+  `function_search_path_mutable` (WARN) for `is_super_admin`,
+  `is_admin_for_club`, `is_admin_for_segment`, `is_assigned_to_team`,
+  `has_independent_access_to_athlete`, `athlete_type`, `within_edit_window`,
+  `within_checkin_window`, `enforce_prescription_brand_shop_visibility`.
+  **Severity is low and checked, not assumed:** all nine are SECURITY
+  *INVOKER*, so there is no privilege-escalation path — a mutable search_path
+  on an invoker function affects only the caller's own privileges — and client
+  roles cannot `CREATE` in `public` anyway, so nothing can be shadowed. Worth
+  closing as hygiene while the window is open, not worth one of its own.
+- **Re-check `schema.sql` against reality.** It still defines
+  `injuries_athlete_view` with `security_invoker = true` and still carries the
+  `"athlete reads own status only"` policy that migration 018 dropped. Anyone
+  rebuilding from `schema.sql` alone would recreate the **pre-018 hole** —
+  athletes regaining row access to `injuries`, clinical `description` included.
+  The numbered migrations are the canonical history and the live database is
+  correct, so this is latent rather than active, but a database split is
+  precisely the moment someone reaches for `schema.sql`.
+
+### Already closed, not part of this
+
+The `security_barrier` hardening on the four SECURITY DEFINER views shipped
+separately as migration 052 — see that file's header for the demonstrated
+leak and why it did not wait for a window (it is a reloption change with no
+behavioural effect on legitimate callers).
+
 ## Target market rollout
 
 1. UAE clubs and academies (launch)
