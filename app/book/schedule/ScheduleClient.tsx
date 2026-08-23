@@ -19,7 +19,7 @@ const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "Ju
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const WEEK_HEADER = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
-const initialState: BookingState = { error: null, requested: false, summary: null };
+const initialState: BookingState = { error: null, requested: false, summary: null, confirmed: false };
 
 function ConfirmButton() {
   const { pending } = useFormStatus();
@@ -39,10 +39,13 @@ export default function ScheduleClient({
   leadId,
   availability,
   tzLabel,
+  utcOffset,
 }: {
   leadId: string | null;
   availability: DayAvailability[];
   tzLabel: string;
+  /** From BOOKING_UTC_OFFSET on the server — see app/book/schedule/page.tsx. */
+  utcOffset: string;
 }) {
   const [state, action] = useActionState(requestBooking, initialState);
   const [monthIndex, setMonthIndex] = useState(0);
@@ -77,7 +80,7 @@ export default function ScheduleClient({
     ? `${DAY_NAMES[new Date(Date.parse(day)).getUTCDay()]}, ${MONTH_NAMES[Number(day.slice(5, 7)) - 1].slice(0, 3)} ${Number(day.slice(8, 10))}`
     : "";
   const slotLabel = day && slot ? `${dayLabel} at ${slot} (GMT+4)` : "";
-  const slotIso = day && slot ? `${day}T${slot}:00+04:00` : "";
+  const slotIso = day && slot ? `${day}T${slot}:00${utcOffset}` : "";
 
   return (
     <>
@@ -211,14 +214,22 @@ export default function ScheduleClient({
                 >
                   ✓
                 </span>
+                {/* Two outcomes, worded honestly. `confirmed` is true only
+                    when a real calendar event now exists; when the calendar is
+                    unconfigured or Google was unreachable, lib/booking.ts
+                    records the slot as a REQUEST and this falls back to the
+                    original promise-nothing copy. Never tell a visitor a
+                    meeting is booked on the strength of a database row. */}
                 <span className="text-[15px] font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
-                  Request received
+                  {state.confirmed ? "Booking confirmed" : "Request received"}
                 </span>
                 <span className="text-[13.5px]" style={{ lineHeight: 1.6, color: "var(--text-muted)", textWrap: "pretty" }}>
                   {state.summary} · 15 min · video call
                 </span>
                 <span className="text-[12.5px]" style={{ lineHeight: 1.6, color: "var(--text-muted)", textWrap: "pretty" }}>
-                  We&apos;ll confirm this time by email shortly — nothing is locked in until you hear from us.
+                  {state.confirmed
+                    ? "This time is now held in our calendar, and a calendar invitation is on its way to your inbox."
+                    : "We’ll confirm this time by email shortly — nothing is locked in until you hear from us."}
                 </span>
               </div>
             ) : !day ? (

@@ -48,11 +48,18 @@ name, DOB, gender, **ethnicity**, conditions, allergies, injuries with their
 clinical description, assessments, GPS/VALD and check-ins — to Anthropic.
 Named as a processor in `app/privacy/page.tsx` section 6.
 
-## Google Calendar — PARTIAL (OAuth wired 2026-08-22; refresh token not yet minted)
+## Google Calendar — ACTIVE (2026-08-23)
 
 Backs the public Book-a-Meeting flow. `lib/booking.ts` is the single seam —
-`getAvailability()` and `createBooking()` are the whole contract, and both
-still run their documented PLACEHOLDER logic until the refresh token exists.
+`getAvailability()` and `createBooking()` are the whole contract, and both now
+run against the real calendar. `app/book/schedule/page.tsx` did not change when
+the placeholder was replaced, which is the whole reason that seam exists.
+
+**It still degrades gracefully.** Unconfigured, or Google unreachable:
+availability falls back to the business-rule grid alone, and a booking is
+recorded as a REQUEST (`meeting_booked` false, `confirmed:false`) so the
+visitor is promised an email rather than a locked-in meeting. A calendar outage
+must never lose a lead.
 
 **OAuth, not a service account.** The Google Cloud org policy
 `constraints/iam.disableServiceAccountKeyCreation` blocks service-account key
@@ -104,10 +111,29 @@ unverified-app warning is seen once and the 100-user cap is irrelevant.
   then a two-minute job, and the route grants nothing without both a
   super-admin session and Google consent.
 
-**Still to build:** the freebusy read and `events.insert` write inside
-`lib/booking.ts`, replacing the two PLACEHOLDER blocks; a re-check of freebusy
-immediately before insert so two visitors cannot take the same slot; and the
-confirmed-booking wording in `app/book/schedule/ScheduleClient.tsx`.
+**Built 2026-08-23:** `lib/googleCalendar.ts` (token refresh with an in-process
+cache, `freeBusy`, `events.insert`, `deleteEvent`); the two live functions in
+`lib/booking.ts`; a freebusy re-check immediately before insert so two visitors
+cannot take the same slot; and confirmed-vs-requested wording in
+`ScheduleClient.tsx` driven by `BookingState.confirmed`.
+
+**Two constants that must not drift.** `BOOKING_UTC_OFFSET` (+04:00) is passed
+to the client as a prop rather than duplicated, because the server filters
+availability by resolving `${date}T${slot}:00${offset}` and the client builds
+the submitted instant the same way — disagreement would book a different hour
+than the one checked. `MEETING_DURATION_MIN` is 15 because that is what the
+confirmation copy promises the visitor; change them together.
+
+A fixed offset is correct only while the market is the UAE, which is UTC+4
+year-round with no DST. A market that observes DST needs real IANA conversion,
+and `BOOKING_UTC_OFFSET` is the one place to start.
+
+**Verified live 2026-08-23** via a temporary dev route (since deleted), against
+the real calendar: a test event was inserted over a known slot, availability
+dropped from 328 to 327 with EXACTLY that slot removed — proving both the
+offset math and that a 15-minute block does not over-filter the adjacent 09:30
+slot — a booking against a nonexistent lead was refused before any calendar
+write, and the test event was deleted. Calendar confirmed clean afterwards.
 
 **Environment** (all four registered in `lib/envManifest.ts` as OPTIONAL, so an
 unconfigured calendar degrades to the placeholder rather than failing the

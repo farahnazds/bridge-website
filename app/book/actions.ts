@@ -23,6 +23,10 @@ export interface BookingState {
   error: string | null;
   requested: boolean;
   summary: string | null;
+  /** True only when a real calendar event was created. Drives the difference
+   *  between "Booking confirmed" and the honest "we'll confirm by email" —
+   *  the UI must never promise a locked-in meeting the calendar does not hold. */
+  confirmed: boolean;
 }
 
 const SQUAD_SIZES = new Set(["1–20", "21–50", "51–150", "150+"]);
@@ -95,15 +99,15 @@ export async function requestBooking(_prev: BookingState, formData: FormData): P
   const slotLabel = clean(formData.get("slot_label"), 80);
 
   if (!/^[0-9a-f-]{36}$/.test(leadId)) {
-    return { error: "That booking session has expired — start again from the intake form.", requested: false, summary: null };
+    return { error: "That booking session has expired — start again from the intake form.", requested: false, summary: null, confirmed: false };
   }
   if (Number.isNaN(Date.parse(slotIso)) || !slotLabel) {
-    return { error: "Pick a day and time first.", requested: false, summary: null };
+    return { error: "Pick a day and time first.", requested: false, summary: null, confirmed: false };
   }
 
   const result = await createBooking(leadId, slotIso, slotLabel);
   if (!result.ok) {
-    return { error: result.error ?? "Couldn't record that time — please try again.", requested: false, summary: null };
+    return { error: result.error ?? "Couldn't record that time — please try again.", requested: false, summary: null, confirmed: false };
   }
-  return { error: null, requested: true, summary: slotLabel };
+  return { error: null, requested: true, summary: slotLabel, confirmed: result.confirmed };
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import BookShell from "../BookShell";
 import ScheduleClient from "./ScheduleClient";
-import { BOOKING_TIMEZONE_LABEL, bookingWindow, getAvailability } from "@/lib/booking";
+import { BOOKING_TIMEZONE_LABEL, BOOKING_UTC_OFFSET, bookingWindow, getAvailability } from "@/lib/booking";
 
 export const metadata: Metadata = {
   title: "Pick a Time — Bridgetx",
@@ -29,7 +29,17 @@ export default async function SchedulePage({
 
   return (
     <BookShell step={2}>
-      <ScheduleClient leadId={leadId} availability={availability} tzLabel={BOOKING_TIMEZONE_LABEL} />
+      {/* utcOffset is passed rather than hardcoded in the client: the server
+          filters availability by resolving `${date}T${slot}:00${offset}` and
+          the client builds the submitted instant the same way. If the two ever
+          disagreed, a slot would be checked against one moment and booked at
+          another. One constant, one source — see lib/booking.ts. */}
+      <ScheduleClient
+        leadId={leadId}
+        availability={availability}
+        tzLabel={BOOKING_TIMEZONE_LABEL}
+        utcOffset={BOOKING_UTC_OFFSET}
+      />
     </BookShell>
   );
 }
