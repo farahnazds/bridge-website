@@ -157,8 +157,19 @@ export default function LoginPage() {
           <LoginForm />
 
           <p style={{ margin: 0, fontSize: 12, lineHeight: 1.7, color: "rgba(255,255,255,.3)", textAlign: "center", animation: "si-fade 1s .3s both" }}>
-            By signing in you agree to our <a href="#" style={{ color: "rgba(255,255,255,.5)" }}>Terms</a> and{" "}
-            <a href="#" style={{ color: "rgba(255,255,255,.5)" }}>Privacy Policy</a>.
+            {/* Real destinations since 2026-08-23 — these were `href="#"`, so the
+                sentence asked people to agree to two documents it would not let
+                them read. Both pages are live: app/terms, app/privacy.
+
+                No inline colour, deliberately. `.si a` in globals.css already
+                carries this surface's link treatment INCLUDING its hover
+                transition, and an inline `color` outranks a class rule — which
+                is why the old anchors had no hover feedback at all. Same trap
+                documented in components/NotificationBell.tsx. Letting the class
+                win is what actually makes these consistent with the page's
+                other links rather than only looking similar. */}
+            By signing in you agree to our <Link href="/terms">Terms</Link> and{" "}
+            <Link href="/privacy">Privacy Policy</Link>.
           </p>
         </div>
       </div>

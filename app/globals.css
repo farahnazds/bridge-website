@@ -383,6 +383,10 @@ body:has(.bx-modal[open]) {
 .si { background: #05091A; color: #fff; }
 .si a { color: rgba(255, 255, 255, .62); text-decoration: none; transition: color 180ms ease-out; }
 .si a:hover { color: #fff; }
+/* Keyboard users need to see where they are. The sign-in surface now carries
+   real navigation (Terms / Privacy Policy), and colour alone is not a focus
+   indicator. */
+.si a:focus-visible { color: #fff; outline: 2px solid rgba(0, 179, 166, .55); outline-offset: 3px; border-radius: 3px; }
 .si input { font-family: var(--font-body), Inter, system-ui, sans-serif; }
 .si input::placeholder { color: rgba(255, 255, 255, .28); }
 
