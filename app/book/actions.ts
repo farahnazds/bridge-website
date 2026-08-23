@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { sendLeadNotificationEmail } from "@/lib/resend";
-import { createBooking } from "@/lib/booking";
+import { createBooking, visitorSlotLabel } from "@/lib/booking";
 
 // The public Book-a-Meeting flow's two actions. Both run for ANONYMOUS
 // visitors, so every input is validated here and nothing is trusted from the
@@ -96,18 +96,23 @@ export async function submitIntake(_prev: IntakeState, formData: FormData): Prom
 export async function requestBooking(_prev: BookingState, formData: FormData): Promise<BookingState> {
   const leadId = clean(formData.get("lead_id"), 40);
   const slotIso = clean(formData.get("slot_iso"), 40);
-  const slotLabel = clean(formData.get("slot_label"), 80);
+  // The visitor timezone is a DISPLAY hint only — it never decides which slot
+  // is booked. slot_iso is an absolute instant, so a wrong or spoofed zone can
+  // change only how the confirmation reads back, never the moment reserved.
+  // lib/booking.ts validates it through safeTimeZone() before use.
+  const visitorTz = clean(formData.get("visitor_tz"), 64) || null;
 
   if (!/^[0-9a-f-]{36}$/.test(leadId)) {
     return { error: "That booking session has expired — start again from the intake form.", requested: false, summary: null, confirmed: false };
   }
-  if (Number.isNaN(Date.parse(slotIso)) || !slotLabel) {
+  if (Number.isNaN(Date.parse(slotIso))) {
     return { error: "Pick a day and time first.", requested: false, summary: null, confirmed: false };
   }
 
-  const result = await createBooking(leadId, slotIso, slotLabel);
+  const result = await createBooking(leadId, slotIso, visitorTz);
   if (!result.ok) {
     return { error: result.error ?? "Couldn't record that time — please try again.", requested: false, summary: null, confirmed: false };
   }
-  return { error: null, requested: true, summary: slotLabel, confirmed: result.confirmed };
+  // Derived, not echoed back from the form — see visitorSlotLabel().
+  return { error: null, requested: true, summary: visitorSlotLabel(slotIso, visitorTz), confirmed: result.confirmed };
 }

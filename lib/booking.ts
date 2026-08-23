@@ -1,34 +1,47 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import { sendLeadNotificationEmail } from "@/lib/resend";
+import { sendBookingConfirmedEmail, sendLeadNotificationEmail } from "@/lib/resend";
 import { freeBusy, insertEvent, isCalendarConfigured } from "@/lib/googleCalendar";
+import { buildIcs, googleAddToCalendarUrl, icsToBase64 } from "@/lib/ics";
 
 // ============================================================================
 // THE GOOGLE CALENDAR INTEGRATION POINT
 // ============================================================================
-// This module is the ONLY place the Book-a-Meeting flow talks to scheduling.
-// The two exported functions are the whole contract:
+//   getAvailability(fromDate, toDate) -> which instants can be offered
+//   createBooking(leadId, slotStartIso, visitorTimeZone) -> commit one
 //
-//   getAvailability(fromDate, toDate)  -> which days/times can be offered
-//   createBooking(leadId, slotStartIso) -> commit the visitor's chosen time
+// TWO TIMEZONES, NEVER CONFLATED. This is the load-bearing idea in this file.
 //
-// LIVE as of 2026-08-23 (was placeholder). The pages, actions and UI states
-// did not change to make that switch, which is the entire reason this file
-// exists — see app/book/schedule/page.tsx, which is unmodified.
+//   The HOST's zone (Asia/Dubai) defines WHEN THE OWNER IS AVAILABLE — weekday
+//   mornings and afternoons. Those are business rules and they belong to the
+//   owner. An empty calendar does not mean he will take a 03:00 Sunday call.
 //
-// It still degrades gracefully. If the calendar is not configured, or Google
-// is unreachable, both functions fall back to the previous honest behaviour:
-// availability is offered from the business-rule grid alone, and a booking is
-// recorded as a REQUEST (meeting_booked stays false, confirmed:false) so the
-// visitor-facing copy promises an email rather than a locked-in meeting.
-// A calendar outage must never lose a lead.
+//   The VISITOR's zone is purely a DISPLAY concern.
+//
+// So availability is generated in host terms, converted to ABSOLUTE INSTANTS,
+// and handed to the client as instants. The client renders them in whatever
+// zone the visitor is in. Nothing about a visitor's location can change which
+// moments are offered — only how they are labelled.
+//
+// This is why the old BOOKING_UTC_OFFSET prop is gone. The client used to
+// rebuild the instant itself from a date, a "HH:MM" string and a duplicated
+// "+04:00" literal; if those ever disagreed with the server, a slot would be
+// checked against one moment and booked at another. Instants remove the
+// possibility rather than documenting it.
+//
+// It still degrades gracefully. Unconfigured, or Google unreachable: the
+// business-rule grid is offered unfiltered, and a booking is recorded as a
+// REQUEST (meeting_booked false, confirmed:false) so the visitor is promised
+// an email rather than a locked-in meeting. A calendar outage must not lose a
+// lead.
 // ============================================================================
 
-export interface DayAvailability {
-  /** ISO date (YYYY-MM-DD). */
-  date: string;
-  /** Offerable start times as "HH:MM", in BOOKING_TIMEZONE_LABEL's zone. */
+export interface AvailabilityPayload {
+  /** Offerable start times as absolute RFC3339 instants, ascending. */
   slots: string[];
+  /** The host's IANA zone, so the client can show "…in Dubai" alongside. */
+  hostTimeZone: string;
+  meetingMinutes: number;
 }
 
 export interface BookingResult {
@@ -39,45 +52,32 @@ export interface BookingResult {
   error?: string;
 }
 
-/** Shown beside the slot grid. */
-export const BOOKING_TIMEZONE_LABEL = "Times in Gulf Standard Time (GMT+4)";
-
-/**
- * THE offset every booking instant is built from, exported so the client
- * cannot drift from the server.
- *
- * ScheduleClient composes `${day}T${slot}:00${BOOKING_UTC_OFFSET}` and this
- * module resolves the SAME string when testing a slot against busy ranges. If
- * the two disagreed, availability would be filtered against one instant while
- * the event was created at another — an off-by-hours booking, which is far
- * worse than showing a stale slot. It is passed to the client as a prop from
- * app/book/schedule/page.tsx rather than duplicated as a literal.
- *
- * A fixed offset is correct here, not a shortcut: the pilot market is the UAE,
- * which is UTC+4 year-round and observes no daylight saving. Serving a market
- * that DOES observe DST means replacing this with a real IANA zone conversion —
- * at which point this constant is the one place to start.
- */
-export const BOOKING_UTC_OFFSET = "+04:00";
-
-/** IANA zone sent to Google, so the event renders in the owner's local time. */
+/** IANA zone the owner's working hours are expressed in, and the zone sent to
+ *  Google so the event renders in the owner's local time. */
 export const BOOKING_TIME_ZONE = "Asia/Dubai";
 
 /**
- * How long a booked meeting runs, and the window checked against freebusy —
- * a meeting starting inside someone else's block counts as a clash.
+ * Fixed offset used to turn a host wall-clock slot into an instant.
  *
- * 15, because that is what the visitor is PROMISED: ScheduleClient's
- * confirmation reads "· 15 min · video call". The number the visitor is shown
- * and the number written into the owner's calendar must be the same one, so if
- * that copy ever changes, change this with it.
+ * Correct only because the pilot market is the UAE, which is UTC+4 year-round
+ * and observes no daylight saving — so this is exact, not an approximation.
+ * Serving a host in a DST-observing zone means replacing this with a real
+ * zone-aware wall-clock-to-instant conversion, and this constant is the one
+ * place that would change. Internal now: it never leaves the server.
+ */
+const HOST_UTC_OFFSET = "+04:00";
+
+/**
+ * How long a booked meeting runs, and the window checked against freebusy.
+ * 15, because that is what the visitor is PROMISED — ScheduleClient's
+ * confirmation reads "· 15 min · video call". The number shown and the number
+ * written into the owner's calendar must be the same one.
  */
 export const MEETING_DURATION_MIN = 15;
 
 const DAY_MS = 86400000;
 
-/** The bookable window: today through ~two months out. Lives here rather
- *  than in the page so the horizon is part of the integration contract. */
+/** The bookable window: today through ~two months out. */
 export function bookingWindow(): { from: string; to: string } {
   return {
     from: new Date().toISOString().slice(0, 10),
@@ -96,36 +96,34 @@ function serviceClient() {
 }
 
 // ---------------------------------------------------------------------------
-// Business rules. These are OURS, not the calendar's — an empty calendar does
-// not mean the owner will take a 03:00 meeting on a Sunday. Google can only
-// ever REMOVE slots this grid offers.
+// Business rules, in HOST terms. Google can only ever REMOVE from this grid.
 // ---------------------------------------------------------------------------
 const SLOT_GRID = ["09:00", "09:30", "10:00", "11:00", "13:30", "14:00", "15:00", "16:30"];
 const LEAD_DAYS = 2;
 
-/** The candidate grid, before the calendar has removed anything. */
-function candidateGrid(fromDate: string, toDate: string): DayAvailability[] {
-  const out: DayAvailability[] = [];
+/** Candidate instants, before the calendar has removed anything. */
+function candidateInstants(fromDate: string, toDate: string): string[] {
+  const out: string[] = [];
   const start = Date.parse(fromDate);
   const end = Date.parse(toDate);
   const earliest = Date.now() + LEAD_DAYS * DAY_MS;
   for (let t = start; t <= end; t += DAY_MS) {
     const d = new Date(t);
+    // Midnight UTC is 04:00 the same date in Dubai, so the UTC weekday of this
+    // timestamp IS the host's weekday for that date.
     const dow = d.getUTCDay();
-    const open = dow !== 0 && dow !== 6 && t >= earliest;
-    out.push({ date: d.toISOString().slice(0, 10), slots: open ? SLOT_GRID : [] });
+    if (dow === 0 || dow === 6 || t < earliest) continue;
+    const date = d.toISOString().slice(0, 10);
+    for (const slot of SLOT_GRID) {
+      out.push(`${date}T${slot}:00${HOST_UTC_OFFSET}`);
+    }
   }
   return out;
 }
 
-/** The instant a given date+slot starts, built exactly as the client builds it. */
-export function slotInstantMs(date: string, slot: string): number {
-  return Date.parse(`${date}T${slot}:00${BOOKING_UTC_OFFSET}`);
-}
-
 /** Half-open overlap: a meeting ENDING exactly when a busy block starts does
- *  not clash, and neither does one starting exactly as a block ends. Using
- *  closed intervals here would drop a legitimate back-to-back slot. */
+ *  not clash, and neither does one starting exactly as a block ends. Closed
+ *  intervals here would drop legitimate back-to-back slots. */
 function overlaps(startMs: number, endMs: number, busy: { start: string; end: string }[]): boolean {
   return busy.some((b) => {
     const bStart = Date.parse(b.start);
@@ -134,47 +132,112 @@ function overlaps(startMs: number, endMs: number, busy: { start: string; end: st
   });
 }
 
-export async function getAvailability(fromDate: string, toDate: string): Promise<DayAvailability[]> {
-  const grid = candidateGrid(fromDate, toDate);
-  if (!isCalendarConfigured()) return grid;
+export async function getAvailability(fromDate: string, toDate: string): Promise<AvailabilityPayload> {
+  const candidates = candidateInstants(fromDate, toDate);
+  const base: AvailabilityPayload = {
+    slots: candidates,
+    hostTimeZone: BOOKING_TIME_ZONE,
+    meetingMinutes: MEETING_DURATION_MIN,
+  };
+  if (!isCalendarConfigured()) return base;
 
   let busy: { start: string; end: string }[];
   try {
     busy = await freeBusy({
-      // Widen by a day at each end so a busy block straddling the boundary
-      // still masks the slot it overlaps.
+      // Widen by a day at each end so a block straddling the boundary still
+      // masks the slot it overlaps.
       timeMinIso: new Date(Date.parse(fromDate) - DAY_MS).toISOString(),
       timeMaxIso: new Date(Date.parse(toDate) + 2 * DAY_MS).toISOString(),
       timeZone: BOOKING_TIME_ZONE,
     });
   } catch (err) {
-    // FAIL SOFT, and deliberately so: showing a visitor an empty calendar
-    // because Google had a bad minute costs a lead outright, whereas offering
-    // a slot that turns out to be taken is caught by the re-check in
-    // createBooking, which then declines that one time with a clear message.
+    // FAIL SOFT: showing an empty calendar because Google had a bad minute
+    // costs a lead outright, whereas offering a slot that turns out to be taken
+    // is caught by the re-check in createBooking, which declines that one time
+    // with a clear message.
     console.error("[booking] freeBusy failed; offering the unfiltered grid.", err);
-    return grid;
+    return base;
   }
 
   const durationMs = MEETING_DURATION_MIN * 60_000;
-  return grid.map((day) => ({
-    date: day.date,
-    slots: day.slots.filter((slot) => {
-      const startMs = slotInstantMs(day.date, slot);
+  return {
+    ...base,
+    slots: candidates.filter((iso) => {
+      const startMs = Date.parse(iso);
       return !overlaps(startMs, startMs + durationMs, busy);
     }),
-  }));
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Formatting. All of it server-side, so the owner's email and the visitor's
+// email are rendered from ONE instant by ONE code path and cannot disagree.
+// ---------------------------------------------------------------------------
+
+/** A caller-supplied IANA zone is untrusted input. Anything Intl will not
+ *  accept falls back to the host zone rather than throwing mid-booking. */
+export function safeTimeZone(tz: string | null | undefined): string {
+  if (!tz) return BOOKING_TIME_ZONE;
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: tz });
+    return tz;
+  } catch {
+    return BOOKING_TIME_ZONE;
+  }
+}
+
+function fmt(iso: string, tz: string, opts: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat("en-GB", { ...opts, timeZone: tz }).format(new Date(iso));
+}
+
+/** e.g. "GMT+4" — read from Intl rather than hardcoded, so it stays right for
+ *  whatever zone the visitor is actually in. */
+function offsetLabel(iso: string, tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: tz, timeZoneName: "shortOffset" }).formatToParts(
+    new Date(iso)
+  );
+  return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+}
+
+/** "Wednesday, 26 August 2026" */
+function dateLine(iso: string, tz: string): string {
+  return fmt(iso, tz, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
+/** "09:00 – 09:15" */
+function timeLine(startIso: string, endIso: string, tz: string): string {
+  const t = (i: string) => fmt(i, tz, { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${t(startIso)} – ${t(endIso)}`;
+}
+
+/**
+ * The label the VISITOR sees on the confirmation screen, in their own zone.
+ *
+ * Derived here rather than accepted from the form. The client used to submit
+ * `slot_label` and the server put that string straight into the owner's email;
+ * once the client started rendering in the visitor's zone, that would have
+ * started sending the owner Sydney clock times. Deriving both labels from the
+ * one instant also removes a trusted-client-input path.
+ */
+export function visitorSlotLabel(startIso: string, tz: string | null): string {
+  const zone = safeTimeZone(tz);
+  const end = new Date(Date.parse(startIso) + MEETING_DURATION_MIN * 60_000).toISOString();
+  return `${dateLine(startIso, zone)} at ${timeLine(startIso, end, zone)} (${offsetLabel(startIso, zone)})`;
+}
+
+/** The label the OWNER sees in their notification, always in host terms. */
+export function hostSlotLabel(startIso: string): string {
+  const end = new Date(Date.parse(startIso) + MEETING_DURATION_MIN * 60_000).toISOString();
+  return `${dateLine(startIso, BOOKING_TIME_ZONE)} at ${timeLine(startIso, end, BOOKING_TIME_ZONE)} (${offsetLabel(startIso, BOOKING_TIME_ZONE)})`;
 }
 
 export async function createBooking(
   leadId: string,
   slotStartIso: string,
-  slotLabel: string
+  visitorTimeZone: string | null
 ): Promise<BookingResult> {
   const supabase = serviceClient();
 
-  // The lead must exist — createBooking never invents one, so a fabricated
-  // leadId dead-ends here rather than writing anywhere.
   const { data: lead } = await supabase
     .from("leads")
     .select("id, name, club_name, email, phone, role, country, sport, squad_size")
@@ -191,17 +254,19 @@ export async function createBooking(
   const startMs = Date.parse(slotStartIso);
   const endMs = startMs + MEETING_DURATION_MIN * 60_000;
   const endIso = new Date(endMs).toISOString();
+  const leadName = lead.name as string;
+  const leadEmail = (lead.email as string | null) ?? null;
+  const clubName = (lead.club_name as string | null) ?? null;
 
   let eventCreated = false;
+  let meetLink: string | null = null;
+  let eventId: string | null = null;
 
   if (isCalendarConfigured()) {
     try {
-      // ---------------------------------------------------------------------
-      // Re-check immediately before writing. Availability was read when the
-      // page rendered; the visitor confirms minutes later. Without this, two
-      // visitors on the same slot both succeed and the owner is double-booked.
-      // The window checked is exactly the meeting, not the whole day.
-      // ---------------------------------------------------------------------
+      // Re-check immediately before writing. Availability was read at page
+      // render; the visitor confirms minutes later. Without this, two visitors
+      // on the same slot both succeed and the owner is double-booked.
       const busy = await freeBusy({
         timeMinIso: new Date(startMs).toISOString(),
         timeMaxIso: endIso,
@@ -215,36 +280,44 @@ export async function createBooking(
         };
       }
 
-      await insertEvent({
-        summary: `Bridgetx intro — ${lead.name as string}${lead.club_name ? ` (${lead.club_name as string})` : ""}`,
+      const created = await insertEvent({
+        summary: `Bridgetx intro — ${leadName}${clubName ? ` (${clubName})` : ""}`,
+        // SHORT ON PURPOSE. This description used to list the visitor's whole
+        // intake back at them — every field they had just typed, plus an
+        // internal lead id — because Google's invite email renders it. The
+        // owner already receives the full record through newLeadEmail, so
+        // repeating it here served nobody.
         description: [
-          `Booked through the Bridgetx website.`,
+          `Booked through bridgetx.co.`,
+          `${leadName}${clubName ? ` · ${clubName}` : ""}${lead.role ? ` · ${lead.role as string}` : ""}`,
+          leadEmail ? `Contact: ${leadEmail}` : "",
           ``,
-          `Name: ${lead.name as string}`,
-          `Club: ${(lead.club_name as string | null) ?? "—"}`,
-          `Role: ${(lead.role as string | null) ?? "—"}`,
-          `Email: ${(lead.email as string | null) ?? "—"}`,
-          `Phone: ${(lead.phone as string | null) ?? "—"}`,
-          `Country: ${(lead.country as string | null) ?? "—"}`,
-          `Sport: ${(lead.sport as string | null) ?? "—"}`,
-          `Squad size: ${(lead.squad_size as string | null) ?? "—"}`,
-          ``,
-          `Lead id: ${lead.id as string}`,
-        ].join("\n"),
+          `Full details: bridgetx.co/admin/leads`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
         startIso: slotStartIso,
         endIso,
         timeZone: BOOKING_TIME_ZONE,
-        attendeeEmail: (lead.email as string | null) ?? null,
-        // The visitor asked for this meeting and gave us their address, so an
-        // invitation is what they expect. Explicit rather than defaulted —
-        // this is the line that emails a real person.
-        sendUpdates: "all",
+        attendeeEmail: leadEmail,
+        // Google's own invitation is SUPPRESSED. It cannot be branded — we
+        // control only summary and description — so the confirmation is our
+        // own letter instead, with an .ics doing the one useful thing the
+        // Google invite did. The visitor stays an attendee on the event so the
+        // owner can still see them and notify them of any later change.
+        sendUpdates: "none",
+        withMeetLink: true,
       });
       eventCreated = true;
+      eventId = created.id;
+      meetLink = created.meetLink ?? null;
+      if (!meetLink) {
+        // Conference creation is a separate Google subsystem and can fail
+        // while the event itself succeeds. The booking is still real; the
+        // email says a link will follow rather than promising a dead one.
+        console.error("[booking] event created but Google returned no Meet link.", created.id);
+      }
     } catch (err) {
-      // Same fail-soft contract as availability: the lead is worth more than
-      // the confirmation. Fall through to recording a REQUEST, which is
-      // exactly what the pre-integration behaviour was.
       console.error("[booking] calendar booking failed; recording as a request instead.", err);
     }
   }
@@ -254,26 +327,78 @@ export async function createBooking(
     .update({ meeting_date: slotStartIso, meeting_booked: eventCreated })
     .eq("id", leadId);
   if (error) {
-    // The calendar event may already exist at this point. That is the right
-    // way round to fail: the owner sees a real meeting on their calendar and
-    // the admin pipeline is merely missing a flag, rather than the visitor
-    // being told nothing happened when it did.
+    // The calendar event may already exist. That is the right way round to
+    // fail: the owner sees a real meeting and the admin pipeline is missing a
+    // flag, rather than the visitor being told nothing happened when it did.
     return { ok: false, confirmed: false, error: "Couldn't record that time — please try again." };
   }
 
-  // Best-effort: the booking is already recorded; a failed email must not
-  // surface as a failed booking.
+  const ownerLabel = hostSlotLabel(slotStartIso);
+
+  // --- the visitor's branded confirmation (best effort) --------------------
+  if (eventCreated && leadEmail) {
+    try {
+      const vtz = safeTimeZone(visitorTimeZone);
+      const summary = "Bridgetx intro call";
+      const details = meetLink
+        ? `Your 15-minute intro call with Bridgetx.\nJoin: ${meetLink}`
+        : `Your 15-minute intro call with Bridgetx.`;
+
+      const ics = buildIcs({
+        // The Google event id, so a re-send updates rather than duplicates.
+        uid: `${eventId ?? crypto.randomUUID()}@bridgetx.co`,
+        startIso: slotStartIso,
+        endIso,
+        summary,
+        description: details,
+        location: meetLink ?? undefined,
+        organizerName: "Bridgetx",
+        organizerEmail: "admin@bridgetx.co",
+      });
+
+      await sendBookingConfirmedEmail({
+        to: leadEmail,
+        firstName: leadName.split(" ")[0] || leadName,
+        dateLine: dateLine(slotStartIso, vtz),
+        timeLine: timeLine(slotStartIso, endIso, vtz),
+        timeZoneLabel: offsetLabel(slotStartIso, vtz),
+        // Only when the visitor is somewhere else — otherwise it is noise.
+        hostTimeLine:
+          vtz === BOOKING_TIME_ZONE
+            ? null
+            : `${timeLine(slotStartIso, endIso, BOOKING_TIME_ZONE)} ${offsetLabel(slotStartIso, BOOKING_TIME_ZONE)} in Dubai`,
+        durationLabel: `${MEETING_DURATION_MIN} minutes`,
+        meetLink,
+        addToCalendarUrl: googleAddToCalendarUrl({
+          startIso: slotStartIso,
+          endIso,
+          summary,
+          details,
+          location: meetLink ?? undefined,
+        }),
+        icsBase64: icsToBase64(ics),
+      });
+    } catch (err) {
+      // The meeting is booked and on the calendar either way. A failed
+      // confirmation must never read as a failed booking.
+      console.error("[booking] confirmation email to the visitor failed.", err);
+    }
+  }
+
+  // --- the owner's notification (best effort, unchanged contract) ----------
   try {
     await sendLeadNotificationEmail({
-      name: lead.name as string,
-      clubName: (lead.club_name as string | null) ?? "—",
-      email: (lead.email as string | null) ?? "—",
+      name: leadName,
+      clubName: clubName ?? "—",
+      email: leadEmail ?? "—",
       phone: (lead.phone as string | null) ?? null,
       role: (lead.role as string | null) ?? "—",
       country: (lead.country as string | null) ?? "—",
       sport: (lead.sport as string | null) ?? "—",
       squadSize: (lead.squad_size as string | null) ?? "—",
-      requestedSlot: slotLabel,
+      // Always host time: the owner must never read a Sydney clock.
+      requestedSlot: ownerLabel,
+      slotConfirmed: eventCreated,
     });
   } catch {
     // Recorded in the DB either way; the admin pipeline shows the booking.

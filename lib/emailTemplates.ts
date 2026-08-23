@@ -284,6 +284,11 @@ export function newLeadEmail(params: {
   submittedAt: string;
   /** Present only on the booking step — renders the highlighted time panel. */
   requestedSlot?: string;
+  /** True once a real calendar event exists. Since 2026-08-23 a booking is
+   *  normally CONFIRMED on the spot, so the old "you will confirm by email"
+   *  wording became wrong for the common case — it now describes only the
+   *  fail-soft path where the calendar was unreachable. */
+  slotConfirmed?: boolean;
 }): { subject: string; html: string } {
   const p = {
     name: escapeHtml(params.name),
@@ -296,18 +301,21 @@ export function newLeadEmail(params: {
     squad: escapeHtml(params.squadSize),
     when: escapeHtml(params.submittedAt),
     slot: params.requestedSlot ? escapeHtml(params.requestedSlot) : null,
+    confirmed: params.slotConfirmed === true,
   };
   const slotPanel = p.slot
     ? `<tr><td class="pad" style="padding:12px 36px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:#E9FBFC;border:1px solid #B5EDF2;border-radius:10px;"><tr>
-          <td width="150" valign="middle" style="width:150px;padding:13px 8px 13px 18px;font-family:${FONT_BODY};font-size:11px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:1.2px;color:#0891C6;text-transform:uppercase;">Requested time</td>
+          <td width="150" valign="middle" style="width:150px;padding:13px 8px 13px 18px;font-family:${FONT_BODY};font-size:11px;line-height:16px;mso-line-height-rule:exactly;letter-spacing:1.2px;color:#0891C6;text-transform:uppercase;">${p.confirmed ? "Confirmed" : "Requested"} time</td>
           <td valign="middle" style="padding:13px 18px 13px 8px;font-family:${FONT_HEAD};font-size:16px;line-height:22px;mso-line-height-rule:exactly;color:#0D1B4C;font-weight:700;">${p.slot}</td>
         </tr></table>
       </td></tr>`
     : "";
-  const intro = p.slot
-    ? `Submitted ${p.when} via the landing page. Requested meeting time below — the booking page told them you'll confirm by email.`
-    : `Submitted ${p.when} via the landing page. No meeting time requested yet.`;
+  const intro = !p.slot
+    ? `Submitted ${p.when} via the landing page. No meeting time requested yet.`
+    : p.confirmed
+      ? `Submitted ${p.when} via the landing page. This meeting is CONFIRMED — the event is already on your calendar and they have had a confirmation with the video link.`
+      : `Submitted ${p.when} via the landing page. Requested meeting time below. The calendar could not be reached, so nothing is booked and the page told them you would confirm by email.`;
   // The compact internal variant throughout — smaller logo, tighter paddings,
   // 25px heading at -0.5px tracking (22px on mobile) — per the refreshed
   // design's new-lead.html.
@@ -319,7 +327,14 @@ export function newLeadEmail(params: {
     [
       logoHeader("INTERNAL&nbsp;&middot;&nbsp;LEADS", true),
       eyebrow("#08B7E8", "#0891C6", "New lead &middot; Book a Meeting form", 26),
-      h1(p.slot ? `Meeting time requested: ${p.name}` : `New lead: ${p.name} from ${p.club}`, 25, 32, 13, "-0.5px"),
+      h1(
+        p.slot
+          ? p.confirmed
+            ? `Meeting booked: ${p.name}`
+            : `Meeting time requested: ${p.name}`
+          : `New lead: ${p.name} from ${p.club}`,
+        25, 32, 13, "-0.5px"
+      ),
       bodyPara(intro, 10, 14, 22),
       factPanel(
         factRow("Name", p.name, "first", true) +
@@ -343,9 +358,115 @@ export function newLeadEmail(params: {
     29
   );
   return {
-    subject: p.slot
-      ? `Meeting time requested: ${params.name} (${params.clubCompany}) — ${params.requestedSlot}`
-      : `New lead: ${params.name} from ${params.clubCompany}`,
+    subject: !p.slot
+      ? `New lead: ${params.name} from ${params.clubCompany}`
+      : p.confirmed
+        ? `Meeting booked: ${params.name} (${params.clubCompany}) — ${params.requestedSlot}`
+        : `Meeting time requested: ${params.name} (${params.clubCompany}) — ${params.requestedSlot}`,
     html,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 4. Booking confirmed — the VISITOR's confirmation
+// ---------------------------------------------------------------------------
+// Replaces Google Calendar's own invitation email, which lib/booking.ts now
+// suppresses with sendUpdates:"none". Two reasons that email had to go:
+//
+//   1. It cannot be branded. Google owns its layout entirely; we control only
+//      the event summary and description.
+//   2. Its body was our event description, which listed the visitor's own
+//      intake data back at them — name, club, role, email, phone, country,
+//      sport, squad size — every field they had just typed in, plus an
+//      internal lead id. Redundant to the point of being impersonal.
+//
+// So the intake block is gone. This letter carries only what the recipient
+// does not already know: WHEN, HOW LONG, and HOW TO JOIN. The full record
+// still reaches the owner through newLeadEmail, which always carried it.
+//
+// The one useful thing Google's invite did — putting the meeting in the
+// visitor's calendar — is replaced by the .ics attachment and the
+// add-to-calendar link that lib/resend.ts sends alongside this HTML.
+//
+// Times are pre-formatted by the caller in the VISITOR's timezone (captured
+// at booking) with the host time shown alongside, so neither party has to
+// convert anything in their head.
+
+export function bookingConfirmedEmail(params: {
+  firstName: string;
+  /** e.g. "Wednesday, 26 August 2026" — already in the visitor's zone. */
+  dateLine: string;
+  /** e.g. "09:00 – 09:15" — already in the visitor's zone. */
+  timeLine: string;
+  /** e.g. "Gulf Standard Time (GMT+4)" or the visitor's own zone label. */
+  timeZoneLabel: string;
+  /** The same moment in the host's zone, when it differs from the visitor's. */
+  hostTimeLine: string | null;
+  durationLabel: string;
+  meetLink: string | null;
+  addToCalendarUrl: string;
+}): { subject: string; html: string } {
+  const p = {
+    firstName: escapeHtml(params.firstName),
+    dateLine: escapeHtml(params.dateLine),
+    timeLine: escapeHtml(params.timeLine),
+    tz: escapeHtml(params.timeZoneLabel),
+    hostTime: params.hostTimeLine ? escapeHtml(params.hostTimeLine) : null,
+    duration: escapeHtml(params.durationLabel),
+    meet: params.meetLink ? escapeHtml(params.meetLink) : null,
+    addUrl: escapeHtml(params.addToCalendarUrl),
+  };
+
+  // Joining row degrades honestly. A Meet link is requested on every booking,
+  // but conference creation is a separate Google subsystem and can fail
+  // independently of the event — promising a link that does not exist would be
+  // worse than saying we will send one.
+  const joiningValue = p.meet
+    ? `<a href="${p.meet}" style="color:#073CF4;text-decoration:none;">${p.meet}</a>`
+    : `Video call link to follow by email before the meeting.`;
+
+  const html = shell(
+    "Your meeting with Bridgetx is confirmed",
+    `${params.dateLine}, ${params.timeLine} (${params.timeZoneLabel}) — ${params.durationLabel}. Video call details inside.`,
+    [
+      logoHeader("HIGH&nbsp;PERFORMANCE<br>INTELLIGENCE"),
+      eyebrow("#08D9DE", "#0891C6", "Meeting confirmed"),
+      h1("Your meeting with Bridgetx is confirmed."),
+      bodyPara(
+        `Hi ${p.firstName} — we&rsquo;re looking forward to meeting you. Everything you need is below, and the meeting is already in our calendar.`
+      ),
+      factPanel(
+        factRow("Date", p.dateLine, "first") +
+          factRow(
+            "Time",
+            `${p.timeLine} <span style="color:#8A94AC;font-weight:400;">${p.tz}</span>` +
+              (p.hostTime
+                ? `<br><span style="font-size:12.5px;line-height:18px;color:#8A94AC;font-weight:400;">${p.hostTime}</span>`
+                : ""),
+            "mid"
+          ) +
+          factRow("Duration", p.duration, "mid") +
+          factRow("Joining", joiningValue, "last")
+      ),
+      ...(p.meet ? [ctaButton(p.meet, "Join the video call")] : []),
+      bodyPara(
+        `Need it in your own calendar? <a href="${p.addUrl}" style="color:#073CF4;text-decoration:none;">Add it to Google Calendar</a>, or open the invitation attached to this email.`,
+        p.meet ? 18 : 22,
+        13.5,
+        21
+      ),
+      bodyPara(
+        `If something comes up and you need to move it, just reply to this email and we&rsquo;ll rearrange.`,
+        12,
+        13.5,
+        21
+      ),
+      divider(),
+      footerInsideCard(
+        `You are receiving this because you booked a meeting with Bridgetx at bridgetx.co.`
+      ),
+    ].join("\n")
+  );
+
+  return { subject: `Your meeting with Bridgetx — ${params.dateLine}, ${params.timeLine}`, html };
 }

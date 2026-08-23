@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import BookShell from "../BookShell";
 import ScheduleClient from "./ScheduleClient";
-import { BOOKING_TIMEZONE_LABEL, BOOKING_UTC_OFFSET, bookingWindow, getAvailability } from "@/lib/booking";
+import { bookingWindow, getAvailability } from "@/lib/booking";
 
 export const metadata: Metadata = {
   title: "Pick a Time — Bridgetx",
 };
 
-
-
 // Step 2: the booking calendar. Availability comes from lib/booking.ts — THE
-// Google Calendar integration point — so this page is already final: when the
-// real freebusy data replaces the placeholder there, nothing here changes.
+// Google Calendar integration point — as ABSOLUTE INSTANTS, so this page has
+// no opinion about timezones at all. Which moments are offered is decided on
+// the server in the host's terms; how they are LABELLED is decided in the
+// browser, in the visitor's own zone.
 //
 // The lead id rides the URL from step 1. An invalid or missing id still
 // renders the page (the visual is public and harmless); confirming a time is
@@ -29,17 +29,7 @@ export default async function SchedulePage({
 
   return (
     <BookShell step={2}>
-      {/* utcOffset is passed rather than hardcoded in the client: the server
-          filters availability by resolving `${date}T${slot}:00${offset}` and
-          the client builds the submitted instant the same way. If the two ever
-          disagreed, a slot would be checked against one moment and booked at
-          another. One constant, one source — see lib/booking.ts. */}
-      <ScheduleClient
-        leadId={leadId}
-        availability={availability}
-        tzLabel={BOOKING_TIMEZONE_LABEL}
-        utcOffset={BOOKING_UTC_OFFSET}
-      />
+      <ScheduleClient leadId={leadId} availability={availability} />
     </BookShell>
   );
 }

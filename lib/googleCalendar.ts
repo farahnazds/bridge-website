@@ -160,6 +160,8 @@ export async function freeBusy(params: {
 export interface InsertedEvent {
   id: string;
   htmlLink?: string;
+  /** The Google Meet URL, when a conference was requested and created. */
+  meetLink?: string;
 }
 
 /**
@@ -178,6 +180,8 @@ export async function insertEvent(params: {
   attendeeEmail?: string | null;
   /** "all" emails the attendee an invitation. "none" creates the event silently. */
   sendUpdates: "all" | "none";
+  /** Ask Google to mint a Meet link for this event. */
+  withMeetLink?: boolean;
 }): Promise<InsertedEvent> {
   const token = await getAccessToken();
   const id = calendarId();
@@ -191,9 +195,25 @@ export async function insertEvent(params: {
   if (params.attendeeEmail) {
     body.attendees = [{ email: params.attendeeEmail }];
   }
+  if (params.withMeetLink) {
+    // requestId only needs to be unique per create attempt — Google uses it to
+    // deduplicate retries of the SAME request, so a fresh random one per call
+    // is correct here (we never retry an insert in place).
+    body.conferenceData = {
+      createRequest: {
+        requestId: crypto.randomUUID(),
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    };
+  }
 
   const url = new URL(`${CALENDAR_API}/calendars/${encodeURIComponent(id)}/events`);
   url.searchParams.set("sendUpdates", params.sendUpdates);
+  if (params.withMeetLink) {
+    // Without this the conferenceData above is SILENTLY IGNORED — the event is
+    // created successfully with no Meet link and no error. Verified 2026-08-23.
+    url.searchParams.set("conferenceDataVersion", "1");
+  }
 
   const res = await fetch(url.toString(), {
     method: "POST",
@@ -205,8 +225,22 @@ export async function insertEvent(params: {
   const text = await res.text();
   if (!res.ok) throw new Error(`Google events.insert failed (HTTP ${res.status}): ${text}`);
 
-  const json = JSON.parse(text) as InsertedEvent;
-  return { id: json.id, htmlLink: json.htmlLink };
+  const json = JSON.parse(text) as {
+    id: string;
+    htmlLink?: string;
+    hangoutLink?: string;
+    conferenceData?: { entryPoints?: { entryPointType?: string; uri?: string }[] };
+  };
+
+  // hangoutLink is the documented field, but read the video entry point as a
+  // fallback: conferenceData is the authoritative structure and hangoutLink is
+  // effectively a convenience mirror of it.
+  const videoEntry = json.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video");
+  return {
+    id: json.id,
+    htmlLink: json.htmlLink,
+    meetLink: json.hangoutLink ?? videoEntry?.uri,
+  };
 }
 
 /** Deletes an event. Not used by the booking flow — it exists so a failed

@@ -147,6 +147,79 @@ build): `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`,
 > The manifest shapes are anchored so a recurrence fails as a malformed
 > variable instead of a runtime mystery.
 
+### Google Meet, the branded confirmation, and the timezone model (2026-08-23, later)
+
+**Every booking now creates a real Meet link.** `insertEvent` sends
+`conferenceData.createRequest` with `conferenceSolutionKey: hangoutsMeet`.
+The trap, verified rather than assumed: without
+`?conferenceDataVersion=1` on the request the `conferenceData` block is
+**silently ignored** — the event is created successfully, with no link and no
+error. The link is read from `hangoutLink`, falling back to the `video`
+entry point in `conferenceData`. Confirmed working on the existing
+`calendar.events` scope; no re-consent was needed.
+
+**Google's own invitation email is suppressed** (`sendUpdates:"none"`). It
+could never be branded — we control only `summary` and `description` — and its
+body was our description, which listed the visitor's whole intake back at them
+plus an internal lead id. The visitor stays an *attendee* on the event, so the
+owner still sees them and can notify them of later changes; they simply are not
+emailed by Google.
+
+In its place, `bookingConfirmedEmail` (lib/emailTemplates.ts) + a
+`text/calendar` attachment built by `lib/ics.ts`. The .ics is what replaces the
+one genuinely useful thing Google's invite did — putting the meeting in the
+visitor's own calendar. `METHOD:PUBLISH`, not `REQUEST`: this is "an event you
+may add", not an invitation that RSVPs back to an organiser it cannot honour.
+
+The event description is now three short lines and a pointer to
+`bridgetx.co/admin/leads`. `newLeadEmail` still carries the full record to the
+owner, and gained a `slotConfirmed` branch — it used to tell the owner "the
+booking page told them you'll confirm by email" on every booking, which became
+wrong the moment bookings started confirming themselves.
+
+**The timezone model — two zones, never conflated.**
+
+- The **host's** zone (`Asia/Dubai`) decides *when the owner is available*.
+  Business rules, generated server-side, unchanged by anything a visitor does.
+- The **visitor's** zone is a pure *display* concern.
+
+`getAvailability` therefore returns **absolute instants**, not `"HH:MM"`
+strings, and `ScheduleClient` renders them in the visitor's zone with a
+418-entry picker (`Intl.supportedValuesOf`) defaulting to the detected zone.
+`BOOKING_UTC_OFFSET` is no longer passed to the client at all: the client used
+to rebuild the instant from a date, a wall-clock string and a duplicated
+`+04:00`, and instants remove that whole class of drift rather than documenting
+it. `slot_label` is gone from the form too — the server derives the visitor's
+label AND the owner's label from the one instant, so the owner can never be
+sent a Sydney clock time.
+
+Changing the zone **regroups** the calendar, it does not merely relabel it. A
+slot legitimately belongs to a different DATE in another zone, and grouping by
+the server's dates would show those visitors slots on the wrong day.
+
+Hydration is handled with `useSyncExternalStore`'s server/client snapshot
+split — server snapshot = host zone, client snapshot = detected zone. A
+`useState` + `useEffect` pair would also work but costs a setState cascade on
+every mount, which the React Compiler lint rejects.
+
+**Verified live 2026-08-23** in a real browser against the live calendar:
+switching the picker to `Australia/Sydney` shifted every slot by exactly +6h;
+switching to `America/Los_Angeles` opened **Aug 25 and Aug 30** — dates closed
+in Dubai terms — and put exactly `22:30, 23:00` on Aug 25 with the remainder
+spilling onto Aug 26, which is the regrouping working rather than a relabel.
+The `.ics` was checked byte-wise for CRLF endings, 75-octet folding and
+`DTSTART:20260902T053000Z` (09:30 Dubai correctly converted to UTC).
+
+**Known, unchanged:** `bookingWindow()` still derives "today" in UTC, the
+app-wide convention tracked in `docs/09-roadmap.md`. It is independent of the
+work above — the weekday rules read `getUTCDay()` on midnight-UTC timestamps,
+which IS the host's weekday because midnight UTC is 04:00 the same date in
+Dubai, and the lead-time filter compares absolute milliseconds. Only the window
+edges are affected, and the 2-day lead time absorbs the front edge. Note the
+roadmap's stated window ("20:00 to midnight local") is the UTC clock time; at
+UTC+4 the affected local window is **00:00–04:00**, which is what its own
+recorded example (00:27 local showing the previous day) actually shows.
+
 ## Stripe — NOT ACTIVE
 No live payment gateway anywhere in this build yet. Clubs are
 contract-based. Independent tier gets a Pricing/Plans config in Super

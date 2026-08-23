@@ -1,6 +1,6 @@
 import "server-only";
 import { Resend } from "resend";
-import { EMAIL_LOGO_CONTENT_ID, complianceAlertEmail, newLeadEmail, reportSharedEmail } from "@/lib/emailTemplates";
+import { EMAIL_LOGO_CONTENT_ID, bookingConfirmedEmail, complianceAlertEmail, newLeadEmail, reportSharedEmail } from "@/lib/emailTemplates";
 import { EMAIL_LOGO_BASE64 } from "@/lib/emailLogo";
 
 // Server-only — never expose RESEND_API_KEY to the client.
@@ -77,6 +77,9 @@ export async function sendLeadNotificationEmail(params: {
   squadSize: string;
   /** Human-readable requested meeting time; present only on the booking step. */
   requestedSlot?: string;
+  /** True when a real calendar event exists, so the letter says "booked"
+   *  rather than "you will confirm by email". */
+  slotConfirmed?: boolean;
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -100,6 +103,7 @@ export async function sendLeadNotificationEmail(params: {
     squadSize: params.squadSize,
     submittedAt: `${submittedAt} (GST)`,
     requestedSlot: params.requestedSlot,
+    slotConfirmed: params.slotConfirmed,
   });
   const resend = new Resend(apiKey);
   const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: LEAD_INBOX, subject, html, attachments: [LOGO_ATTACHMENT] });
@@ -131,6 +135,68 @@ export async function sendComplianceAlertEmail(params: {
   });
   const resend = new Resend(apiKey);
   const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: params.to, subject, html, attachments: [LOGO_ATTACHMENT] });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * The visitor's booking confirmation — the branded replacement for Google
+ * Calendar's own invitation email, which lib/booking.ts now suppresses.
+ *
+ * Two attachments, both load-bearing:
+ *   - the inline logo, as every send carries (see LOGO_ATTACHMENT above)
+ *   - invite.ics, which is what actually puts the meeting in the recipient's
+ *     calendar. Without it this letter would be strictly LESS useful than the
+ *     Google invite it replaced, which is not a trade worth making.
+ *
+ * contentType is spelled out rather than inferred: several clients will not
+ * offer "add to calendar" for an .ics served as application/octet-stream.
+ */
+export async function sendBookingConfirmedEmail(params: {
+  to: string;
+  firstName: string;
+  dateLine: string;
+  timeLine: string;
+  timeZoneLabel: string;
+  hostTimeLine: string | null;
+  durationLabel: string;
+  meetLink: string | null;
+  addToCalendarUrl: string;
+  icsBase64: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured.");
+  }
+
+  const { subject, html } = bookingConfirmedEmail({
+    firstName: params.firstName,
+    dateLine: params.dateLine,
+    timeLine: params.timeLine,
+    timeZoneLabel: params.timeZoneLabel,
+    hostTimeLine: params.hostTimeLine,
+    durationLabel: params.durationLabel,
+    meetLink: params.meetLink,
+    addToCalendarUrl: params.addToCalendarUrl,
+  });
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({
+    from: FROM_ADDRESS,
+    to: params.to,
+    subject,
+    html,
+    attachments: [
+      LOGO_ATTACHMENT,
+      {
+        filename: "invite.ics",
+        content: params.icsBase64,
+        contentType: "text/calendar; charset=utf-8; method=PUBLISH",
+      },
+    ],
+  });
 
   if (error) {
     throw new Error(error.message);
