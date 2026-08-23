@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import DataModal from "@/components/DataModal";
 import ReportPdfLink from "@/components/ReportPdfLink";
-import { NOTICE_EMPTY } from "@/lib/ui";
+import ReportSummaryBody from "@/components/ReportSummaryBody";
 
 // Reads a report's generated PDF in an overlay on top of the page it was
 // opened from — no new tab, no navigation away.
@@ -25,16 +25,50 @@ import { NOTICE_EMPTY } from "@/lib/ui";
 // WHY THE SMALL-SCREEN FALLBACK IS NOT OPTIONAL
 //
 // iOS Safari does not scroll a PDF inside an iframe. It renders the first page
-// as a static thumbnail and swallows the gesture, so a multi-page report looks
-// like a one-page report — the failure is silent and looks like real content,
-// which is worse than an honest link. Android Chrome renders nothing at all in
-// some versions. Below the breakpoint the embed is therefore replaced by an
-// explicit hand-off rather than shipped broken.
+// as a static image and swallows the gesture, so a multi-page report looks like
+// a one-page report — the failure is silent and looks like real content, which
+// is worse than an honest hand-off. Below the breakpoint the embed is therefore
+// replaced rather than shipped broken.
 //
-// The check is viewport width rather than user-agent sniffing: it is the same
-// set of devices in practice, it degrades safely on a narrow desktop window
-// (an offered link, not a broken frame), and it needs no maintenance as
-// browsers change.
+// The check is viewport width rather than user-agent sniffing: it degrades
+// safely on a narrow desktop window (real content, not a broken frame) and it
+// needs no maintenance as browsers change.
+//
+// ---------------------------------------------------------------------------
+// RE-INVESTIGATED 2026-08-23. What changed, and what did not.
+// ---------------------------------------------------------------------------
+// STILL TRUE: iOS Safari has behaved this way since iOS 8 and shows no sign of
+// changing. It is not a scroll bug that CSS can reach — there is nothing to
+// scroll, because what is rendered is an image. The widely-cited
+// `-webkit-overflow-scrolling: touch` fix applies to iframes containing HTML
+// and does nothing here. This also affects Chrome and Firefox ON iOS, which are
+// WebKit underneath, so the real axis is "iOS", not "Safari".
+//
+// NOW OUT OF DATE: the claim that Android Chrome "renders nothing at all" was
+// true when written. Chrome for Android 136+ supports inline PDF viewing
+// natively, so the width rule now denies a working viewer to Android users who
+// would be fine. Narrowing the rule to iOS is therefore a real improvement and
+// is DELIBERATELY NOT DONE YET — it rests on documentation rather than a device
+// test, and the owner is arranging a real Android device to verify against
+// first. If it is done, it must fail SAFE: ambiguous detection shows this
+// fallback, and iPadOS reports as macOS so it needs a maxTouchPoints check.
+//
+// REJECTED — pdf.js / react-pdf: it would render on iOS, but iOS Safari
+// enforces a canvas size ceiling (16,777,216 px) and a canvas memory ceiling
+// (~256-384 MB), producing crashes and page reloads on large documents. Against
+// the real corpus — 95 stored report PDFs, median 37KB, p90 69KB, but a max of
+// 9.8MB sitting at the bucket ceiling — that trades silent truncation for a
+// hard crash on the biggest reports, which is a worse failure, for ~350KB of JS.
+//
+// THE EVENTUAL CORRECT FIX is not a PDF at all: a phone wants reflowable text,
+// not a fixed A4 page. That needs the report markdown persisted so it can be
+// re-rendered as responsive HTML; today only `ai_summary` and the PDF survive
+// generation. Tracked in docs/09-roadmap.md.
+//
+// MEANWHILE, this fallback shows the stored `ai_summary` inline instead of a
+// dead end. It is explicitly labelled as the summary, not the report, so nobody
+// mistakes it for the whole document — the silent-truncation trap this whole
+// design exists to avoid.
 const EMBED_MIN_WIDTH = "(min-width: 40rem)";
 
 // One MediaQueryList for the whole app rather than one per open modal, created
@@ -119,12 +153,24 @@ export default function ReportPdfModal({
         )}
 
         {canEmbed === false && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10 text-center">
-            <p className={NOTICE_EMPTY} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-              This screen is too narrow to read a full report page. Open the PDF to read it in your
-              device&apos;s own viewer.
-            </p>
-            <ReportPdfLink reportId={reportId} variant="button" label="Open the PDF" />
+          // Scrolls itself: the summary is prose of arbitrary length, and the
+          // parent is a fixed-height modal body.
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-5">
+            {/* Action FIRST. The old fallback put a single button under a line
+                of apology; here the summary can run for screens, so the way to
+                the real document has to be reachable without scrolling past it. */}
+            <div className="flex flex-col gap-3">
+              <p className="text-[13px]" style={{ lineHeight: 1.6, color: "var(--text-muted)", textWrap: "pretty" }}>
+                Here&apos;s this report&apos;s summary. The full report — with its charts, tables and
+                formatting — is in the PDF.
+              </p>
+              <ReportPdfLink reportId={reportId} variant="button" label="Open the full PDF" />
+            </div>
+
+            {/* The same component the History list expands, so the prose looks
+                identical wherever it is read, and its fetch/cache/empty/error
+                states are handled in one place rather than twice. */}
+            <ReportSummaryBody reportId={reportId} />
           </div>
         )}
       </div>

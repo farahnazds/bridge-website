@@ -423,6 +423,59 @@ separately as migration 052 — see that file's header for the demonstrated
 leak and why it did not wait for a window (it is a reloption change with no
 behavioural effect on legitimate callers).
 
+## Deferred, and the real answer: persist the report markdown
+
+**Raised 2026-08-23, after re-investigating the mobile PDF fallback. Not
+urgent — the fallback is now genuinely useful rather than a dead end — but this
+is the correct fix, and everything else in this area is a workaround.**
+
+A phone does not want a PDF. It wants **reflowable text**. A report PDF is a
+fixed A4 page; on a 360px screen that is either unreadably small or requires
+pan-and-zoom, and neither is a good answer no matter how well the embed works.
+
+**What blocks it today:** the full report body is not stored anywhere.
+`reports` holds `ai_summary` and `file_url`; the generated markdown is handed to
+`lib/reportPdfDelivery.ts`, rendered to a PDF, and discarded. So there is
+nothing to re-render responsively even if we wanted to.
+
+**What it needs:**
+
+1. A column (or a Storage object) holding the generated markdown, written at
+   generation time alongside the PDF upload.
+2. A responsive HTML report view that renders it — the `ReportMarkdown`
+   component already exists and is already used for `ai_summary`.
+3. A decision about the 95 existing reports, which will have no markdown. Most
+   likely: the HTML view is offered when markdown exists and the current
+   summary-plus-PDF fallback stands in when it does not, so there is no
+   backfill and no regeneration.
+
+**Why not the alternatives** (all investigated 2026-08-23, full reasoning in the
+header of `components/ReportPdfModal.tsx`):
+
+- **pdf.js / react-pdf** — would render on iOS, but iOS Safari enforces a canvas
+  size ceiling (16,777,216 px) and a canvas memory ceiling (~256-384 MB) and
+  crashes or reloads on large documents. Measured against the real corpus: 95
+  stored PDFs, median 37KB, p90 69KB, **max 9.8MB** at the bucket ceiling. That
+  trades silent truncation for a hard crash on the biggest reports, for ~350KB
+  of JS. Rejected.
+- **Narrowing the fallback from "narrow screen" to "iOS"** — worth doing and
+  separately tracked below, but it only decides WHICH devices see the PDF. It
+  does not make a PDF a good thing to read on a phone.
+
+### Related, pending a device test: narrow the fallback rule to iOS
+
+The current rule is viewport width. iOS Safari genuinely cannot scroll a PDF in
+an iframe (it renders page one as an image — unchanged since iOS 8, and it
+affects Chrome and Firefox on iOS too, which are WebKit underneath). But
+**Chrome for Android 136+ now supports inline PDF viewing natively**, so the
+width rule currently denies a working viewer to Android users who would be fine.
+
+Not changed yet, deliberately: the Android claim rests on documentation rather
+than a device test, and the owner is arranging a real Android device to verify
+against first (2026-08-23). When it is done it must fail SAFE — ambiguous
+detection shows the fallback — and note that iPadOS reports as macOS, so it
+needs a `maxTouchPoints` check rather than a plain platform string match.
+
 ## Target market rollout
 
 1. UAE clubs and academies (launch)
