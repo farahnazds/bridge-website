@@ -85,14 +85,41 @@ export default function NotificationBell({
     return () => clearInterval(t);
   }, [refresh]);
 
-  // Close on any click outside the bell or its panel.
+  // Close on any press outside the bell or its panel, and on Escape.
+  //
+  // `pointerdown`, NOT `mousedown`: iOS Safari does not reliably synthesise
+  // mouse events for taps on elements that are not natively interactive, so a
+  // mousedown listener leaves the panel stuck open when a phone user taps the
+  // page behind it. pointerdown covers mouse, touch and pen in one listener.
+  // The mobile backdrop below is belt-and-braces on top of this.
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => {
+    const onDown = (e: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // While the mobile sheet is up, stop the page behind it scrolling — without
+  // this, a scroll gesture that starts on the backdrop drags the page around
+  // underneath. Syncing a DOM property to React state is what effects are for;
+  // there is no setState here, so the cascading-render rule does not apply.
+  useEffect(() => {
+    if (!open) return;
+    if (!window.matchMedia("(max-width: 639px)").matches) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
   }, [open]);
 
   const onItemClick = (n: NotificationItem) => {
@@ -174,22 +201,29 @@ export default function NotificationBell({
       </button>
 
       {open && (
-        <div
-          role="menu"
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 8px)",
-            width: 340,
-            maxHeight: 420,
-            overflowY: "auto",
-            zIndex: 50,
-            borderRadius: 12,
-            border: "1px solid var(--border)",
-            backgroundColor: "var(--surface)",
-            boxShadow: "0 12px 32px rgba(0,0,0,.45)",
-          }}
-        >
+        <>
+          {/* Mobile only (hidden ≥sm in globals.css). Dims the page behind the
+              sheet and gives phones a large, unambiguous tap-to-close target
+              instead of asking them to hit the sliver of page around it. */}
+          <div className="nb-backdrop" aria-hidden onClick={() => setOpen(false)} />
+          <div
+            role="menu"
+            aria-label="Notifications"
+            // .nb-panel owns POSITION, WIDTH, MAX-HEIGHT and RADIUS, because
+            // those flip between a bottom sheet and a dropdown at sm and a
+            // media query cannot live in an inline style. Everything that does
+            // not change at the breakpoint stays inline, as before.
+            className="nb-panel"
+            style={{
+              overflowY: "auto",
+              zIndex: 50,
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--surface)",
+              boxShadow: "0 12px 32px rgba(0,0,0,.45)",
+              // Momentum scrolling inside the sheet on iOS.
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
           <div
             style={{
               display: "flex",
@@ -237,6 +271,9 @@ export default function NotificationBell({
               <button
                 key={n.id}
                 type="button"
+                // role="menu" on the panel requires menuitem children; these
+                // shipped as plain buttons, which made the ARIA invalid.
+                role="menuitem"
                 aria-label={n.title}
                 onClick={() => onItemClick(n)}
                 // Hover/focus affordance via classes — inline styles can't
@@ -305,7 +342,8 @@ export default function NotificationBell({
               </button>
             ))
           )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

@@ -433,3 +433,62 @@ input[type="month"],
 input[type="week"] {
   color-scheme: dark;
 }
+
+/* ---------------------------------------------------------------------------
+   Notification bell panel — components/NotificationBell.tsx
+   ---------------------------------------------------------------------------
+   Lives here rather than inline because the panel changes POSITIONING MODEL at
+   the breakpoint, and per docs/06-design-system.md media queries cannot live in
+   inline styles.
+
+   The bug this fixes: the panel was a fixed 340px anchored `right:0` to the
+   bell, and the bell sits left of the account avatar inside a header with 16px
+   side padding. On a 360px viewport that puts the panel's right edge at ~296px,
+   so a 340px panel starts at -44px — clipped off-screen. Verified at 320/360px:
+   the unread dots and the first characters of every title were cut off, and the
+   "NOTIFICATIONS" label read "ONS".
+
+   Below sm the panel becomes a BOTTOM SHEET rather than a repositioned
+   dropdown. Two reasons, both practical: DashboardHeader is not sticky, so a
+   fixed dropdown pinned under it would detach from the bell as soon as the page
+   scrolled; and a sheet puts the list in thumb reach instead of at the top edge
+   of a phone. Drawers are already the established mobile pattern here — the
+   dashboard sidebar becomes one below lg.
+
+   100dvh, not 100vh: on mobile browsers vh ignores the collapsing URL bar, so a
+   70vh sheet can extend under it and hide its own last row. */
+.nb-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  width: auto;
+  max-height: min(70dvh, 560px);
+  border-radius: 16px 16px 0 0;
+  /* Clears the iOS home indicator so the last row is not sitting under it. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.nb-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .5);
+  z-index: 49;
+}
+
+@media (min-width: 640px) {
+  /* Desktop keeps the original dropdown exactly as it was. */
+  .nb-panel {
+    position: absolute;
+    left: auto;
+    right: 0;
+    bottom: auto;
+    top: calc(100% + 8px);
+    width: 340px;
+    max-height: 420px;
+    border-radius: 12px;
+    padding-bottom: 0;
+  }
+  .nb-backdrop { display: none; }
+}
