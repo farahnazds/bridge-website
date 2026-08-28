@@ -221,11 +221,24 @@ export const PAYMENT_MODES = [
   { value: "redirect_affiliate", label: "Redirect / affiliate" },
 ];
 
-// `products.category` is free text and schema.sql comments it "loosely ties to
-// supplement_library.category" — that tie is what lets the commercial layer
-// find a real product for a clinical recommendation (docs/05-business-rules.md,
-// "Clinical recommendation vs. commercial product"). Curated list keeps the two
-// vocabularies aligned; "Other" keeps it open, same pattern as SPORTS.
+// The six broad docs/13 category groups — the ONE product/grouping vocabulary
+// since migration 054 (owner ruling 2026-08-28: no parallel vocabularies).
+// Matches the supplement_library.category_group CHECK constraint (044) and is
+// the only set the product form and library editor offer; the clinical tie is
+// products.supplement_library_id, not the category string.
+export const CATEGORY_GROUPS = [
+  "Hydration",
+  "Protein",
+  "Performance",
+  "Race Fuel",
+  "Recovery",
+  "Micronutrient",
+] as const;
+
+// NARROW clinical slugs -> display labels. Since migration 054 this is a
+// label map for supplement_library.category in the prompt builders (which is
+// why it keeps slugs no product carries any more), NOT the product form's
+// category list — that is CATEGORY_GROUPS above.
 export const PRODUCT_CATEGORIES = [
   { value: "protein", label: "Protein" },
   { value: "creatine", label: "Creatine" },
@@ -238,7 +251,6 @@ export const PRODUCT_CATEGORIES = [
   { value: "multivitamin", label: "Multivitamin" },
   { value: "caffeine", label: "Caffeine" },
 ];
-export const OTHER_PRODUCT_CATEGORY = "__other__";
 
 // "Not set" is a real, distinct state in the permission matrix — no row in
 // `role_permissions` at all. It means no ceiling has been declared for that

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
-import { PAYMENT_MODES } from "@/lib/constants";
+import { PAYMENT_MODES, CATEGORY_GROUPS } from "@/lib/constants";
 
 // Super Admin CRUD for brands, their products, and club/segment-brand pairings
 // (docs/03-site-map.md: "Supplements & Brands — products, club/segment-brand
@@ -138,7 +138,12 @@ export async function saveProduct(_prev: BrandState, formData: FormData): Promis
   // can never be matched to a recommendation, so it's required here even
   // though the column is nullable.
   const category = String(formData.get("category") ?? "").trim();
-  if (!category) return { error: "Category is required — it's what matches this product to a clinical recommendation.", saved: false };
+  if (!category) return { error: "Category is required.", saved: false };
+  // The six canonical docs/13 groups only (migration 054) — validated here so
+  // a hand-crafted POST cannot re-seed a parallel category vocabulary.
+  if (!(CATEGORY_GROUPS as readonly string[]).includes(category)) {
+    return { error: `Category must be one of: ${CATEGORY_GROUPS.join(", ")}.`, saved: false };
+  }
 
   const values = {
     brand_id: brandId,

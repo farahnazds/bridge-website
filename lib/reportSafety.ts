@@ -27,9 +27,13 @@
 export interface SafetyProduct {
   name: string;
   category: string | null;
+  /** The product's clinical-entry link. When present it is the ONLY tie
+   *  used — see the matching note in checkReportSafety(). */
+  supplementLibraryId?: string | null;
 }
 
 export interface SafetySupplementEntry {
+  id?: string;
   category: string;
   contraindicatedConditions: string[];
 }
@@ -105,19 +109,30 @@ export function checkReportSafety(input: {
   const declaredCodes = new Set(declarations.map((d) => d.code.toLowerCase()));
   const labelByCode = new Map(declarations.map((d) => [d.code.toLowerCase(), d.label]));
 
-  // category -> the declared codes that contraindicate it
+  // The declared codes that contraindicate each clinical entry, keyed both
+  // ways: by entry id (precise) and by narrow category slug (legacy).
+  //
+  // MATCHING RULE (migration 054): a product carrying supplement_library_id
+  // is judged by that link ALONE. The id is the clinical identity — falling
+  // back to category for a linked product would re-introduce the false
+  // positives the link exists to prevent (a dairy-free isolate shares
+  // category "Protein" with whey products but not whey's milk
+  // contraindication). The category comparison survives only for unlinked
+  // products, which after 054 is an empty set kept as defence in depth.
+  const contraindicatedByEntryId = new Map<string, string[]>();
   const contraindicatedCategories = new Map<string, string[]>();
   for (const entry of supplementLibrary) {
     const hits = (entry.contraindicatedConditions ?? [])
       .map((c) => c.toLowerCase())
       .filter((c) => declaredCodes.has(c));
     if (hits.length === 0) continue;
+    if (entry.id) contraindicatedByEntryId.set(entry.id, [...new Set(hits)]);
     const key = entry.category.toLowerCase();
     const existing = contraindicatedCategories.get(key) ?? [];
     contraindicatedCategories.set(key, [...new Set([...existing, ...hits])]);
   }
 
-  if (contraindicatedCategories.size === 0) {
+  if (contraindicatedByEntryId.size === 0 && contraindicatedCategories.size === 0) {
     return { ok: true, findings: [], message: null };
   }
 
@@ -125,8 +140,11 @@ export function checkReportSafety(input: {
   const findings: SafetyFinding[] = [];
 
   for (const product of products) {
-    if (!product.category) continue;
-    const conflicting = contraindicatedCategories.get(product.category.toLowerCase());
+    const conflicting = product.supplementLibraryId
+      ? contraindicatedByEntryId.get(product.supplementLibraryId)
+      : product.category
+        ? contraindicatedCategories.get(product.category.toLowerCase())
+        : undefined;
     if (!conflicting) continue;
 
     const needle = product.name.toLowerCase();
@@ -156,7 +174,7 @@ export function checkReportSafety(input: {
     if (mentioned && !anyExcluded) {
       findings.push({
         productName: product.name,
-        category: product.category,
+        category: product.category ?? "uncategorised",
         conflictingCodes: conflicting,
         conflictingLabels: conflicting.map((c) => labelByCode.get(c) ?? c),
         excerpt: firstExcerpt,

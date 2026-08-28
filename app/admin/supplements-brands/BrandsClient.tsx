@@ -7,7 +7,7 @@ import {
   saveBrand, deleteBrand, saveProduct, deleteProduct, savePairing, deletePairing,
   type BrandState,
 } from "./actions";
-import { PAYMENT_MODES, PRODUCT_CATEGORIES, OTHER_PRODUCT_CATEGORY } from "@/lib/constants";
+import { PAYMENT_MODES, CATEGORY_GROUPS } from "@/lib/constants";
 
 export interface Brand {
   id: string;
@@ -126,8 +126,6 @@ function ProductForm({ brands, product, defaultBrandId, onDone }: {
   brands: Brand[]; product?: Product; defaultBrandId?: string; onDone?: () => void;
 }) {
   const [state, action] = useActionState(saveProduct, initial);
-  const known = PRODUCT_CATEGORIES.some((c) => c.value === product?.category);
-  const [category, setCategory] = useState(product?.category && !known ? OTHER_PRODUCT_CATEGORY : product?.category ?? "");
   if (state.saved && onDone) onDone();
 
   return (
@@ -144,16 +142,14 @@ function ProductForm({ brands, product, defaultBrandId, onDone }: {
           <input name="name" required defaultValue={product?.name ?? ""} className={INPUT} style={INPUT_STYLE} />
         </Field>
         <Field label="Category">
-          <select value={category} onChange={(e) => setCategory(e.target.value)}
-            name={category === OTHER_PRODUCT_CATEGORY ? undefined : "category"}
-            className={INPUT} style={INPUT_STYLE}>
+          {/* The six canonical docs/13 groups only (migration 054) — the
+              "Other…" free-text escape is gone so a parallel category
+              vocabulary can never re-form. The clinical tie is the library
+              link, not this string. */}
+          <select name="category" defaultValue={product?.category ?? ""} className={INPUT} style={INPUT_STYLE}>
             <option value="">Select a category…</option>
-            {PRODUCT_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            <option value={OTHER_PRODUCT_CATEGORY}>Other…</option>
+            {CATEGORY_GROUPS.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          {category === OTHER_PRODUCT_CATEGORY && (
-            <input name="category" required placeholder="e.g. beta_alanine" className={`${INPUT} mt-2`} style={INPUT_STYLE} />
-          )}
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Base price">

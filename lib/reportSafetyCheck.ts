@@ -94,11 +94,12 @@ export async function assertReportSafe(athleteId: string, reportText: string): P
     if (pairing) {
       const { data: productRows } = await supabase
         .from("products")
-        .select("name, category")
+        .select("name, category, supplement_library_id")
         .eq("brand_id", pairing.brand_id as string);
       products = (productRows ?? []).map((p) => ({
         name: p.name as string,
         category: (p.category as string | null) ?? null,
+        supplementLibraryId: (p.supplement_library_id as string | null) ?? null,
       }));
     }
   }
@@ -106,8 +107,9 @@ export async function assertReportSafe(athleteId: string, reportText: string): P
 
   const { data: supplementRows } = await supabase
     .from("supplement_library")
-    .select("category, contraindicated_conditions");
+    .select("id, category, contraindicated_conditions");
   const supplementLibrary: SafetySupplementEntry[] = (supplementRows ?? []).map((s) => ({
+    id: s.id as string,
     category: s.category as string,
     contraindicatedConditions: (s.contraindicated_conditions as string[] | null) ?? [],
   }));
