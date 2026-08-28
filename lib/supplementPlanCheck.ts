@@ -63,6 +63,10 @@ export interface SupplementLibraryRow {
   contraindicatedConditions: string[];
   dietCompatibility: string[];
   culturalNotes: string | null;
+  /** Migration 056: authoritative prose dosing guidance from the library
+   *  editor — flows into the planner/report prompts, never matched by the
+   *  safety system. */
+  typicalDosing: string | null;
 }
 
 export interface PlanSafetyFinding {

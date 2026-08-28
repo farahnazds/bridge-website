@@ -52,6 +52,9 @@ export interface LibraryEntry {
   evidence_grade: string | null;
   age_min: number | null;
   contraindicated_conditions: string[];
+  /** Authoritative prose guidance (migration 056) — preferred over the
+   *  product-derived summary on the entity card. */
+  typical_dosing?: string | null;
 }
 
 type Editing = { ctx: EditingContext; entriesById: Record<string, EditableLibraryEntry> };
@@ -443,12 +446,17 @@ export default function CertifiedCatalogue({
                           ? `Contraindicated for ${l.contraindicated_conditions.map(label).join(", ")}`
                           : "No recorded contraindications"}
                       </p>
-                      {dosingSummaryFor(l.id) && (
+                      {l.typical_dosing ? (
+                        <p className="mt-0.5 text-xs" style={{ color: "var(--text)" }}>
+                          <span style={{ color: "var(--text-muted)" }}>Dosing (authoritative): </span>
+                          {l.typical_dosing}
+                        </p>
+                      ) : dosingSummaryFor(l.id) ? (
                         <p className="mt-0.5 text-xs" style={{ color: "var(--text)" }}>
                           <span style={{ color: "var(--text-muted)" }}>Dosing (from products): </span>
                           {dosingSummaryFor(l.id)}
                         </p>
-                      )}
+                      ) : null}
                     </div>
                     {editing && (
                       <div className="flex shrink-0 items-center gap-2">

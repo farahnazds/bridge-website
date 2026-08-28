@@ -329,7 +329,7 @@ export async function getReportBundle(
     const [{ data: supplementRows }, vocab] = await Promise.all([
       supabase
         .from("supplement_library")
-        .select("name, category, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, cultural_notes"),
+        .select("name, category, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, cultural_notes, typical_dosing"),
       // Contraindication codes span all three clinical vocabularies; resolved
       // here so the prompt reads "Milk / Dairy", never "milk_dairy".
       loadVocabularyLabels(),
@@ -346,6 +346,7 @@ export async function getReportBundle(
       ),
       dietCompatibility: (s.diet_compatibility as string[] | null) ?? [],
       culturalNotes: (s.cultural_notes as string | null) ?? null,
+      typicalDosing: (s.typical_dosing as string | null) ?? null,
     }));
     notes.push(
       prescription

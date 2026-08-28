@@ -127,6 +127,9 @@ export async function saveLibraryEntry(_prev: LibraryState, formData: FormData):
     contraindicated_conditions: contraindicated,
     diet_compatibility: diets,
     alternatives,
+    // Free text sanctioned (owner ruling 2026-08-29): prose guidance the AI
+    // reads, not a safety code — see migration 056's header.
+    typical_dosing: String(formData.get("typical_dosing") ?? "").trim() || null,
   };
 
   const { error } = id

@@ -41,7 +41,7 @@ export default async function AdminSupplementsBrandsPage() {
     supabase
       .from("supplement_library")
       .select(
-        "id, name, category, category_group, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, alternatives, cultural_notes, ethnicity_dosing_notes"
+        "id, name, category, category_group, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, alternatives, cultural_notes, ethnicity_dosing_notes, typical_dosing"
       )
       .order("name"),
     supabase.from("medical_conditions").select("code, label"),

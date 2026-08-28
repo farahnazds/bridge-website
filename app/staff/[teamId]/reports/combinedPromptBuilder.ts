@@ -261,6 +261,8 @@ ${bundle.types.map(typeLabel).join(", ")}`);
               ? ` | diets: ${s.dietCompatibility.map((d) => DIET_LABEL[d] ?? d).join(", ")}`
               : ""
           }${
+            s.typicalDosing ? ` | typical dosing (authoritative): ${s.typicalDosing}` : ""
+          }${
             s.culturalNotes ? ` | ${s.culturalNotes}` : ""
           }`
       )

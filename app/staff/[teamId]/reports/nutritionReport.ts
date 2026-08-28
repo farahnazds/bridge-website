@@ -196,6 +196,7 @@ export async function generateAndSaveNutritionReport(
       contraindicatedConditions: vocabularyLabelsFor(vocab, s.contraindicatedConditions),
       dietCompatibility: s.dietCompatibility,
       culturalNotes: s.culturalNotes,
+      typicalDosing: s.typicalDosing,
     })),
     clinicalLibraryEntries: req.citations,
     previousReportSummary: req.extras.previousReportSummary,

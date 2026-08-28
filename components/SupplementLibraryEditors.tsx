@@ -33,6 +33,7 @@ export interface EditableLibraryEntry {
   alternatives: string[];
   cultural_notes: string | null;
   ethnicity_dosing_notes: string | null;
+  typical_dosing: string | null;
 }
 
 export interface EditableProductClinical {
@@ -104,6 +105,7 @@ export function LibraryEntryEditor({
   const [ageMin, setAgeMin] = useState(entry?.age_min?.toString() ?? "");
   const [ageMax, setAgeMax] = useState(entry?.age_max?.toString() ?? "");
   const [diets, setDiets] = useState<string[]>(entry?.diet_compatibility ?? []);
+  const [typicalDosing, setTypicalDosing] = useState(entry?.typical_dosing ?? "");
   // Alternatives moved into a VocabularyPicker, which owns its selection
   // state (and therefore survives a rejected save on its own).
   const alternatives = entry?.alternatives ?? [];
@@ -168,6 +170,27 @@ export function LibraryEntryEditor({
                 </label>
               </div>
             </div>
+
+            {/* Free text SANCTIONED here (owner ruling 2026-08-29, reversing
+                the derived-only decision): prose the AI reads, not a code the
+                safety system matches. The never-free-text rule stays where it
+                lives — contraindications, allergens, diets. */}
+            <label className="flex flex-col gap-1.5">
+              <FieldLabel>Typical dosing (authoritative)</FieldLabel>
+              <input
+                name="typical_dosing"
+                value={typicalDosing}
+                onChange={(e) => setTypicalDosing(e.target.value)}
+                placeholder="e.g. 3–5 g daily, any time, with food"
+                className={INPUT}
+                style={INPUT_STYLE}
+              />
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Authoritative dosing guidance for this entity — flows straight into the Nutrition
+                Planner&apos;s AI suggestions and the report prompts. Product cards keep their own label
+                dosing separately.
+              </span>
+            </label>
 
             <VocabularyPicker
               name="contraindicated_conditions"

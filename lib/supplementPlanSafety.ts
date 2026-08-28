@@ -132,7 +132,7 @@ export async function loadSupplementLibrary(): Promise<SupplementLibraryRow[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("supplement_library")
-    .select("id, name, category, category_group, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, cultural_notes");
+    .select("id, name, category, category_group, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, cultural_notes, typical_dosing");
   return (data ?? []).map((s) => ({
     id: s.id as string,
     name: s.name as string,
@@ -144,6 +144,7 @@ export async function loadSupplementLibrary(): Promise<SupplementLibraryRow[]> {
     contraindicatedConditions: (s.contraindicated_conditions as string[] | null) ?? [],
     dietCompatibility: (s.diet_compatibility as string[] | null) ?? [],
     culturalNotes: (s.cultural_notes as string | null) ?? null,
+    typicalDosing: (s.typical_dosing as string | null) ?? null,
   }));
 }
 

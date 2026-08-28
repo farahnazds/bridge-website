@@ -2756,6 +2756,7 @@ export type Database = {
           evidence_grade: string | null
           id: string
           name: string
+          typical_dosing: string | null
         }
         Insert: {
           age_max?: number | null
@@ -2771,6 +2772,7 @@ export type Database = {
           evidence_grade?: string | null
           id?: string
           name: string
+          typical_dosing?: string | null
         }
         Update: {
           age_max?: number | null
@@ -2786,6 +2788,7 @@ export type Database = {
           evidence_grade?: string | null
           id?: string
           name?: string
+          typical_dosing?: string | null
         }
         Relationships: []
       }

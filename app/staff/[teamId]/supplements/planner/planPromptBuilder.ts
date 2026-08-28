@@ -301,7 +301,7 @@ ${
                 s.dietCompatibility.length > 0
                   ? ` | diet: ${s.dietCompatibility.map((d) => DIET_LABEL[d] ?? d).join(", ")}`
                   : ""
-              }${s.culturalNotes ? ` | ${s.culturalNotes}` : ""}`
+              }${s.typicalDosing ? ` | typical dosing (authoritative): ${s.typicalDosing}` : ""}${s.culturalNotes ? ` | ${s.culturalNotes}` : ""}`
           )
           .join("\n")
       : `The supplement library is empty. Rely on the declared allergies, intolerances and conditions below for the safety cross-check, use "${NO_LIBRARY_MATCH}" for every supplement_library_id, and say plainly in the period summary that no structured contraindication library was available.`;

@@ -162,6 +162,8 @@ export interface SupplementLibraryEntry {
   contraindicatedConditions: string[];
   dietCompatibility: string[];
   culturalNotes: string | null;
+  /** Authoritative prose dosing guidance (migration 056). */
+  typicalDosing: string | null;
 }
 
 export interface ClinicalLibraryEntry {
@@ -606,6 +608,8 @@ ${
                 s.dietCompatibility.length > 0
                   ? ` | diet: ${s.dietCompatibility.map((d) => DIET_LABEL[d] ?? d).join(", ")}`
                   : ""
+              }${
+                s.typicalDosing ? ` | typical dosing (authoritative): ${s.typicalDosing}` : ""
               }${
                 s.culturalNotes ? ` | ${s.culturalNotes}` : ""
               }`
