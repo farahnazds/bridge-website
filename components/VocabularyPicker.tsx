@@ -32,11 +32,16 @@ export default function VocabularyPicker({
   groups,
   initial = [],
   legend,
+  hint,
 }: {
   name: string;
   groups: VocabGroup[];
   initial?: string[];
   legend?: string;
+  /** One plain sentence stating what checking a box actually DOES — real
+   *  user feedback 2026-08-29: "Contraindicated for" alone did not make the
+   *  consequence (an enforced block) unambiguous. */
+  hint?: string;
 }) {
   const [selected, setSelected] = useState<string[]>(initial);
   const [filter, setFilter] = useState("");
@@ -65,6 +70,11 @@ export default function VocabularyPicker({
         <legend className="text-sm font-medium" style={{ color: "var(--text)" }}>
           {legend}
         </legend>
+      )}
+      {hint && (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {hint}
+        </p>
       )}
 
       {selected.map((code) => (

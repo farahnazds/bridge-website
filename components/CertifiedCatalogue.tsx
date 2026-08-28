@@ -207,6 +207,23 @@ export default function CertifiedCatalogue({
 }) {
   const [category, setCategory] = useState<string>("");
   const [brandId, setBrandId] = useState<string>("");
+  const [query, setQuery] = useState<string>("");
+
+  // Adjust-during-render (the repo's sanctioned pattern): when the library
+  // GROWS, a new entry was just added — clear every filter so it is visible.
+  // Real user feedback 2026-08-29: with a brand filter active, a brand-new
+  // entity (which by definition has no products yet) was hidden by the very
+  // filter, reading as "my entry didn't save". The save was never the
+  // problem; the filters were.
+  const [prevLibraryCount, setPrevLibraryCount] = useState(library.length);
+  if (library.length !== prevLibraryCount) {
+    setPrevLibraryCount(library.length);
+    if (library.length > prevLibraryCount) {
+      setCategory("");
+      setBrandId("");
+      setQuery("");
+    }
+  }
 
   const brandName = useMemo(() => new Map(brands.map((b) => [b.id, b.name])), [brands]);
   const libById = useMemo(() => new Map(library.map((l) => [l.id, l])), [library]);
@@ -243,6 +260,20 @@ export default function CertifiedCatalogue({
       Certification, allergen and clinical-link data appears here once migration 042 is applied and
       the certified-supplements import has run.
     </p>
+  );
+
+  const searchBox = (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Search</span>
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Product or entity name…"
+        className={INPUT}
+        style={{ ...INPUT_STYLE, paddingTop: ".375rem", paddingBottom: ".375rem" }}
+      />
+    </label>
   );
 
   const brandSelect = (
@@ -287,22 +318,42 @@ export default function CertifiedCatalogue({
       }
     }
 
+    // Search (real user request 2026-08-29): an entity stays visible when its
+    // own name matches OR any of its (brand-filtered) products' names match;
+    // when only products matched, the nested grid narrows to those matches so
+    // the hit is visible rather than buried.
+    const q = query.trim().toLowerCase();
+    const entityNameMatches = (l: LibraryEntry) => !q || l.name.toLowerCase().includes(q);
+    const productMatches = (p: CatalogueProduct) => !q || p.name.toLowerCase().includes(q);
+    const entityVisible = (l: LibraryEntry) =>
+      entityNameMatches(l) || (productsByEntity.get(l.id) ?? []).some(productMatches);
+
     const visibleGroups = groups
       .filter((g) => !category || g.name === category)
       .map((g) => ({
         ...g,
         // A brand filter narrows to entities that actually have that brand's
         // products; without one every entity shows, products or not.
-        entries: brandId ? g.entries.filter((l) => (productsByEntity.get(l.id) ?? []).length > 0) : g.entries,
+        entries: (brandId ? g.entries.filter((l) => (productsByEntity.get(l.id) ?? []).length > 0) : g.entries)
+          .filter(entityVisible),
       }))
       .filter((g) => g.entries.length > 0);
+
+    const visibleUnlinked = unlinked.filter(productMatches);
+
+    // When only a product matched the search, the entity's grid narrows to
+    // the matching products; an entity matched by name keeps its full grid.
+    const displayedProductsFor = (l: LibraryEntry) => {
+      const own = productsByEntity.get(l.id) ?? [];
+      return entityNameMatches(l) ? own : own.filter(productMatches);
+    };
 
     const visibleEntityCount = visibleGroups.reduce((n, g) => n + g.entries.length, 0);
     const visibleProductCount =
       visibleGroups.reduce(
-        (n, g) => n + g.entries.reduce((m, l) => m + (productsByEntity.get(l.id) ?? []).length, 0),
+        (n, g) => n + g.entries.reduce((m, l) => m + displayedProductsFor(l).length, 0),
         0
-      ) + (!category ? unlinked.length : 0);
+      ) + (!category ? visibleUnlinked.length : 0);
 
     return (
       <div className="flex flex-col gap-6">
@@ -316,6 +367,7 @@ export default function CertifiedCatalogue({
             setCategory={setCategory}
           />
           {brandSelect}
+          {searchBox}
           <p className="pb-2 text-xs" style={{ color: "var(--text-muted)" }} role="status">
             {visibleEntityCount} of {library.length} entities · {visibleProductCount} of {products.length} products
           </p>
@@ -338,7 +390,7 @@ export default function CertifiedCatalogue({
               {g.name}
             </h3>
             {g.entries.map((l) => {
-              const own = productsByEntity.get(l.id) ?? [];
+              const own = displayedProductsFor(l);
               return (
                 <div key={l.id} className={`${CARD} flex flex-col gap-3 p-5`}
                   style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
@@ -388,13 +440,13 @@ export default function CertifiedCatalogue({
           </section>
         ))}
 
-        {unlinked.length > 0 && !category && (
+        {visibleUnlinked.length > 0 && !category && (
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ fontFamily: "var(--font-heading)", color: "var(--text-muted)" }}>
               Products without a clinical link
             </h3>
             <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 17rem), 1fr))" }}>
-              {unlinked.map((p) => (
+              {visibleUnlinked.map((p) => (
                 <ProductCard
                   key={p.id}
                   p={p}
@@ -412,8 +464,12 @@ export default function CertifiedCatalogue({
   }
 
   // ---- products-first: the original Supplements & Brands layout ----
+  const q = query.trim().toLowerCase();
   const visible = products.filter(
-    (p) => (!category || p.category === category) && (!brandId || p.brand_id === brandId)
+    (p) =>
+      (!category || p.category === category) &&
+      (!brandId || p.brand_id === brandId) &&
+      (!q || p.name.toLowerCase().includes(q))
   );
 
   return (
@@ -424,6 +480,7 @@ export default function CertifiedCatalogue({
       <div className="flex flex-wrap items-end gap-3">
         <CategoryChips categories={categories} category={category} setCategory={setCategory} />
         {brandSelect}
+        {searchBox}
         <p className="pb-2 text-xs" style={{ color: "var(--text-muted)" }} role="status">
           {visible.length} of {products.length} products
         </p>

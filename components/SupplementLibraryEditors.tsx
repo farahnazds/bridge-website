@@ -162,6 +162,7 @@ export function LibraryEntryEditor({
             <VocabularyPicker
               name="contraindicated_conditions"
               legend="Contraindicated for"
+              hint="Checking a condition BLOCKS this supplement for every athlete who has declared it — the planner's safety gate and the report safety check enforce the block automatically."
               groups={ctx.vocabGroups}
               initial={entry?.contraindicated_conditions ?? []}
             />
@@ -301,6 +302,7 @@ export function ProductClinicalEditor({
             <VocabularyPicker
               name="allergens"
               legend="Contains (allergens)"
+              hint="These declare what the product physically contains. An athlete who has declared a matching allergy is protected automatically by the same safety checks."
               groups={ctx.allergyGroups}
               initial={product.allergens ?? []}
             />
