@@ -443,6 +443,10 @@ export const VALIDITY_TIERS = [
   { value: "club_verified", label: "Club-Verified" },
   { value: "practitioner_verified", label: "Practitioner-Verified" },
   { value: "self_reported", label: "Self-Reported" },
+  // Migration 053: entries made by the platform role (Super Admin) carry
+  // their own tier — never club_verified, which docs/05 defines as the
+  // club's own staff vouching. Honest provenance over borrowed authority.
+  { value: "bridgetx_verified", label: "Bridgetx Staff" },
 ];
 export const VALIDITY_TIER_LABELS: Record<string, string> = Object.fromEntries(
   VALIDITY_TIERS.map((t) => [t.value, t.label])

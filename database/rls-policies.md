@@ -1597,3 +1597,31 @@ that 018's two invariants survive: `injuries_athlete_view` still has
 `security_invoker = false`, and still exposes exactly three columns.
 
 See `database/migrations/052_definer_views_security_barrier.sql`.
+
+---
+
+## Migration 053 — bridgetx_verified validity tier (2026-08-28)
+
+Not a policy change: a CHECK-constraint widening on the four
+validity-carrying tables (`assessments`, `gps_logs`, `vald_data`,
+`injuries`) admitting a fourth tier value, `bridgetx_verified`.
+
+Context is the Super Admin write-parity ruling (see
+`docs/02-roles-and-permissions.md`): every club-data write action now
+admits `super_admin` via `canWriteClubData()` in `lib/auth.ts`. **No RLS
+migration was needed for that** — every club-data table has carried
+`"super admin full access" ... using (is_super_admin())` since the
+original schema, so the database always permitted these writes; the app
+layer was the only gate. The constraint is the one schema-level change:
+a Super Admin entry is stamped `bridgetx_verified` (rendered "Bridgetx
+Staff"), never `club_verified`, because that tier means the club's own
+staff vouched for the row (`docs/05-business-rules.md`).
+
+Two policy-adjacent consequences, both deliberate:
+
+- The `club staff edit within 7 days` window does not bind Super Admin
+  edits — their full-access policy has no window, matching the
+  edit-window table's "then Admin only" escalation tier.
+- `provider_id` semantics are unchanged: the Super Admin's own profile
+  id, real name shown. The tier, not the name, is what distinguishes a
+  platform entry.

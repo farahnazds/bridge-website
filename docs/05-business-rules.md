@@ -7,6 +7,12 @@ Every data row carries a validity tier reflecting who entered it:
 - **Club-Verified** — entered by a club practitioner or Club Manager
 - **Practitioner-Verified** — entered by an independent practitioner
 - **Self-Reported** — entered by the athlete themselves
+- **Bridgetx Staff** (`bridgetx_verified`, migration 053) — entered by the
+  platform's own staff (Super Admin). A deliberate fourth tier (owner
+  ruling 2026-08-28): platform entries are never stamped Club-Verified,
+  because that tier means the club's own staff vouched for the data. The
+  entrant's real name shows in `provider_id` as always — honest
+  self-attribution, never disguised as the club's staff.
 
 Labels are never hidden or silently resolved — reports and the athlete's
 history always show which tier each data point came from. If two

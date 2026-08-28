@@ -441,7 +441,9 @@ $$;
 -- SECTION 7 — DATA ENTRY: ASSESSMENTS, PERFORMANCE, INJURIES
 -- ============================================================================
 -- Every data-entry table below shares the same provenance/validity pattern.
--- validity_tier: club_verified / practitioner_verified / self_reported
+-- validity_tier: club_verified / practitioner_verified / self_reported /
+--   bridgetx_verified (migration 053 — platform-staff entries, i.e. Super
+--   Admin, are never disguised as the club's own staff)
 -- provider_id: who originally entered it — NEVER reassigned on edit
 -- updated_by/updated_at: set on edit, original provider_id stays intact
 
@@ -458,7 +460,7 @@ create table assessments (
   bmr numeric,
   tdee numeric,
   notes text,
-  validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported')),
+  validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported','bridgetx_verified')),
   provider_id uuid not null references profiles(id),
   created_at timestamptz not null default now(),
   updated_by uuid references profiles(id),
@@ -481,7 +483,7 @@ create table gps_logs (
   max_velocity numeric,
   player_load numeric,
   session_duration_min numeric,
-  validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported')),
+  validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported','bridgetx_verified')),
   provider_id uuid not null references profiles(id),
   created_at timestamptz not null default now(),
   updated_by uuid references profiles(id),
@@ -495,7 +497,7 @@ create table vald_data (
   test_type text not null, -- e.g. cmj, nordic_curl
   metric_json jsonb not null default '{}',
   asymmetry_pct numeric,
-  validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported')),
+  validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported','bridgetx_verified')),
   provider_id uuid not null references profiles(id),
   created_at timestamptz not null default now(),
   updated_by uuid references profiles(id),
@@ -512,7 +514,7 @@ create table injuries (
   rtp_phase text check (rtp_phase in ('acute','sub_acute','return_to_training','returned')),
   target_return_date date,
   cleared_date date,
-  validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported')),
+  validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported','bridgetx_verified')),
   provider_id uuid not null references profiles(id),
   created_at timestamptz not null default now(),
   updated_by uuid references profiles(id),
