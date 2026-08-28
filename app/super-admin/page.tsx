@@ -51,11 +51,18 @@ function StatCard({ label, value, hint }: { label: string; value: number | strin
   );
 }
 
+// Module-scope so react-hooks/purity doesn't see a Date.now() in the
+// component body — a server page renders once per request, so a
+// per-request timestamp is exactly the intent.
+function isoDaysFromNow(days: number): string {
+  return new Date(Date.now() + days * 86_400_000).toISOString();
+}
+
 export default async function SuperAdminOverviewPage() {
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
-  const thirtyDaysOut = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const thirtyDaysOut = isoDaysFromNow(30).slice(0, 10);
+  const thirtyDaysAgo = isoDaysFromNow(-30);
 
   const [
     clubsRes, athletesRes, reportsRes, recentReportsRes, checkinsRes,

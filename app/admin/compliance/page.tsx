@@ -24,8 +24,8 @@ export default async function AdminCompliancePage() {
   const today = new Date().toISOString().slice(0, 10);
   const supabase = await createClient();
 
-  let statusByAthlete = new Map<string, string>();
-  let last7ByAthlete = new Map<string, number>();
+  const statusByAthlete = new Map<string, string>();
+  const last7ByAthlete = new Map<string, number>();
   let fetchError: string | null = null;
 
   if (athleteIds.length > 0) {
