@@ -10,6 +10,7 @@ import {
   type EditableLibraryEntry,
 } from "@/components/SupplementLibraryEditors";
 import { CATEGORY_GROUPS } from "@/lib/constants";
+import CategoryIcon from "@/components/CategoryIcon";
 
 // The certified supplement catalogue view — the read side of the docs/13
 // import (migration 042 + scripts/import-certified-supplements.mjs).
@@ -81,7 +82,7 @@ function ProductCard({
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2.5">
-          {p.image_url && (
+          {p.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={p.image_url}
@@ -89,6 +90,8 @@ function ProductCard({
               className="h-11 w-11 shrink-0 rounded-lg border object-cover"
               style={{ borderColor: "var(--border)" }}
             />
+          ) : (
+            <CategoryIcon category={p.category} />
           )}
           <div className="min-w-0">
             <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{p.name}</p>

@@ -1625,3 +1625,24 @@ Two policy-adjacent consequences, both deliberate:
 - `provider_id` semantics are unchanged: the Super Admin's own profile
   id, real name shown. The tier, not the name, is what distinguishes a
   platform entry.
+
+---
+
+## Migration 057 — club_product_priorities (2026-08-29)
+
+Per-club product ranking within a clinical entity (rank 1 = preferred,
+2+ = approved alternatives). Owner-approved design: decorates the team
+workspace's product-choice step; the planner AI never reads it.
+
+| Policy | Command | Rule |
+|---|---|---|
+| `super admin full access` | `all` | `is_super_admin()` |
+| `club staff read own club priorities` | `select` | `is_club_staff_for_club(club_id)` |
+
+Writes are Super Admin only — the ranking is club configuration, set on
+/super-admin/clubs/[clubId]/products. Club staff read their own club's
+rows so the Add form and Alternatives panel can order, badge and
+pre-select. A BEFORE trigger (`club_product_priorities_entity_check`)
+asserts the ranked product actually belongs to the row's clinical
+entity, so a priority can never point across entities even under the
+service role.

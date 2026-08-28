@@ -128,6 +128,11 @@ export default async function SuperAdminClubDetailPage({
           {club.sport}
           {club.location ? ` · ${club.location}` : ""} · {club.timezone}
         </p>
+        <p className="mt-2 text-sm">
+          <Link href={`/super-admin/clubs/${clubId}/products`} className="font-medium underline-offset-2 hover:underline" style={{ color: "var(--brand-blue)" }}>
+            Products &amp; Priorities →
+          </Link>
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

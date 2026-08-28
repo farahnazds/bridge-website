@@ -55,6 +55,11 @@ export interface CatalogueProductLite {
    *  non-canonical value (the Beet It loading protocol) pre-fills the Custom
    *  timing input verbatim. */
   defaultTiming: string | null;
+  /** The club's ranking for this product within its entity (migration 057):
+   *  1 = club preferred, 2+ = approved alternative, null = unranked. Orders
+   *  and badges the Add form and Alternatives panel; the preferred product
+   *  is pre-selected when its entity is chosen. */
+  priorityRank: number | null;
 }
 
 export interface AthleteProtocols {
@@ -472,6 +477,16 @@ function LiveWarnings({ findings }: { findings: string[] }) {
 function ProductBadges({ p, codeLabels }: { p: CatalogueProductLite; codeLabels: Record<string, string> }) {
   return (
     <span className="flex flex-wrap items-center gap-1">
+      {p.priorityRank === 1 && (
+        <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--brand-teal) 14%, transparent)", color: "var(--brand-teal)" }}>
+          Club preferred
+        </span>
+      )}
+      {p.priorityRank !== null && p.priorityRank > 1 && (
+        <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--brand-blue) 12%, transparent)", color: "var(--brand-blue)" }}>
+          Approved alternative
+        </span>
+      )}
       {p.informedSport && (
         <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--brand-teal) 14%, transparent)", color: "var(--brand-teal)" }}>
           Informed Sport
@@ -1186,7 +1201,9 @@ function AddProtocolForm({
     () =>
       (libraryId ? productsByLibrary.get(libraryId) ?? [] : [])
         .slice()
-        .sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name)),
+        .sort(
+          (a, b) => (a.priorityRank ?? 99) - (b.priorityRank ?? 99) || a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name)
+        ),
     [libraryId, productsByLibrary]
   );
   const product = entityProducts.find((p) => p.id === productId) ?? null;
@@ -1274,7 +1291,16 @@ function AddProtocolForm({
           <select
             name="supplement_library_id"
             value={libraryId}
-            onChange={(e) => { setLibraryId(e.target.value); resetSelection(); }}
+            onChange={(e) => {
+              const id = e.target.value;
+              setLibraryId(id);
+              resetSelection();
+              // The club's preferred product (rank 1, migration 057) is the
+              // default choice the moment its entity is picked — still fully
+              // changeable; the radios stay right below.
+              const preferred = (productsByLibrary.get(id) ?? []).find((p) => p.priorityRank === 1);
+              if (preferred) chooseProduct(preferred);
+            }}
             className={INPUT}
             style={INPUT_STYLE}
             required
@@ -1498,6 +1524,14 @@ export default function SupplementsClient({
       const list = by.get(p.supplementLibraryId);
       if (list) list.push(p);
       else by.set(p.supplementLibraryId, [p]);
+    }
+    // Club ranking first (preferred, then approved alternatives in order),
+    // unranked after, alphabetical within — so every consumer of this map
+    // (Add form, Alternatives panel) reads the club's preference the same way.
+    for (const list of by.values()) {
+      list.sort(
+        (a, b) => (a.priorityRank ?? 99) - (b.priorityRank ?? 99) || a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name)
+      );
     }
     return by;
   }, [products]);

@@ -68,3 +68,4 @@ foreign key (it points at either `teams` or `clubs`), and the app re-checks the
 stored id against what the person may actually open today before using it —
 falling back to the first option alphabetically. Deleting this table's contents
 would cost people their default landing spot and nothing else.
+| `club_product_priorities` | Per-club product ranking within a clinical entity (migration 057): rank 1 = the club's preferred certified product, 2+ = approved alternatives. Super Admin writes; club staff read. Decorates the Add form / Alternatives panel; never read by the planner AI. |

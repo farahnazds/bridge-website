@@ -1080,6 +1080,69 @@ export type Database = {
           },
         ]
       }
+      club_product_priorities: {
+        Row: {
+          club_id: string
+          created_at: string
+          id: string
+          product_id: string
+          rank: number
+          supplement_library_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          rank: number
+          supplement_library_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          rank?: number
+          supplement_library_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_product_priorities_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_own_club"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_product_priorities_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_product_priorities_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "consultant_referred_clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_product_priorities_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_product_priorities_supplement_library_id_fkey"
+            columns: ["supplement_library_id"]
+            isOneToOne: false
+            referencedRelation: "supplement_library"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_settings: {
         Row: {
           club_id: string

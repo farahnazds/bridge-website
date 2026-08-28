@@ -73,7 +73,7 @@ export default async function SupplementsPage({
   // than the phase decisions.
   const agendaEnd = new Date(Date.parse(today) + 6 * 86400000).toISOString().slice(0, 10);
 
-  const [contexts, library, productsRes, brandsRes, allergiesRes, loadDaysByAthlete] = await Promise.all([
+  const [contexts, library, productsRes, brandsRes, prioritiesRes, allergiesRes, loadDaysByAthlete] = await Promise.all([
     loadAthleteClinicalContext(athleteIds),
     loadSupplementLibrary(),
     // The certified catalogue (migration 042): every product carrying a
@@ -84,6 +84,15 @@ export default async function SupplementsPage({
       .select("id, name, brand_id, supplement_library_id, informed_sport, nsf_certified, allergens, vegan, default_dosing, default_timing")
       .not("supplement_library_id", "is", null),
     supabase.from("brands").select("id, name"),
+    // The club's product ranking (migration 057) — read-only club config
+    // (RLS: "club staff read own club priorities") that orders/badges the
+    // product choices below and pre-selects the preferred product.
+    context?.team.club_id
+      ? supabase
+          .from("club_product_priorities")
+          .select("supplement_library_id, product_id, rank")
+          .eq("club_id", context.team.club_id)
+      : Promise.resolve({ data: [] }),
     // The full allergy vocabulary, so a product chip can name an allergen the
     // ATHLETE HASN'T declared. The athlete's own codeLabels only cover their
     // declarations — without this, an undeclared allergen rendered as its raw
@@ -109,6 +118,12 @@ export default async function SupplementsPage({
   }
 
   const brandName = new Map(((brandsRes.data ?? []) as { id: string; name: string }[]).map((b) => [b.id, b.name]));
+  const rankByProduct = new Map<string, number>(
+    ((prioritiesRes.data ?? []) as { supplement_library_id: string; product_id: string; rank: number }[]).map((r) => [
+      `${r.supplement_library_id}:${r.product_id}`,
+      r.rank,
+    ])
+  );
   const products: CatalogueProductLite[] = ((productsRes.data ?? []) as Record<string, unknown>[]).map((p) => ({
     id: p.id as string,
     name: p.name as string,
@@ -120,6 +135,7 @@ export default async function SupplementsPage({
     vegan: Boolean(p.vegan),
     defaultDosing: (p.default_dosing as string | null) ?? null,
     defaultTiming: (p.default_timing as string | null) ?? null,
+    priorityRank: rankByProduct.get(`${p.supplement_library_id}:${p.id}`) ?? null,
   }));
   const allergenLabels: Record<string, string> = Object.fromEntries(
     ((allergiesRes.data ?? []) as { code: string; label: string }[]).map((a) => [a.code, a.label])
