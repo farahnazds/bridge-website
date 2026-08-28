@@ -63,7 +63,13 @@ export default async function TeamCommentsPage({
       targetLabel: r.team_id ? `${teamName} (team-wide)` : athlete ? `${athlete.first_name} ${athlete.last_name}` : "Unknown athlete",
       createdAt: r.created_at,
       isOwn: r.author_id === profile.id,
-      canToggleOff: isManager && r.comment_type === "official_comment" && r.reflect_in_ai,
+      // isManager is false for oversight roles, but Super Admin holds the
+      // moderation power too (2026-08-28 parity ruling) — mirror of the
+      // toggleReflection action's own gate.
+      canToggleOff:
+        (isManager || profile.role === "super_admin") &&
+        r.comment_type === "official_comment" &&
+        r.reflect_in_ai,
     };
   });
 

@@ -14,7 +14,9 @@ export interface ActionState {
 // RLS-scoped throughout — "club staff access own club teams" already
 // permits this for club_manager, no admin-client bypass needed.
 export async function createTeam(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-  if (!(await hasRole("club_manager"))) {
+  // super_admin admitted 2026-08-28 — full parity ruling, manager-tier
+  // powers included (see canWriteClubData in lib/auth.ts for the story).
+  if (!(await hasRole("club_manager", "super_admin"))) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -52,7 +54,9 @@ export async function invitePractitioner(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  if (!(await hasRole("club_manager"))) {
+  // super_admin admitted 2026-08-28 — full parity ruling, manager-tier
+  // powers included (see canWriteClubData in lib/auth.ts for the story).
+  if (!(await hasRole("club_manager", "super_admin"))) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -141,7 +145,9 @@ export async function invitePractitioner(
 
 // ---- Assign an existing practitioner to another team ----
 export async function assignToTeam(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-  if (!(await hasRole("club_manager"))) {
+  // super_admin admitted 2026-08-28 — full parity ruling, manager-tier
+  // powers included (see canWriteClubData in lib/auth.ts for the story).
+  if (!(await hasRole("club_manager", "super_admin"))) {
     return { error: "You don't have permission to do this." };
   }
 

@@ -22,7 +22,9 @@ export async function saveClubSettings(
   formData: FormData
 ): Promise<SettingsState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_manager") {
+  // super_admin admitted 2026-08-28 — full parity ruling, manager-tier
+  // powers included (see canWriteClubData in lib/auth.ts for the story).
+  if (!profile || (profile.role !== "club_manager" && profile.role !== "super_admin")) {
     return { error: "Only a Club Manager can change these settings.", saved: false };
   }
 

@@ -121,6 +121,25 @@ subscription dates and manual stop/resume, brands/products, the Clinical
 + Research library (Super Admin only — see `07-ai-engine.md`), club
 branding and report templates.
 
+**Full club-level write parity (2026-08-28, deliberate).** The app layer
+now enforces what the role cascade below always described: a Super Admin
+can do everything club staff can, in any club — all data writes
+(assessments, injuries, GPS, VALD, training load, supplement protocols
+and the Nutrition Planner, comments, messenger, report generation and
+sharing) AND the manager-tier powers (athlete registration, teams &
+staff management, club settings, the comment AI-reflection toggle). The
+write gate is `canWriteClubData()` in `lib/auth.ts`; manager-tier gates
+admit `super_admin` explicitly at their call sites. No RLS change was
+needed — every club-data table has carried "super admin full access"
+since the original schema. Two provenance rules distinguish these
+entries from club staff's own (`05-business-rules.md`): data rows are
+stamped `bridgetx_verified` ("Bridgetx Staff"), never `club_verified`,
+and attribution always shows the Super Admin's real name. The 7-day
+staff edit window does not bind this role (its RLS full-access policy
+has no window — consistent with "then Admin only" in the edit-window
+table). **Admin deliberately does NOT get this parity yet** — scoped to
+Super Admin only, Admin to be revisited separately.
+
 ### Admin
 Same structural dashboard as Super Admin, scoped to clubs assigned via
 `admin_club_assignments`. Typically handles new club onboarding

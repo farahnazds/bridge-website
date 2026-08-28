@@ -23,7 +23,9 @@ export async function registerAthlete(
   _prevState: RegisterAthleteState,
   formData: FormData
 ): Promise<RegisterAthleteState> {
-  if (!(await hasRole("club_manager"))) {
+  // super_admin admitted 2026-08-28 — full parity ruling, manager-tier
+  // powers included (see canWriteClubData in lib/auth.ts for the story).
+  if (!(await hasRole("club_manager", "super_admin"))) {
     return { error: "You don't have permission to do this." };
   }
 

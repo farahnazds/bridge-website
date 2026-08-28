@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { TablesInsert } from "@/lib/supabase/database.types";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData } from "@/lib/auth";
 
 export interface ActionState {
   error: string | null;
@@ -19,7 +19,7 @@ export interface ActionState {
 // role check is just a fast, clear failure path, not the real boundary.
 export async function createComment(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -88,7 +88,9 @@ export async function deleteComment(_prevState: ActionState, formData: FormData)
 // "toggle back on" — nothing in Flow 8 describes re-enabling it).
 export async function toggleReflection(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "club_manager") {
+  // super_admin admitted 2026-08-28 — full parity ruling, manager-tier
+  // powers included (see canWriteClubData in lib/auth.ts for the story).
+  if (!profile || (profile.role !== "club_manager" && profile.role !== "super_admin")) {
     return { error: "Only a Club Manager can do this." };
   }
 
