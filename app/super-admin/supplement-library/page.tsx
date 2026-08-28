@@ -87,6 +87,7 @@ export default async function SupplementLibraryPage() {
             )
           )}
           editing={editing}
+          variant="clinical-first"
         />
       )}
     </div>

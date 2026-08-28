@@ -8,6 +8,7 @@ import {
   type EditingContext,
   type EditableLibraryEntry,
 } from "@/components/SupplementLibraryEditors";
+import { CATEGORY_GROUPS } from "@/lib/constants";
 
 // The certified supplement catalogue view — the read side of the docs/13
 // import (migration 042 + scripts/import-certified-supplements.mjs).
@@ -18,14 +19,12 @@ import {
 // ruling — one component, two surfaces, never a duplicate). Kept separate
 // from BrandsClient so the pairing machinery stays untouched.
 //
-// Two filter dimensions, per the same decision: CATEGORY (the six from
-// docs/13, preserved verbatim on products.category) and BRAND (new — the
-// catalogue arrived brand-annotated even though nothing grouped by it).
-//
-// Everything here is display. The catalogue is import-managed; editing a
-// product's clinical link or a library entry's codes is deliberately not
-// offered in v1 — a UI that lets contraindication codes be edited casually is
-// how free text sneaks back in.
+// TWO LAYOUTS, one truth (owner ruling 2026-08-28): the Admin page keeps the
+// original products-first grid with the clinical table beneath (a commercial
+// page leading with products); the Supplement Library page renders
+// clinical-first — the six docs/13 category sections, each clinical entity a
+// block with its branded products nested inside it — so the two layers read
+// as one structure rather than two separate, easy-to-miss sections.
 
 export interface CatalogueProduct {
   id: string;
@@ -47,9 +46,140 @@ export interface LibraryEntry {
   id: string;
   name: string;
   category: string;
+  category_group?: string | null;
   evidence_grade: string | null;
   age_min: number | null;
   contraindicated_conditions: string[];
+}
+
+type Editing = { ctx: EditingContext; entriesById: Record<string, EditableLibraryEntry> };
+
+function ProductCard({
+  p,
+  brandLabel,
+  label,
+  editing,
+  migrated,
+  entityFooter,
+}: {
+  p: CatalogueProduct;
+  brandLabel: string;
+  label: (code: string) => string;
+  editing?: Editing;
+  migrated: boolean;
+  /** The "Clinical entry: …" footer — redundant when the card is already
+   *  nested under its entity, so the clinical-first layout omits it. */
+  entityFooter?: LibraryEntry | null;
+}) {
+  return (
+    <div className={`${CARD} flex flex-col gap-2 p-4`}
+      style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{p.name}</p>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {brandLabel}{p.category ? ` · ${p.category}` : ""}
+          </p>
+        </div>
+        {editing && migrated && (
+          <ProductClinicalEditor
+            product={{
+              id: p.id,
+              name: p.name,
+              supplement_library_id: p.supplement_library_id ?? null,
+              informed_sport: p.informed_sport,
+              nsf_certified: p.nsf_certified,
+              vegan: p.vegan,
+              allergens: p.allergens,
+              default_dosing: p.default_dosing ?? null,
+            }}
+            ctx={editing.ctx}
+          />
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {p.informed_sport && (
+          <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--brand-teal) 14%, transparent)", color: "var(--brand-teal)" }}>
+            Informed Sport
+          </span>
+        )}
+        {p.nsf_certified && (
+          <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--brand-blue) 14%, transparent)", color: "var(--brand-blue)" }}>
+            NSF Certified
+          </span>
+        )}
+        {p.vegan && (
+          <span className={CHIP} style={{ backgroundColor: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+            Vegan
+          </span>
+        )}
+        {(p.allergens ?? []).map((a) => (
+          <span key={a} className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--warning) 12%, transparent)", color: "var(--warning)" }}>
+            Contains: {label(a)}
+          </span>
+        ))}
+      </div>
+
+      {p.description && (
+        <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>{p.description}</p>
+      )}
+      {p.default_dosing && (
+        <p className="text-xs" style={{ color: "var(--text)" }}>
+          <span style={{ color: "var(--text-muted)" }}>Dosing: </span>{p.default_dosing}
+        </p>
+      )}
+
+      {entityFooter && (
+        <div className={`${PANEL} mt-auto px-3 py-2`}
+          style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)" }}>
+          <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            Clinical entry: <span style={{ color: "var(--text)" }}>{entityFooter.name}</span>
+            {entityFooter.contraindicated_conditions.length > 0 ? (
+              <> — contraindicated for {entityFooter.contraindicated_conditions.map(label).join(", ")}</>
+            ) : (
+              <> — no recorded contraindications</>
+            )}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategoryChips({
+  categories,
+  category,
+  setCategory,
+}: {
+  categories: string[];
+  category: string;
+  setCategory: (c: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Category</span>
+      {categories.map((c) => {
+        const on = category === c;
+        return (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setCategory(on ? "" : c)}
+            aria-pressed={on}
+            className={`${CHIP} transition-colors duration-150`}
+            style={{
+              backgroundColor: on ? "color-mix(in srgb, var(--brand-blue) 14%, transparent)" : "var(--bg)",
+              color: on ? "var(--brand-blue)" : "var(--text)",
+              border: `1px solid ${on ? "var(--brand-blue)" : "var(--border)"}`,
+            }}
+          >
+            {c}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function CertifiedCatalogue({
@@ -58,6 +188,7 @@ export default function CertifiedCatalogue({
   library,
   codeLabels,
   editing,
+  variant = "products-first",
 }: {
   products: CatalogueProduct[];
   brands: { id: string; name: string }[];
@@ -70,7 +201,9 @@ export default function CertifiedCatalogue({
    *  still gets. The v1 "no editing" rule was about protecting the coded
    *  vocabulary; the editors keep that via VocabularyPicker + server-side
    *  code validation, so the protection moved rather than lapsed. */
-  editing?: { ctx: EditingContext; entriesById: Record<string, EditableLibraryEntry> };
+  editing?: Editing;
+  /** See the layout note at the top of this file. */
+  variant?: "products-first" | "clinical-first";
 }) {
   const [category, setCategory] = useState<string>("");
   const [brandId, setBrandId] = useState<string>("");
@@ -90,71 +223,207 @@ export default function CertifiedCatalogue({
   }, [products, brands]);
 
   const migrated = products.some((p) => p.informed_sport !== undefined);
+  const label = (code: string) => codeLabels[code] ?? code;
 
+  const header = (
+    <div className="flex flex-col gap-1">
+      <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
+        Certified catalogue
+      </h2>
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {variant === "clinical-first"
+          ? "The clinical library the AI reasons over and the planner's safety check enforces from, with each entity's batch-tested products (Informed Sport / NSF Certified for Sport) nested under it. Contraindications are codes from the declarable vocabulary — never prose."
+          : "Batch-tested products (Informed Sport / NSF Certified for Sport) and the clinical library entries they hang off. Import-managed — see scripts/import-certified-supplements.mjs."}
+      </p>
+    </div>
+  );
+
+  const migrationNotice = !migrated && products.length > 0 && (
+    <p className={NOTICE_EMPTY} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+      Certification, allergen and clinical-link data appears here once migration 042 is applied and
+      the certified-supplements import has run.
+    </p>
+  );
+
+  const brandSelect = (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Brand</span>
+      <select
+        value={brandId}
+        onChange={(e) => setBrandId(e.target.value)}
+        className={INPUT}
+        style={{ ...INPUT_STYLE, paddingTop: ".375rem", paddingBottom: ".375rem" }}
+      >
+        <option value="">All brands ({brandsPresent.length})</option>
+        {brandsPresent.map((b) => (
+          <option key={b.id} value={b.id}>{b.name}</option>
+        ))}
+      </select>
+    </label>
+  );
+
+  if (variant === "clinical-first") {
+    // Entities grouped under the six docs/13 sections, null groups last —
+    // Sodium Bicarbonate's deliberate NULL (migration 044) still renders,
+    // just under its own heading.
+    const groups: { name: string; entries: LibraryEntry[] }[] = [
+      ...CATEGORY_GROUPS.map((g) => ({
+        name: g,
+        entries: library.filter((l) => l.category_group === g),
+      })),
+      { name: "Ungrouped", entries: library.filter((l) => !l.category_group) },
+    ].filter((g) => g.entries.length > 0);
+
+    const productsByEntity = new Map<string, CatalogueProduct[]>();
+    const unlinked: CatalogueProduct[] = [];
+    for (const p of products) {
+      if (!brandId || p.brand_id === brandId) {
+        const key = p.supplement_library_id ?? "";
+        if (key && libById.has(key)) {
+          productsByEntity.set(key, [...(productsByEntity.get(key) ?? []), p]);
+        } else {
+          unlinked.push(p);
+        }
+      }
+    }
+
+    const visibleGroups = groups
+      .filter((g) => !category || g.name === category)
+      .map((g) => ({
+        ...g,
+        // A brand filter narrows to entities that actually have that brand's
+        // products; without one every entity shows, products or not.
+        entries: brandId ? g.entries.filter((l) => (productsByEntity.get(l.id) ?? []).length > 0) : g.entries,
+      }))
+      .filter((g) => g.entries.length > 0);
+
+    const visibleEntityCount = visibleGroups.reduce((n, g) => n + g.entries.length, 0);
+    const visibleProductCount =
+      visibleGroups.reduce(
+        (n, g) => n + g.entries.reduce((m, l) => m + (productsByEntity.get(l.id) ?? []).length, 0),
+        0
+      ) + (!category ? unlinked.length : 0);
+
+    return (
+      <div className="flex flex-col gap-6">
+        {header}
+        {migrationNotice}
+
+        <div className="flex flex-wrap items-end gap-3">
+          <CategoryChips
+            categories={[...CATEGORY_GROUPS.filter((g) => groups.some((x) => x.name === g))]}
+            category={category}
+            setCategory={setCategory}
+          />
+          {brandSelect}
+          <p className="pb-2 text-xs" style={{ color: "var(--text-muted)" }} role="status">
+            {visibleEntityCount} of {library.length} entities · {visibleProductCount} of {products.length} products
+          </p>
+          {editing && (
+            <div className="pb-1">
+              <LibraryEntryEditor ctx={editing.ctx} />
+            </div>
+          )}
+        </div>
+
+        {visibleGroups.length === 0 && (
+          <p className={NOTICE_EMPTY} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+            No entities match these filters.
+          </p>
+        )}
+
+        {visibleGroups.map((g) => (
+          <section key={g.name} className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ fontFamily: "var(--font-heading)", color: "var(--text-muted)" }}>
+              {g.name}
+            </h3>
+            {g.entries.map((l) => {
+              const own = productsByEntity.get(l.id) ?? [];
+              return (
+                <div key={l.id} className={`${CARD} flex flex-col gap-3 p-5`}
+                  style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                        {l.name}
+                        {l.evidence_grade && (
+                          <span className={`${BADGE} ml-2`} style={{ backgroundColor: "color-mix(in srgb, var(--brand-blue) 12%, transparent)", color: "var(--brand-blue)" }}>
+                            Evidence {l.evidence_grade}
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                        {l.age_min !== null ? `Age ${l.age_min}+ · ` : ""}
+                        {l.contraindicated_conditions.length > 0
+                          ? `Contraindicated for ${l.contraindicated_conditions.map(label).join(", ")}`
+                          : "No recorded contraindications"}
+                      </p>
+                    </div>
+                    {editing && editing.entriesById[l.id] && (
+                      <LibraryEntryEditor entry={editing.entriesById[l.id]} ctx={editing.ctx} />
+                    )}
+                  </div>
+
+                  {own.length === 0 ? (
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      No branded products{brandId ? " from this brand" : ""} for this entity.
+                    </p>
+                  ) : (
+                    <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 17rem), 1fr))" }}>
+                      {own.map((p) => (
+                        <ProductCard
+                          key={p.id}
+                          p={p}
+                          brandLabel={brandName.get(p.brand_id) ?? "—"}
+                          label={label}
+                          editing={editing}
+                          migrated={migrated}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        ))}
+
+        {unlinked.length > 0 && !category && (
+          <section className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ fontFamily: "var(--font-heading)", color: "var(--text-muted)" }}>
+              Products without a clinical link
+            </h3>
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 17rem), 1fr))" }}>
+              {unlinked.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  p={p}
+                  brandLabel={brandName.get(p.brand_id) ?? "—"}
+                  label={label}
+                  editing={editing}
+                  migrated={migrated}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    );
+  }
+
+  // ---- products-first: the original Supplements & Brands layout ----
   const visible = products.filter(
     (p) => (!category || p.category === category) && (!brandId || p.brand_id === brandId)
   );
 
-  const label = (code: string) => codeLabels[code] ?? code;
-
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
-          Certified catalogue
-        </h2>
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Batch-tested products (Informed Sport / NSF Certified for Sport) and the clinical library
-          entries they hang off. Import-managed — see scripts/import-certified-supplements.mjs.
-        </p>
-      </div>
-
-      {!migrated && products.length > 0 && (
-        <p className={NOTICE_EMPTY} style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-          Certification, allergen and clinical-link data appears here once migration 042 is applied and
-          the certified-supplements import has run.
-        </p>
-      )}
+      {header}
+      {migrationNotice}
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Category</span>
-          {categories.map((c) => {
-            const on = category === c;
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategory(on ? "" : c)}
-                aria-pressed={on}
-                className={`${CHIP} transition-colors duration-150`}
-                style={{
-                  backgroundColor: on ? "color-mix(in srgb, var(--brand-blue) 14%, transparent)" : "var(--bg)",
-                  color: on ? "var(--brand-blue)" : "var(--text)",
-                  border: `1px solid ${on ? "var(--brand-blue)" : "var(--border)"}`,
-                }}
-              >
-                {c}
-              </button>
-            );
-          })}
-        </div>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Brand</span>
-          <select
-            value={brandId}
-            onChange={(e) => setBrandId(e.target.value)}
-            className={INPUT}
-            style={{ ...INPUT_STYLE, paddingTop: ".375rem", paddingBottom: ".375rem" }}
-          >
-            <option value="">All brands ({brandsPresent.length})</option>
-            {brandsPresent.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </label>
-
+        <CategoryChips categories={categories} category={category} setCategory={setCategory} />
+        {brandSelect}
         <p className="pb-2 text-xs" style={{ color: "var(--text-muted)" }} role="status">
           {visible.length} of {products.length} products
         </p>
@@ -165,84 +434,18 @@ export default function CertifiedCatalogue({
           No products match these filters.
         </p>
       ) : (
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(19rem, 1fr))" }}>
-          {visible.map((p) => {
-            const entity = p.supplement_library_id ? libById.get(p.supplement_library_id) : undefined;
-            return (
-              <div key={p.id} className={`${CARD} flex flex-col gap-2 p-4`}
-                style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{p.name}</p>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {brandName.get(p.brand_id) ?? "—"}{p.category ? ` · ${p.category}` : ""}
-                    </p>
-                  </div>
-                  {editing && migrated && (
-                    <ProductClinicalEditor
-                      product={{
-                        id: p.id,
-                        name: p.name,
-                        supplement_library_id: p.supplement_library_id ?? null,
-                        informed_sport: p.informed_sport,
-                        nsf_certified: p.nsf_certified,
-                        vegan: p.vegan,
-                        allergens: p.allergens,
-                        default_dosing: p.default_dosing ?? null,
-                      }}
-                      ctx={editing.ctx}
-                    />
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {p.informed_sport && (
-                    <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--brand-teal) 14%, transparent)", color: "var(--brand-teal)" }}>
-                      Informed Sport
-                    </span>
-                  )}
-                  {p.nsf_certified && (
-                    <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--brand-blue) 14%, transparent)", color: "var(--brand-blue)" }}>
-                      NSF Certified
-                    </span>
-                  )}
-                  {p.vegan && (
-                    <span className={CHIP} style={{ backgroundColor: "var(--bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
-                      Vegan
-                    </span>
-                  )}
-                  {(p.allergens ?? []).map((a) => (
-                    <span key={a} className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--warning) 12%, transparent)", color: "var(--warning)" }}>
-                      Contains: {label(a)}
-                    </span>
-                  ))}
-                </div>
-
-                {p.description && (
-                  <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>{p.description}</p>
-                )}
-                {p.default_dosing && (
-                  <p className="text-xs" style={{ color: "var(--text)" }}>
-                    <span style={{ color: "var(--text-muted)" }}>Dosing: </span>{p.default_dosing}
-                  </p>
-                )}
-
-                {entity && (
-                  <div className={`${PANEL} mt-auto px-3 py-2`}
-                    style={{ borderColor: "var(--border)", backgroundColor: "var(--bg)" }}>
-                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      Clinical entry: <span style={{ color: "var(--text)" }}>{entity.name}</span>
-                      {entity.contraindicated_conditions.length > 0 ? (
-                        <> — contraindicated for {entity.contraindicated_conditions.map(label).join(", ")}</>
-                      ) : (
-                        <> — no recorded contraindications</>
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 19rem), 1fr))" }}>
+          {visible.map((p) => (
+            <ProductCard
+              key={p.id}
+              p={p}
+              brandLabel={brandName.get(p.brand_id) ?? "—"}
+              label={label}
+              editing={editing}
+              migrated={migrated}
+              entityFooter={p.supplement_library_id ? libById.get(p.supplement_library_id) ?? null : null}
+            />
+          ))}
         </div>
       )}
 
@@ -255,7 +458,7 @@ export default function CertifiedCatalogue({
           are codes from the declarable vocabulary — the labels below are those codes&apos; own labels, which
           is what makes them enforceable rather than prose.
         </p>
-        <div className={`${CARD} overflow-x-auto`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
+        <div className={`${CARD} relative overflow-x-auto`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           <table className="w-full text-left text-xs">
             <thead>
               <tr style={{ color: "var(--text-muted)" }}>
