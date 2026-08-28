@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import CertifiedCatalogue, { type CatalogueProduct, type LibraryEntry } from "@/components/CertifiedCatalogue";
+import { type EditableLibraryEntry } from "@/components/SupplementLibraryEditors";
 import { NOTICE } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Supplement Library — Super Admin — Bridgetx" };
@@ -26,7 +27,9 @@ export default async function SupplementLibraryPage() {
     supabase.from("products").select("*").order("name"),
     supabase
       .from("supplement_library")
-      .select("id, name, category, evidence_grade, age_min, contraindicated_conditions")
+      .select(
+        "id, name, category, category_group, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, alternatives, cultural_notes, ethnicity_dosing_notes"
+      )
       .order("name"),
     supabase.from("medical_conditions").select("code, label"),
     supabase.from("allergies").select("code, label"),
@@ -34,6 +37,25 @@ export default async function SupplementLibraryPage() {
   ]);
 
   const loadError = brandsRes.error ?? productsRes.error ?? libraryRes.error;
+
+  const fullEntries = (libraryRes.data ?? []) as unknown as EditableLibraryEntry[];
+  const toGroup = (label: string, rows: { code: string; label: string }[] | null) => ({
+    label,
+    options: (rows ?? []).map((r) => ({ code: r.code, label: r.label })),
+  });
+  const allergyGroup = toGroup("Allergies", allergiesRes.data as { code: string; label: string }[] | null);
+  const editing = {
+    ctx: {
+      vocabGroups: [
+        toGroup("Medical conditions", condsRes.data as { code: string; label: string }[] | null),
+        allergyGroup,
+        toGroup("Intolerances", intolsRes.data as { code: string; label: string }[] | null),
+      ],
+      allergyGroups: [allergyGroup],
+      libraryOptions: fullEntries.map((l) => ({ id: l.id, name: l.name })),
+    },
+    entriesById: Object.fromEntries(fullEntries.map((l) => [l.id, l])),
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -64,6 +86,7 @@ export default async function SupplementLibraryPage() {
               (r) => [r.code as string, r.label as string]
             )
           )}
+          editing={editing}
         />
       )}
     </div>

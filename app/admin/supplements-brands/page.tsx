@@ -4,6 +4,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import BrandsClient, { type Brand, type Product, type Pairing, type Target } from "./BrandsClient";
 import CertifiedCatalogue, { type CatalogueProduct, type LibraryEntry } from "@/components/CertifiedCatalogue";
+import { type EditableLibraryEntry } from "@/components/SupplementLibraryEditors";
 import { NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Supplements & Brands — Admin — Bridgetx" };
@@ -39,7 +40,9 @@ export default async function AdminSupplementsBrandsPage() {
     supabase.from("segments").select("id, name").order("name"),
     supabase
       .from("supplement_library")
-      .select("id, name, category, evidence_grade, age_min, contraindicated_conditions")
+      .select(
+        "id, name, category, category_group, evidence_grade, age_min, age_max, contraindicated_conditions, diet_compatibility, alternatives, cultural_notes, ethnicity_dosing_notes"
+      )
       .order("name"),
     supabase.from("medical_conditions").select("code, label"),
     supabase.from("allergies").select("code, label"),
@@ -122,6 +125,30 @@ export default async function AdminSupplementsBrandsPage() {
               (r) => [r.code as string, r.label as string]
             )
           )}
+          // The same editors the Supplement Library page renders, and only
+          // for the role that can actually write (the actions are
+          // super_admin-gated regardless — this just avoids offering an
+          // Admin a button that would be refused).
+          editing={canWrite ? (() => {
+            const fullEntries = (libraryRes.data ?? []) as unknown as EditableLibraryEntry[];
+            const toGroup = (label: string, rows: { code: string; label: string }[] | null) => ({
+              label,
+              options: (rows ?? []).map((r) => ({ code: r.code, label: r.label })),
+            });
+            const allergyGroup = toGroup("Allergies", allergiesRes.data as { code: string; label: string }[] | null);
+            return {
+              ctx: {
+                vocabGroups: [
+                  toGroup("Medical conditions", condsRes.data as { code: string; label: string }[] | null),
+                  allergyGroup,
+                  toGroup("Intolerances", intolsRes.data as { code: string; label: string }[] | null),
+                ],
+                allergyGroups: [allergyGroup],
+                libraryOptions: fullEntries.map((l) => ({ id: l.id, name: l.name })),
+              },
+              entriesById: Object.fromEntries(fullEntries.map((l) => [l.id, l])),
+            };
+          })() : undefined}
         />
       )}
     </div>

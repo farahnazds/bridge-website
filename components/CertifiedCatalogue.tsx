@@ -2,6 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { BADGE, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE_EMPTY, PANEL } from "@/lib/ui";
+import {
+  LibraryEntryEditor,
+  ProductClinicalEditor,
+  type EditingContext,
+  type EditableLibraryEntry,
+} from "@/components/SupplementLibraryEditors";
 
 // The certified supplement catalogue view — the read side of the docs/13
 // import (migration 042 + scripts/import-certified-supplements.mjs).
@@ -51,12 +57,20 @@ export default function CertifiedCatalogue({
   brands,
   library,
   codeLabels,
+  editing,
 }: {
   products: CatalogueProduct[];
   brands: { id: string; name: string }[];
   library: LibraryEntry[];
   /** code -> human label, unioned across medical_conditions/allergies/intolerances. */
   codeLabels: Record<string, string>;
+  /** Present = the Super Admin editors render (Phase 2, owner-approved
+   *  2026-08-28): per-entry and per-product edit modals plus Add. Absent =
+   *  the original display-only catalogue, which is what the Admin role
+   *  still gets. The v1 "no editing" rule was about protecting the coded
+   *  vocabulary; the editors keep that via VocabularyPicker + server-side
+   *  code validation, so the protection moved rather than lapsed. */
+  editing?: { ctx: EditingContext; entriesById: Record<string, EditableLibraryEntry> };
 }) {
   const [category, setCategory] = useState<string>("");
   const [brandId, setBrandId] = useState<string>("");
@@ -164,6 +178,21 @@ export default function CertifiedCatalogue({
                       {brandName.get(p.brand_id) ?? "—"}{p.category ? ` · ${p.category}` : ""}
                     </p>
                   </div>
+                  {editing && migrated && (
+                    <ProductClinicalEditor
+                      product={{
+                        id: p.id,
+                        name: p.name,
+                        supplement_library_id: p.supplement_library_id ?? null,
+                        informed_sport: p.informed_sport,
+                        nsf_certified: p.nsf_certified,
+                        vegan: p.vegan,
+                        allergens: p.allergens,
+                        default_dosing: p.default_dosing ?? null,
+                      }}
+                      ctx={editing.ctx}
+                    />
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
@@ -236,6 +265,7 @@ export default function CertifiedCatalogue({
                 <th className="px-4 py-2 font-medium">Age</th>
                 <th className="px-4 py-2 font-medium">Contraindicated for</th>
                 <th className="px-4 py-2 font-medium">Products</th>
+                {editing && <th className="px-4 py-2" />}
               </tr>
             </thead>
             <tbody style={{ color: "var(--text)" }}>
@@ -253,11 +283,23 @@ export default function CertifiedCatalogue({
                   <td className="px-4 py-2" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {products.filter((p) => p.supplement_library_id === l.id).length}
                   </td>
+                  {editing && (
+                    <td className="px-4 py-2 text-right">
+                      {editing.entriesById[l.id] && (
+                        <LibraryEntryEditor entry={editing.entriesById[l.id]} ctx={editing.ctx} />
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {editing && (
+          <div>
+            <LibraryEntryEditor ctx={editing.ctx} />
+          </div>
+        )}
       </div>
     </div>
   );
