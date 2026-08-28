@@ -113,6 +113,47 @@ export function isClubStaff(profile: Profile | null): profile is Profile {
   return profile !== null && (profile.role === "club_practitioner" || profile.role === "club_manager");
 }
 
+/**
+ * THE club-data write gate: club staff plus Super Admin.
+ *
+ * Super Admin write parity (2026-08-28, owner ruling): the role cascade in
+ * docs/02-roles-and-permissions.md ("Everything an Admin can do → Super
+ * Admin can do") now holds at the app layer for every club-data write, not
+ * just reads. The RLS layer always permitted this — every club-data table
+ * has carried "super admin full access" since the original schema — so
+ * this helper, swapped in for isClubStaff() at the write-action gates, is
+ * the entire change.
+ *
+ * Deliberately NOT the admin role: the owner scoped this to Super Admin
+ * only, revisiting Admin separately. Keep isClubStaff() for checks that
+ * are genuinely about club-employed staff (e.g. the /staff/profile page).
+ */
+export function canWriteClubData(profile: Profile | null): profile is Profile {
+  // Spelled out rather than `isClubStaff(profile) || ...`: isClubStaff's
+  // type predicate narrows `profile` to null in the false branch, which
+  // makes the second check `never`-typed.
+  if (profile === null) return false;
+  return (
+    profile.role === "club_practitioner" ||
+    profile.role === "club_manager" ||
+    profile.role === "super_admin"
+  );
+}
+
+/**
+ * The validity tier a club-data entry gets, given who is entering it.
+ *
+ * club_verified is defined in docs/05-business-rules.md as "entered by a
+ * club practitioner or Club Manager" — the club's own staff vouching. A
+ * Super Admin entry must never wear that label (owner ruling 2026-08-28):
+ * it is stamped bridgetx_verified and renders as "Bridgetx Staff", with
+ * provider_id recording the real person as always. Never a form field, so
+ * neither tier can be misrepresented as the other.
+ */
+export function clubEntryValidityTier(profile: Profile): "club_verified" | "bridgetx_verified" {
+  return profile.role === "super_admin" ? "bridgetx_verified" : "club_verified";
+}
+
 // Calls the athlete_type() SQL function (database/schema.sql, Section 6) —
 // live-computed from relationships, never a stored label.
 export async function getAthleteType(athleteId: string): Promise<AthleteType> {

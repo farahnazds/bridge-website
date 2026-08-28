@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData } from "@/lib/auth";
 import { todayIso } from "@/lib/supplementProtocols";
 import type { ConfirmedItem } from "@/lib/supplementPlan";
 import {
@@ -134,7 +134,7 @@ export async function updateProtocol(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 
@@ -274,7 +274,7 @@ export async function endProtocolToday(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 
@@ -341,7 +341,7 @@ export async function cancelScheduledProtocol(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 
@@ -413,7 +413,7 @@ export async function createProtocol(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 
@@ -571,7 +571,7 @@ export async function switchProtocolProduct(
   formData: FormData
 ): Promise<ProtocolActionState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...EMPTY, error: "You don't have permission to do this." };
   }
 

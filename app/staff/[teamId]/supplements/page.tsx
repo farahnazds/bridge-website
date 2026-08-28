@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getStaffTeamContext } from "@/lib/staffTeamContext";
-import { isClubStaff } from "@/lib/auth";
+import { canWriteClubData } from "@/lib/auth";
 import { CARD } from "@/lib/ui";
 import { todayIso } from "@/lib/supplementProtocols";
 import { loadAthleteClinicalContext, loadSupplementLibrary } from "@/lib/supplementPlanSafety";
@@ -38,7 +38,7 @@ export default async function SupplementsPage({
   const { athlete: athleteParam } = await searchParams;
   const supabase = await createClient();
   const context = await getStaffTeamContext(teamId);
-  const canEdit = isClubStaff(context?.profile ?? null);
+  const canEdit = canWriteClubData(context?.profile ?? null);
 
   const { data: rosterRows } = await supabase
     .from("athlete_teams")

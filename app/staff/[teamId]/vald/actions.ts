@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData, clubEntryValidityTier } from "@/lib/auth";
 import { parseCsvText } from "@/lib/csv";
 import { matchRowsByAthleteCode, parseNum, type MatchedRow } from "@/lib/csvImport";
 
@@ -27,7 +27,7 @@ const RESERVED_CSV_COLUMNS = new Set(["athlete_code", "code", "date", "test_type
 
 async function requireStaff() {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) return null;
+  if (!canWriteClubData(profile)) return null;
   return profile;
 }
 
@@ -72,7 +72,7 @@ export async function logVald(_prevState: ActionState, formData: FormData): Prom
     test_type: testType,
     asymmetry_pct: asymmetry,
     metric_json: metricsFromForm(formData),
-    validity_tier: "club_verified",
+    validity_tier: clubEntryValidityTier(profile),
     provider_id: profile.id,
   });
   if (error) return { error: `Couldn't save the VALD test: ${error.message}` };
@@ -194,7 +194,7 @@ export async function confirmValdCsv(_prev: ConfirmState, formData: FormData): P
       test_type: r.values.test_type,
       asymmetry_pct: r.values.asymmetry_pct,
       metric_json: r.values.metric_json,
-      validity_tier: "club_verified",
+      validity_tier: clubEntryValidityTier(profile),
       provider_id: profile.id,
     }));
 

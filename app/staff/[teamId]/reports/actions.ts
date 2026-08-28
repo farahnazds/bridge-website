@@ -27,7 +27,7 @@ import {
   REPORT_MAX_TOKENS,
   reportResponseError,
 } from "@/lib/anthropic";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData } from "@/lib/auth";
 import { sendReportSharedEmail } from "@/lib/resend";
 import { REPORT_TYPE_LABELS } from "@/lib/constants";
 import { assertReportSafe } from "@/lib/reportSafetyCheck";
@@ -105,7 +105,7 @@ export async function generateComplianceReport(
   // Managers generate too — owner's ruling 2026-08-16, aligning the three
   // practitioner-only generators (this one, Body Composition, Combined) with
   // Nutrition/Performance/Injury, which always accepted club_manager.
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
@@ -359,7 +359,7 @@ export async function generateBodyCompositionReport(
 ): Promise<GenerateReportState> {
   const profile = await getCurrentProfile();
   // Managers generate too — see the note on generateComplianceReport.
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this.", reportText: null, dataCheckNote: null, reportId: null };
   }
 
@@ -675,7 +675,7 @@ export async function shareReport(_prevState: ShareState, formData: FormData): P
   }
   // Captured before the type-predicate check below narrows `profile` away.
   const signedInAs = `${profile.role.replace(/_/g, " ")} (${profile.email})`;
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return {
       error: `Sharing is available to club practitioners and club managers only — this account is signed in as ${signedInAs}.`,
       warning: null,
@@ -917,7 +917,7 @@ export async function generateNutritionReport(
 ): Promise<GenerateReportState> {
   const base = { reportText: null, dataCheckNote: null, reportId: null };
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...base, error: "You don't have permission to do this." };
   }
 
@@ -1079,7 +1079,7 @@ export async function generatePerformanceReport(
 ): Promise<GenerateReportState> {
   const base = { reportText: null, dataCheckNote: null, reportId: null };
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...base, error: "You don't have permission to do this." };
   }
 
@@ -1296,7 +1296,7 @@ export async function generateInjuryReport(
 ): Promise<GenerateReportState> {
   const base = { reportText: null, dataCheckNote: null, reportId: null };
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...base, error: "You don't have permission to do this." };
   }
 
@@ -1523,7 +1523,7 @@ export async function generateCombinedReport(
 
   const profile = await getCurrentProfile();
   // Managers generate too — see the note on generateComplianceReport.
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...base, error: "You don't have permission to do this." };
   }
 

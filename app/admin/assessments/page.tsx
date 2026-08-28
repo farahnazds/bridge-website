@@ -14,6 +14,7 @@ const VALIDITY_COLOR: Record<string, string> = {
   club_verified: "var(--success)",
   practitioner_verified: "var(--brand-blue)",
   self_reported: "var(--text-muted)",
+  bridgetx_verified: "var(--brand-teal)",
 };
 
 type AssessmentRow = {

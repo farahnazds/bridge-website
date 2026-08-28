@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData } from "@/lib/auth";
 import { createAnthropicClient, REPORT_MODEL, REPORT_EFFORT, REPORT_MAX_TOKENS } from "@/lib/anthropic";
 import { resolveReportLanguage } from "@/lib/reportLanguage";
 import {
@@ -210,7 +210,7 @@ async function runGeneratePlan(
   formData: FormData
 ): Promise<PlanState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this.", plan: null };
   }
 
@@ -648,7 +648,7 @@ async function runConfirm(
     error: null, done: false, written: [], safetyBlocked: [], skippedCount: 0, writtenCount: 0,
   };
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { ...empty, error: "You don't have permission to do this." };
   }
 

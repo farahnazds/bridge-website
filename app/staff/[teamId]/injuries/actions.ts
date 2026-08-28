@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData, clubEntryValidityTier } from "@/lib/auth";
 
 export interface ActionState {
   error: string | null;
@@ -34,7 +34,7 @@ export async function logInjury(_prevState: ActionState, formData: FormData): Pr
   // club_manager admitted 2026-08-17 — a DELIBERATE owner reversal of the
   // manager read-only boundary (full write parity with practitioners). RLS
   // always permitted managers here; only this gate blocked them.
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -52,7 +52,7 @@ export async function logInjury(_prevState: ActionState, formData: FormData): Pr
     date,
     type,
     ...injuryFields(formData),
-    validity_tier: "club_verified",
+    validity_tier: clubEntryValidityTier(profile),
     provider_id: profile.id,
   });
   if (error) {
@@ -71,7 +71,7 @@ export async function updateInjury(_prevState: ActionState, formData: FormData):
   const profile = await getCurrentProfile();
   // club_manager admitted 2026-08-17 — same deliberate parity reversal as
   // logInjury above; the 7-day RLS edit window applies to both roles.
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this." };
   }
 

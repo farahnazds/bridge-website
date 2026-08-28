@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData, clubEntryValidityTier } from "@/lib/auth";
 import { parseCsvText } from "@/lib/csv";
 import { matchRowsByAthleteCode, parseNum, parseInt10, type MatchedRow } from "@/lib/csvImport";
 
@@ -30,7 +30,7 @@ export interface GpsValues {
 
 async function requireStaff() {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) return null;
+  if (!canWriteClubData(profile)) return null;
   return profile;
 }
 
@@ -72,7 +72,7 @@ export async function logGps(_prevState: ActionState, formData: FormData): Promi
     team_id: teamId,
     date,
     ...gpsFromForm(formData),
-    validity_tier: "club_verified",
+    validity_tier: clubEntryValidityTier(profile),
     provider_id: profile.id,
   });
   if (error) return { error: `Couldn't save the GPS log: ${error.message}` };
@@ -199,7 +199,7 @@ export async function confirmGpsCsv(_prev: ConfirmState, formData: FormData): Pr
       team_id: teamId,
       date: r.date,
       ...r.values,
-      validity_tier: "club_verified",
+      validity_tier: clubEntryValidityTier(profile),
       provider_id: profile.id,
     }));
 

@@ -3,7 +3,7 @@
 import type { Json } from "@/lib/supabase/database.types";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData, clubEntryValidityTier } from "@/lib/auth";
 import { parseCsvText } from "@/lib/csv";
 import { matchRowsByAthleteCode, parseNum, type MatchedRow } from "@/lib/csvImport";
 import {
@@ -178,9 +178,11 @@ async function loadAthlete(
   return { dob: (data.dob as string | null) ?? null, gender: (data.gender as string | null) ?? null };
 }
 
-// validity_tier is always "club_verified" here — docs/05-business-rules.md:
-// "Club-Verified — entered by a club practitioner or Club Manager". Never a
-// form field, so it can't be misrepresented as a different tier.
+// validity_tier comes from clubEntryValidityTier(): "club_verified" for the
+// club's own staff (docs/05-business-rules.md: "Club-Verified — entered by a
+// club practitioner or Club Manager"), "bridgetx_verified" for a Super Admin
+// entry, which must never be disguised as the club's own. Never a form
+// field, so neither tier can be misrepresented as the other.
 export async function logAssessment(_prevState: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await getCurrentProfile();
   // club_manager admitted 2026-08-17 — a DELIBERATE owner reversal of the
@@ -188,7 +190,7 @@ export async function logAssessment(_prevState: ActionState, formData: FormData)
   // RLS insert policy always permitted managers (is_assigned_to_athlete_
   // via_team's club-manager fallback); this gate was the only thing blocking
   // them, contradicting the validity_tier comment above.
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -228,7 +230,7 @@ export async function logAssessment(_prevState: ActionState, formData: FormData)
     method_data: { ...methodData, ...extraMethodData },
     ...shared,
     ...canonical,
-    validity_tier: "club_verified",
+    validity_tier: clubEntryValidityTier(profile),
     provider_id: profile.id,
   });
   if (error) {
@@ -252,7 +254,7 @@ export async function updateAssessment(_prevState: ActionState, formData: FormDa
   const profile = await getCurrentProfile();
   // club_manager admitted 2026-08-17 — same deliberate parity reversal as
   // logAssessment above; the 7-day RLS edit window applies to both roles.
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this." };
   }
 
@@ -462,7 +464,7 @@ export async function previewAssessmentCsv(
   formData: FormData
 ): Promise<PreviewState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this.", rows: [] };
   }
 
@@ -500,7 +502,7 @@ export async function confirmAssessmentCsv(
   formData: FormData
 ): Promise<ConfirmState> {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return { error: "You don't have permission to do this.", savedCount: null };
   }
 
@@ -538,7 +540,7 @@ export async function confirmAssessmentCsv(
       tdee: r.values.tdee,
       notes: r.values.notes,
       ...r.values.canonical,
-      validity_tier: "club_verified",
+      validity_tier: clubEntryValidityTier(profile),
       provider_id: profile.id,
     }));
 

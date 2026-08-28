@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile, isClubStaff } from "@/lib/auth";
+import { getCurrentProfile, canWriteClubData } from "@/lib/auth";
 import { SESSION_TYPES, SESSION_DURATION_BANDS } from "@/lib/constants";
 
 export interface ActionState {
@@ -27,7 +27,7 @@ const DURATION_BAND_VALUES = SESSION_DURATION_BANDS.map((d) => d.value);
 // Club Manager fallback so RLS agrees.
 async function requireStaff() {
   const profile = await getCurrentProfile();
-  if (!isClubStaff(profile)) {
+  if (!canWriteClubData(profile)) {
     return null;
   }
   return profile;
