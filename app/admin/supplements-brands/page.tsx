@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { getAssignedClubs, getScopeNoun } from "@/lib/adminScope";
 import BrandsClient, { type Brand, type Product, type Pairing, type Target } from "./BrandsClient";
-import CertifiedCatalogue, { type CatalogueProduct, type LibraryEntry } from "./CertifiedCatalogue";
+import CertifiedCatalogue, { type CatalogueProduct, type LibraryEntry } from "@/components/CertifiedCatalogue";
 import { NOTICE, NOTICE_EMPTY } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "Supplements & Brands — Admin — Bridgetx" };

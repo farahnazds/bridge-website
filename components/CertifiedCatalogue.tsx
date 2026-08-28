@@ -6,11 +6,11 @@ import { BADGE, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE_EMPTY, PANEL } from "@/li
 // The certified supplement catalogue view — the read side of the docs/13
 // import (migration 042 + scripts/import-certified-supplements.mjs).
 //
-// Lives on Supplements & Brands rather than a page of its own (owner decision
-// 2026-08-15): this page is already where Super Admin looks at products and
-// brands, and the certified catalogue IS products and brands, plus the
-// clinical layer each product hangs off. Kept as its own component so the
-// pairing machinery in BrandsClient stays untouched.
+// Originally a section of Admin > Supplements & Brands only (owner decision
+// 2026-08-15). Since 2026-08-28 it is SHARED: the same component also renders
+// /super-admin/supplement-library, the dedicated Super Admin page (owner
+// ruling — one component, two surfaces, never a duplicate). Kept separate
+// from BrandsClient so the pairing machinery stays untouched.
 //
 // Two filter dimensions, per the same decision: CATEGORY (the six from
 // docs/13, preserved verbatim on products.category) and BRAND (new — the
