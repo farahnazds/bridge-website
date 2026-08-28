@@ -85,9 +85,17 @@ export default async function TeamLayout({
   // of the club sidebar's "Jump to team" switcher (2026-08-17 navigation
   // parity work): club view ⇄ team workspace is one round trip, symmetrical
   // from both ends, not a detour through Teams & Staff.
+  //
+  // Oversight gets the SAME destination (2026-08-28 bug fix): it used to be
+  // "/staff", the bare My-Teams chooser — the only page that existed for the
+  // role before the cascade work admitted admin/super_admin to the club
+  // dashboard. That page renders without the shell (it is a practitioner
+  // interstitial), so to an oversight viewer the link led to what read as a
+  // blank page with a list of teams. They descend club view → Jump to team,
+  // so back goes up the same edge.
   const clubName = team.clubs?.name ?? "Club";
-  const backHref = isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : null;
-  const backLabel = isOversight ? "← All teams" : `← ${clubName} — club view`;
+  const backHref = isManager || isOversight ? `/club/${team.club_id}` : null;
+  const backLabel = `← ${clubName} — club view`;
   // Order per the owner's 2026-08-16 restructure: the top group is the daily
   // working set (Supplements promoted from Athlete Data, ahead of Reports);
   // Athlete Data keeps the measurement surfaces; Messenger and Comments move
@@ -136,7 +144,19 @@ export default async function TeamLayout({
         name={profile.first_name ?? profile.email}
         email={profile.email}
         role={ROLE_LABELS[profile.role] ?? "Staff"}
-        homeHref={isOversight ? "/staff" : isManager ? `/club/${team.club_id}` : `/staff/${teamId}`}
+        // The logo is "home", and an oversight viewer's home is their own
+        // dashboard — not "/staff", the shell-less My-Teams chooser (same
+        // 2026-08-28 bug as backHref above). Mirrors the club layout's
+        // role-split homeHref.
+        homeHref={
+          profile.role === "super_admin"
+            ? "/super-admin"
+            : profile.role === "admin"
+              ? "/admin"
+              : isManager
+                ? `/club/${team.club_id}`
+                : `/staff/${teamId}`
+        }
       >
         {/* Staff-only for now (owner ruling 2026-08-21); athlete/admin surfaces
             can adopt the same component later. Initial state is server-rendered
