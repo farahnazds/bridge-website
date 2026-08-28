@@ -4,7 +4,7 @@ import AssessmentsClient, { type AssessmentRecord } from "./AssessmentsClient";
 import { loadSkinfoldEquations } from "@/lib/skinfoldEquationsData";
 import type { AssessmentMethod } from "@/lib/assessmentMethods";
 import { CARD, NOTICE } from "@/lib/ui";
-import { EDIT_WINDOW_MS } from "@/lib/constants";
+import { isWithinEditWindow } from "@/lib/constants";
 
 // Formats an embedded profile row into a display name. The provider name
 // used to require a second round trip (fetch ids, then fetch profiles);
@@ -86,7 +86,6 @@ export default async function TeamAssessmentsPage({
   }
 
 
-  const now = Date.now();
   const records: AssessmentRecord[] = assessments.map((a) => {
     const athlete = athleteById.get(a.athlete_id);
     return {
@@ -106,7 +105,7 @@ export default async function TeamAssessmentsPage({
       tdee: a.tdee,
       notes: a.notes,
       providerName: personName(a.provider),
-      isEditable: now <= new Date(a.created_at).getTime() + EDIT_WINDOW_MS,
+      isEditable: isWithinEditWindow(a.created_at),
     };
   });
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import ValdClient, { type ValdEntry, type Athlete } from "./ValdClient";
 import { CARD, NOTICE } from "@/lib/ui";
-import { EDIT_WINDOW_MS } from "@/lib/constants";
+import { isWithinEditWindow } from "@/lib/constants";
 
 // Formats an embedded profile row into a display name. The provider name
 // used to require a second round trip (fetch ids, then fetch profiles);
@@ -46,7 +46,6 @@ export default async function TeamValdPage({ params }: { params: Promise<{ teamI
       .limit(100);
     error = fetchError?.message ?? null;
 
-    const now = Date.now();
     entries = (data ?? []).map((r) => {
       const a = athleteById.get(r.athlete_id as string);
       return {
@@ -59,7 +58,7 @@ export default async function TeamValdPage({ params }: { params: Promise<{ teamI
           metric_json: (r.metric_json ?? {}) as Record<string, number | string>,
         },
         providerName: personName((r as unknown as { provider: { first_name: string | null; last_name: string | null } | null }).provider),
-        isEditable: now <= new Date(r.created_at as string).getTime() + EDIT_WINDOW_MS,
+        isEditable: isWithinEditWindow(r.created_at as string),
       };
     });
   }

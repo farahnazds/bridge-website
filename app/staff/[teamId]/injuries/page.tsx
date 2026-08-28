@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import InjuriesClient, { type InjuryRecord } from "./InjuriesClient";
 import { CARD, NOTICE } from "@/lib/ui";
-import { EDIT_WINDOW_MS } from "@/lib/constants";
+import { isWithinEditWindow } from "@/lib/constants";
 
 // Formats an embedded profile row into a display name. The provider name
 // used to require a second round trip (fetch ids, then fetch profiles);
@@ -68,7 +68,6 @@ export default async function TeamInjuriesPage({
   }
 
 
-  const now = Date.now();
   const records: InjuryRecord[] = injuriesData.map((i) => {
     const athlete = athleteById.get(i.athlete_id);
     return {
@@ -83,7 +82,7 @@ export default async function TeamInjuriesPage({
       targetReturnDate: i.target_return_date,
       clearedDate: i.cleared_date,
       providerName: personName(i.provider),
-      isEditable: now <= new Date(i.created_at).getTime() + EDIT_WINDOW_MS,
+      isEditable: isWithinEditWindow(i.created_at),
     };
   });
 

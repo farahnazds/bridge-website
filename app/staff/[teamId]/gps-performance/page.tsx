@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import GpsClient, { type GpsEntry, type Athlete } from "./GpsClient";
 import { CARD, NOTICE } from "@/lib/ui";
-import { EDIT_WINDOW_MS } from "@/lib/constants";
+import { isWithinEditWindow } from "@/lib/constants";
 
 // Formats an embedded profile row into a display name. The provider name
 // used to require a second round trip (fetch ids, then fetch profiles);
@@ -46,7 +46,6 @@ export default async function TeamGpsPage({ params }: { params: Promise<{ teamId
       .limit(100);
     error = fetchError?.message ?? null;
 
-    const now = Date.now();
     entries = (data ?? []).map((r) => {
       const a = athleteById.get(r.athlete_id as string);
       return {
@@ -68,7 +67,7 @@ export default async function TeamGpsPage({ params }: { params: Promise<{ teamId
           session_duration_min: r.session_duration_min,
         },
         providerName: personName((r as unknown as { provider: { first_name: string | null; last_name: string | null } | null }).provider),
-        isEditable: now <= new Date(r.created_at as string).getTime() + EDIT_WINDOW_MS,
+        isEditable: isWithinEditWindow(r.created_at as string),
       };
     });
   }
