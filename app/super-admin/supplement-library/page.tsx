@@ -53,6 +53,7 @@ export default async function SupplementLibraryPage() {
       ],
       allergyGroups: [allergyGroup],
       libraryOptions: fullEntries.map((l) => ({ id: l.id, name: l.name })),
+      brandOptions: ((brandsRes.data ?? []) as { id: string; name: string }[]).map((b) => ({ id: b.id, name: b.name })),
     },
     entriesById: Object.fromEntries(fullEntries.map((l) => [l.id, l])),
   };

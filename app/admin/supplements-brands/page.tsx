@@ -145,6 +145,7 @@ export default async function AdminSupplementsBrandsPage() {
                 ],
                 allergyGroups: [allergyGroup],
                 libraryOptions: fullEntries.map((l) => ({ id: l.id, name: l.name })),
+                brandOptions: brands.map((b) => ({ id: b.id, name: b.name })),
               },
               entriesById: Object.fromEntries(fullEntries.map((l) => [l.id, l])),
             };

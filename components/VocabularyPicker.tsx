@@ -33,6 +33,8 @@ export default function VocabularyPicker({
   initial = [],
   legend,
   hint,
+  tone = "warning",
+  showCodes = true,
 }: {
   name: string;
   groups: VocabGroup[];
@@ -42,6 +44,13 @@ export default function VocabularyPicker({
    *  user feedback 2026-08-29: "Contraindicated for" alone did not make the
    *  consequence (an enforced block) unambiguous. */
   hint?: string;
+  /** Chip colour. "warning" (default) for safety codes; "neutral" for
+   *  non-safety selections like clinical alternatives, where amber would
+   *  wrongly read as a hazard. */
+  tone?: "warning" | "neutral";
+  /** Hide the mono code beside each label — for pickers over entities,
+   *  whose "codes" are uuids nobody needs to read. */
+  showCodes?: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>(initial);
   const [filter, setFilter] = useState("");
@@ -89,10 +98,11 @@ export default function VocabularyPicker({
               type="button"
               onClick={() => toggle(code)}
               className={`${BADGE} inline-flex items-center gap-1`}
-              style={{
-                backgroundColor: "color-mix(in srgb, var(--warning) 12%, transparent)",
-                color: "var(--warning)",
-              }}
+              style={
+                tone === "warning"
+                  ? { backgroundColor: "color-mix(in srgb, var(--warning) 12%, transparent)", color: "var(--warning)" }
+                  : { backgroundColor: "color-mix(in srgb, var(--brand-blue) 12%, transparent)", color: "var(--brand-blue)" }
+              }
               aria-label={`Remove ${labelByCode.get(code) ?? code}`}
             >
               {labelByCode.get(code) ?? code}
@@ -135,9 +145,11 @@ export default function VocabularyPicker({
                   onChange={() => toggle(o.code)}
                 />
                 <span>{o.label}</span>
-                <span className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-                  {o.code}
-                </span>
+                {showCodes && (
+                  <span className="text-[11px]" style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                    {o.code}
+                  </span>
+                )}
               </label>
             ))}
           </div>

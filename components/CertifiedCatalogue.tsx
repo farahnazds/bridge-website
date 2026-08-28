@@ -5,6 +5,7 @@ import { BADGE, CARD, CHIP, INPUT, INPUT_STYLE, NOTICE_EMPTY, PANEL } from "@/li
 import {
   LibraryEntryEditor,
   ProductClinicalEditor,
+  AddProductEditor,
   type EditingContext,
   type EditableLibraryEntry,
 } from "@/components/SupplementLibraryEditors";
@@ -40,6 +41,7 @@ export interface CatalogueProduct {
   allergens?: string[];
   vegan?: boolean;
   default_dosing?: string | null;
+  image_url?: string | null;
 }
 
 export interface LibraryEntry {
@@ -75,11 +77,22 @@ function ProductCard({
     <div className={`${CARD} flex flex-col gap-2 p-4`}
       style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{p.name}</p>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {brandLabel}{p.category ? ` · ${p.category}` : ""}
-          </p>
+        <div className="flex min-w-0 items-start gap-2.5">
+          {p.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={p.image_url}
+              alt=""
+              className="h-11 w-11 shrink-0 rounded-lg border object-cover"
+              style={{ borderColor: "var(--border)" }}
+            />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{p.name}</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {brandLabel}{p.category ? ` · ${p.category}` : ""}
+            </p>
+          </div>
         </div>
         {editing && migrated && (
           <ProductClinicalEditor
@@ -92,6 +105,7 @@ function ProductCard({
               vegan: p.vegan,
               allergens: p.allergens,
               default_dosing: p.default_dosing ?? null,
+              image_url: p.image_url ?? null,
             }}
             ctx={editing.ctx}
           />
@@ -307,9 +321,13 @@ export default function CertifiedCatalogue({
 
     const productsByEntity = new Map<string, CatalogueProduct[]>();
     const unlinked: CatalogueProduct[] = [];
+    // Unfiltered link map, for facts about the ENTITY (its dosing summary)
+    // that must not shift when a brand or search filter narrows the grid.
+    const allByEntity = new Map<string, CatalogueProduct[]>();
     for (const p of products) {
+      const key = p.supplement_library_id ?? "";
+      if (key && libById.has(key)) allByEntity.set(key, [...(allByEntity.get(key) ?? []), p]);
       if (!brandId || p.brand_id === brandId) {
-        const key = p.supplement_library_id ?? "";
         if (key && libById.has(key)) {
           productsByEntity.set(key, [...(productsByEntity.get(key) ?? []), p]);
         } else {
@@ -317,6 +335,21 @@ export default function CertifiedCatalogue({
         }
       }
     }
+
+    // Dosing shown at the entity level is DERIVED from the linked products'
+    // real, import-sourced default_dosing — never a hand-typed entity field
+    // (owner ruling 2026-08-29, following the skinfold-equation precedent:
+    // no clinical figure enters this system without a real source).
+    const dosingSummaryFor = (entityId: string): string | null => {
+      const values = [...new Set(
+        (allByEntity.get(entityId) ?? [])
+          .map((p) => p.default_dosing?.trim())
+          .filter((d): d is string => !!d)
+      )];
+      if (values.length === 0) return null;
+      if (values.length === 1) return values[0];
+      return `varies by product — see each product's own dosing below (${values.length} regimens)`;
+    };
 
     // Search (real user request 2026-08-29): an entity stays visible when its
     // own name matches OR any of its (brand-filtered) products' names match;
@@ -410,9 +443,23 @@ export default function CertifiedCatalogue({
                           ? `Contraindicated for ${l.contraindicated_conditions.map(label).join(", ")}`
                           : "No recorded contraindications"}
                       </p>
+                      {dosingSummaryFor(l.id) && (
+                        <p className="mt-0.5 text-xs" style={{ color: "var(--text)" }}>
+                          <span style={{ color: "var(--text-muted)" }}>Dosing (from products): </span>
+                          {dosingSummaryFor(l.id)}
+                        </p>
+                      )}
                     </div>
-                    {editing && editing.entriesById[l.id] && (
-                      <LibraryEntryEditor entry={editing.entriesById[l.id]} ctx={editing.ctx} />
+                    {editing && (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <AddProductEditor
+                          entity={{ id: l.id, name: l.name, category_group: l.category_group ?? null }}
+                          ctx={editing.ctx}
+                        />
+                        {editing.entriesById[l.id] && (
+                          <LibraryEntryEditor entry={editing.entriesById[l.id]} ctx={editing.ctx} />
+                        )}
+                      </div>
                     )}
                   </div>
 
