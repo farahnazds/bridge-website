@@ -85,6 +85,20 @@ export function LibraryEntryEditor({
     if (state.saved) setOpen(false);
   }
 
+  // CONTROLLED on purpose: React resets a form's uncontrolled inputs when a
+  // server action returns, so a rejected save (the exact moment the user
+  // needs their input back) would blank every field. Verified live before
+  // this fix: a code-validation rejection kept the picker's chips (component
+  // state) but wiped name and category.
+  const [name, setName] = useState(entry?.name ?? "");
+  const [categoryGroup, setCategoryGroup] = useState(entry?.category_group ?? "");
+  const [grade, setGrade] = useState(entry?.evidence_grade ?? "");
+  const [ageMin, setAgeMin] = useState(entry?.age_min?.toString() ?? "");
+  const [ageMax, setAgeMax] = useState(entry?.age_max?.toString() ?? "");
+  const [diets, setDiets] = useState<string[]>(entry?.diet_compatibility ?? []);
+  const [alternatives, setAlternatives] = useState<string[]>(entry?.alternatives ?? []);
+  const toggleIn = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+
   return (
     <>
       <button
@@ -108,14 +122,15 @@ export function LibraryEntryEditor({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-1.5">
                 <FieldLabel>Name</FieldLabel>
-                <input name="name" required defaultValue={entry?.name ?? ""} className={INPUT} style={INPUT_STYLE} />
+                <input name="name" required value={name} onChange={(e) => setName(e.target.value)} className={INPUT} style={INPUT_STYLE} />
               </label>
               <label className="flex flex-col gap-1.5">
                 <FieldLabel>Category</FieldLabel>
                 <select
                   name="category_group"
                   required
-                  defaultValue={entry?.category_group ?? ""}
+                  value={categoryGroup}
+                  onChange={(e) => setCategoryGroup(e.target.value)}
                   className={`w-full ${INPUT}`}
                   style={INPUT_STYLE}
                 >
@@ -125,7 +140,7 @@ export function LibraryEntryEditor({
               </label>
               <label className="flex flex-col gap-1.5">
                 <FieldLabel>Evidence grade</FieldLabel>
-                <select name="evidence_grade" defaultValue={entry?.evidence_grade ?? ""} className={`w-full ${INPUT}`} style={INPUT_STYLE}>
+                <select name="evidence_grade" value={grade} onChange={(e) => setGrade(e.target.value)} className={`w-full ${INPUT}`} style={INPUT_STYLE}>
                   <option value="">Not graded</option>
                   <option value="A">A</option>
                   <option value="B">B</option>
@@ -135,11 +150,11 @@ export function LibraryEntryEditor({
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1.5">
                   <FieldLabel>Min age</FieldLabel>
-                  <input name="age_min" type="number" min={0} max={100} defaultValue={entry?.age_min ?? ""} className={INPUT} style={INPUT_STYLE} />
+                  <input name="age_min" type="number" min={0} max={100} value={ageMin} onChange={(e) => setAgeMin(e.target.value)} className={INPUT} style={INPUT_STYLE} />
                 </label>
                 <label className="flex flex-col gap-1.5">
                   <FieldLabel>Max age</FieldLabel>
-                  <input name="age_max" type="number" min={0} max={100} defaultValue={entry?.age_max ?? ""} className={INPUT} style={INPUT_STYLE} />
+                  <input name="age_max" type="number" min={0} max={100} value={ageMax} onChange={(e) => setAgeMax(e.target.value)} className={INPUT} style={INPUT_STYLE} />
                 </label>
               </div>
             </div>
@@ -160,7 +175,8 @@ export function LibraryEntryEditor({
                       type="checkbox"
                       name="diet_compatibility"
                       value={d.value}
-                      defaultChecked={(entry?.diet_compatibility ?? []).includes(d.value)}
+                      checked={diets.includes(d.value)}
+                      onChange={() => setDiets((prev) => toggleIn(prev, d.value))}
                     />
                     {d.label}
                   </label>
@@ -179,7 +195,8 @@ export function LibraryEntryEditor({
                         type="checkbox"
                         name="alternatives"
                         value={o.id}
-                        defaultChecked={(entry?.alternatives ?? []).includes(o.id)}
+                        checked={alternatives.includes(o.id)}
+                        onChange={() => setAlternatives((prev) => toggleIn(prev, o.id))}
                       />
                       {o.name}
                     </label>
@@ -235,6 +252,14 @@ export function ProductClinicalEditor({
     if (state.saved) setOpen(false);
   }
 
+  // Controlled for the same failed-save reason as LibraryEntryEditor.
+  const [toggles, setToggles] = useState({
+    informed_sport: Boolean(product.informed_sport),
+    nsf_certified: Boolean(product.nsf_certified),
+    vegan: Boolean(product.vegan),
+  });
+  const [libraryId, setLibraryId] = useState(product.supplement_library_id ?? "");
+
   return (
     <>
       <button
@@ -257,12 +282,17 @@ export function ProductClinicalEditor({
 
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               {([
-                ["informed_sport", "Informed Sport", product.informed_sport],
-                ["nsf_certified", "NSF Certified for Sport", product.nsf_certified],
-                ["vegan", "Vegan", product.vegan],
-              ] as const).map(([nameAttr, label, checked]) => (
+                ["informed_sport", "Informed Sport"],
+                ["nsf_certified", "NSF Certified for Sport"],
+                ["vegan", "Vegan"],
+              ] as const).map(([nameAttr, label]) => (
                 <label key={nameAttr} className="flex items-center gap-1.5 text-sm" style={{ color: "var(--text)" }}>
-                  <input type="checkbox" name={nameAttr} defaultChecked={Boolean(checked)} />
+                  <input
+                    type="checkbox"
+                    name={nameAttr}
+                    checked={toggles[nameAttr]}
+                    onChange={() => setToggles((prev) => ({ ...prev, [nameAttr]: !prev[nameAttr] }))}
+                  />
                   {label}
                 </label>
               ))}
@@ -279,7 +309,8 @@ export function ProductClinicalEditor({
               <FieldLabel>Clinical entry</FieldLabel>
               <select
                 name="supplement_library_id"
-                defaultValue={product.supplement_library_id ?? ""}
+                value={libraryId}
+                onChange={(e) => setLibraryId(e.target.value)}
                 className={`w-full ${INPUT}`}
                 style={INPUT_STYLE}
               >
