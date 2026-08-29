@@ -354,6 +354,88 @@ export type Database = {
           },
         ]
       }
+      athlete_notification_prefs: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          missed_followup_enabled: boolean
+          prompted_at: string | null
+          reminder_enabled: boolean
+          reminder_time: string | null
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          missed_followup_enabled?: boolean
+          prompted_at?: string | null
+          reminder_enabled?: boolean
+          reminder_time?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          missed_followup_enabled?: boolean
+          prompted_at?: string | null
+          reminder_enabled?: boolean
+          reminder_time?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_notification_prefs_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: true
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      athlete_push_tokens: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          device_name: string | null
+          disabled_at: string | null
+          expo_push_token: string
+          id: string
+          last_seen_at: string
+          platform: string
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          device_name?: string | null
+          disabled_at?: string | null
+          expo_push_token: string
+          id?: string
+          last_seen_at?: string
+          platform: string
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          device_name?: string | null
+          disabled_at?: string | null
+          expo_push_token?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_push_tokens_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_relationship_history: {
         Row: {
           athlete_id: string
@@ -3273,6 +3355,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      register_push_token: {
+        Args: { p_device_name?: string; p_platform: string; p_token: string }
+        Returns: undefined
+      }
       shares_club_with_staff: {
         Args: { p_profile_id: string }
         Returns: boolean

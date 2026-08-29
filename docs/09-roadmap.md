@@ -46,9 +46,24 @@ new Date().toISOString().slice(0, 10)
 ```
 
 That is the date in **UTC**, not in the club's timezone. The pilot market is the
-UAE at **UTC+4**, so from **20:00 to midnight local, every day, the whole
+UAE at **UTC+4**, so from **midnight to 04:00 local, every day, the whole
 application is a day behind**. Observed live: at 00:27 local on 14 August the
 Training Load Plan marked 13 August as "today".
+
+> **Corrected 2026-08-29.** This section previously said the bad window was
+> "20:00 to midnight local". That was a sign error, and it inverted the
+> practical risk. For a zone at UTC**+**X the local date runs *ahead* of the
+> UTC date, so they disagree only for local times **00:00 to X:00** — at UTC+4,
+> midnight to 04:00. Local evenings are fine. The 00:27 observation recorded
+> immediately above is inside the corrected window and was always the better
+> evidence; the prose next to it was wrong.
+>
+> The direction flips for **negative** offsets: at UTC−5 the disagreement is
+> local 19:00–23:59, so the evening genuinely is the bad window in the
+> Americas. Anything that encodes a "safe window" must therefore be keyed to
+> the sign of the offset, not copied from the UAE case — see the temporary
+> `reminder_time_within_utc_safe_window` constraint in migration 059, which is
+> correct for the GCC and explicitly not for the Americas.
 
 Surfaces that read a current date, and therefore all inherit it:
 
@@ -71,8 +86,22 @@ carefully rather than quickly:
 What a real fix needs to decide:
 
 - Whose timezone is authoritative — the club's, the team's, or the viewer's?
-  A club setting is the likely answer (`clubs` has no timezone column today),
-  since an academy's "training day" is a club-level concept.
+  A club setting is the likely answer, since an academy's "training day" is a
+  club-level concept. **Updated 2026-08-29:** the schema no longer needs a new
+  column for this — `clubs.timezone` exists (`not null`, default `Asia/Dubai`,
+  written at club creation), and `segments.timezone` exists alongside
+  `athletes.segment_id`. Migration 059 adds a per-athlete override for the
+  unclubbed and travelling cases. So the resolution chain is already available
+  end to end:
+
+      athlete override -> club.timezone -> segment.timezone -> 'Asia/Dubai'
+
+  What remains is deciding that this chain *is* the rule and adopting it, not
+  building the storage for it.
+- Note that **form default values may not want the same answer as data
+  semantics**. A compliance window should be the club's today; the date
+  pre-filled into a report form is arguably the *viewer's* today. Triage these
+  separately rather than replacing every call site with one helper.
 - Whether historical rows need reinterpreting, or only new writes change.
 - One shared helper (`todayFor(club)`) that every surface adopts at once —
   a per-page migration would leave the app internally inconsistent mid-flight,

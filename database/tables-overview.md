@@ -34,6 +34,8 @@ schema.sql matches this.
 | `subscriptions` | Club subscription dates. Separate `plans` table (foundation) for future independent-tier Stripe pricing config. |
 | `messages` | Messenger — sender, recipient(s) (one or more practitioners), thread, read status. |
 | `notifications` | Compliance alerts, report-ready, subscription-expiry reminders, etc. |
+| `athlete_notification_prefs` | One row per athlete: their chosen daily check-in reminder time, their IANA timezone, and whether each reminder type is on. A missing row (or a null `reminder_time`) is what the mobile app reads as "never asked", which is what triggers the first-run prompt — so it is deliberately not pre-populated. Kept off `athletes` because RLS is row-level: an athlete UPDATE policy there would expose every column of the row. Migration 059. |
+| `athlete_push_tokens` | Expo push tokens, **one row per device** (phone + tablet, and a fresh token after every reinstall) — not one per athlete. Written only through `register_push_token()`, which reassigns a token when a shared device changes hands. Dead tokens are `disabled_at`-stamped from Expo's delivery *receipts*, never deleted. Migration 059. |
 | `leads`, `content`, `articles` | `leads` gained intake fields (role, country, sport, squad_size — migration 046) for the public Book-a-Meeting flow; meeting_date + meeting_booked=false together mean "time requested, awaiting confirmation". `content` and `articles` unchanged from v3. |
 | `partnerships_consultants`, `partnerships_consultant_clubs`, `brand_partners` | Unchanged from v3. |
 | `club_branding` | Super Admin-managed per club: logo, advertising banner, report template rules/color/Arabic format, Additional-Instructions guardrails. |

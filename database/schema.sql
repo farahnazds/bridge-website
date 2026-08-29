@@ -574,6 +574,46 @@ create table checkins (
 comment on table checkins is
   'Always available regardless of subscription status — the one universal exception. Club practitioners may proxy-enter for club athletes only.';
 
+-- Check-in reminder settings, one row per athlete. Added migration 059.
+-- Deliberately NOT columns on `athletes`: RLS is row-level, so an athlete
+-- UPDATE policy on that table would expose tier/status/club_id/is_subscribed
+-- along with the preference. A table the athlete owns entirely needs no such
+-- carve-out.
+create table athlete_notification_prefs (
+  athlete_id uuid primary key references athletes(id) on delete cascade,
+  reminder_time time, -- null = never chosen; drives the first-run prompt
+  timezone text not null default 'Asia/Dubai', -- IANA; validated in app, not by CHECK
+  reminder_enabled boolean not null default true,
+  missed_followup_enabled boolean not null default true,
+  prompted_at timestamptz, -- shown the prompt, whatever they answered
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  -- TEMPORARY: keeps reminders out of the window where UTC today and local
+  -- today disagree (00:00-04:00 at UTC+4). Drop when the UTC-today task lands
+  -- (docs/09-roadmap.md). Not valid for negative UTC offsets — see 059.
+  constraint reminder_time_within_utc_safe_window check (
+    reminder_time is null or reminder_time >= time '04:00'
+  )
+);
+comment on table athlete_notification_prefs is
+  'Per-athlete check-in reminder settings. Separate from `athletes` because RLS is row-level. See migration 059.';
+
+-- Expo push tokens, one row PER DEVICE (phone + tablet; new token after every
+-- reinstall). Written only through register_push_token(). Added migration 059.
+create table athlete_push_tokens (
+  id uuid primary key default gen_random_uuid(),
+  athlete_id uuid not null references athletes(id) on delete cascade,
+  expo_push_token text not null unique, -- unique: never live for two athletes at once
+  platform text not null check (platform in ('ios', 'android')),
+  device_name text,
+  last_seen_at timestamptz not null default now(),
+  disabled_at timestamptz, -- set on a DeviceNotRegistered RECEIPT, not deleted
+  created_at timestamptz not null default now()
+);
+comment on table athlete_push_tokens is
+  'Expo push tokens, one row per device installation. Written only through register_push_token(). See migration 059.';
+create index athlete_push_tokens_active_idx on athlete_push_tokens (athlete_id) where disabled_at is null;
+
 -- ============================================================================
 -- SECTION 9 — COMMENTS
 -- ============================================================================
@@ -921,15 +961,15 @@ $$;
 -- infinite recursion; SECURITY DEFINER stops the inner lookup re-triggering
 -- the calling policy. Same fix shape as migration 001.
 create or replace function is_message_sender(p_message_id uuid) returns boolean
-language sql stable security definer set search_path = public, pg_temp as $
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (
     select 1 from messages m
     where m.id = p_message_id and m.sender_id = current_profile_id()
   )
-$;
+$$;
 
 create or replace function is_message_participant(p_message_id uuid) returns boolean
-language sql stable security definer set search_path = public, pg_temp as $
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (
     select 1 from messages m
     where m.id = p_message_id and m.sender_id = current_profile_id()
@@ -938,14 +978,14 @@ language sql stable security definer set search_path = public, pg_temp as $
     select 1 from message_recipients mr
     where mr.message_id = p_message_id and mr.recipient_id = current_profile_id()
   )
-$;
+$$;
 
 -- Messenger relationship guard — see
 -- database/migrations/013_messenger_policies.sql. SECURITY DEFINER is
 -- required: an athlete cannot read their own athlete_teams rows under the
 -- team-linked policy, so this would be false for every athlete otherwise.
 create or replace function can_message_profile(p_recipient_id uuid) returns boolean
-language sql stable security definer set search_path = public, pg_temp as $
+language sql stable security definer set search_path = public, pg_temp as $$
   select
     exists (
       select 1 from athletes a
@@ -974,7 +1014,7 @@ language sql stable security definer set search_path = public, pg_temp as $
       where a.profile_id = p_recipient_id
         and (is_assigned_to_athlete_via_team(a.id) or has_independent_access_to_athlete(a.id))
     )
-$;
+$$;
 
 create or replace function is_assigned_to_team(p_team_id uuid) returns boolean
 language sql stable as $$
@@ -1046,9 +1086,9 @@ $$;
 -- Keyed on the day a check-in is ABOUT, unlike within_edit_window() below
 -- which measures from created_at. See migration 034.
 create or replace function within_checkin_window(p_date date, p_days int) returns boolean
-language sql immutable as $
+language sql stable as $$
   select p_date <= current_date and p_date >= current_date - make_interval(days => p_days)
-$;
+$$;
 
 create or replace function within_edit_window(p_created_at timestamptz, p_days int) returns boolean
 language sql stable as $$
@@ -1145,6 +1185,8 @@ alter table injuries enable row level security;
 alter table competitions enable row level security;
 alter table training_load_plans enable row level security;
 alter table checkins enable row level security;
+alter table athlete_notification_prefs enable row level security;
+alter table athlete_push_tokens enable row level security;
 alter table comments enable row level security;
 alter table reports enable row level security;
 alter table plans enable row level security;
@@ -1569,6 +1611,23 @@ create policy "club practitioner proxy entry for club athletes" on checkins for 
   );
 create policy "linked practitioners read" on checkins for select
   using (is_assigned_to_athlete_via_team(athlete_id) or has_independent_access_to_athlete(athlete_id));
+
+-- ---- athlete_notification_prefs / athlete_push_tokens (migration 059) ----
+-- Wholly athlete-owned, so `for all` on is_own_athlete_profile() is the
+-- complete rule. WITH CHECK as well as USING: without it an athlete could
+-- update a row they own and set athlete_id to somebody else on the way out.
+-- No staff policy — a reminder time is not clinical data. The cron job reads
+-- these with the service role (see lib/complianceAlerts.ts).
+create policy "athlete manages own notification prefs" on athlete_notification_prefs for all
+  using (is_own_athlete_profile(athlete_id))
+  with check (is_own_athlete_profile(athlete_id));
+create policy "athlete reads own push tokens" on athlete_push_tokens for select
+  using (is_own_athlete_profile(athlete_id));
+create policy "athlete removes own push tokens" on athlete_push_tokens for delete
+  using (is_own_athlete_profile(athlete_id));
+-- No insert/update policy on athlete_push_tokens by design: registration goes
+-- through register_push_token(), because a shared device changing hands needs
+-- an UPDATE on a row the new caller does not yet own. See migration 059.
 
 -- ---- comments ----
 create policy "super admin full access" on comments for all using (is_super_admin());

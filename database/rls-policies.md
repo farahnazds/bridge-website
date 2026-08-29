@@ -1646,3 +1646,82 @@ pre-select. A BEFORE trigger (`club_product_priorities_entity_check`)
 asserts the ranked product actually belongs to the row's clinical
 entity, so a priority can never point across entities even under the
 service role.
+
+## Migration 058 — `within_checkin_window()` volatility (2026-08-29)
+
+**No policy changed.** The function three `checkins` write policies depend
+on was declared `immutable` while its body reads `current_date`.
+
+`immutable` promises the planner a fixed result for fixed arguments forever,
+which licenses constant-folding into a cached plan. `current_date` changes at
+every UTC midnight, so the promise was false. The exposure is narrow but lands
+in a bad place: a plan cached before midnight could keep enforcing yesterday's
+window afterwards — refusing today's check-in as "in the future", or still
+accepting a day that had just aged out of the 7-day window. Supabase's pooler
+makes long-lived prepared statements unlikely, which is very probably why it
+was never observed.
+
+Corrected to `stable`, matching `within_edit_window()` directly beneath it in
+`schema.sql` — which suggests a slip in 034 rather than a decision.
+
+The body is otherwise byte-identical. In particular the UTC-anchored
+`p_date <= current_date` guard is **untouched**; changing it belongs to the
+separate "today is computed in UTC" task (`docs/09-roadmap.md`), not to a
+volatility fix.
+
+Policies affected (unchanged, listed because they inherit the behaviour):
+`athlete logs own checkin within window`, `athlete edits own checkin within
+window` (USING and WITH CHECK).
+
+While fixing this, four function bodies in `database/schema.sql` were found
+to be dollar-quoted with a single `$` instead of `$$` —
+`is_message_sender()`, `is_message_participant()`, `can_message_profile()`
+and `within_checkin_window()`. That is not valid Postgres, so the file could
+not have been run against a fresh project as its header instructs. The live
+database was never affected (it was built from the numbered migrations, which
+are correct); only the reference file was wrong. Repaired in the same commit.
+
+## Migration 059 — check-in reminder prefs + push tokens (2026-08-29)
+
+Two new athlete-owned tables for the daily check-in reminder feature.
+
+| Policy | Table | Command | Rule |
+|---|---|---|---|
+| `athlete manages own notification prefs` | `athlete_notification_prefs` | `all` | `is_own_athlete_profile(athlete_id)`, USING + WITH CHECK |
+| `athlete reads own push tokens` | `athlete_push_tokens` | `select` | `is_own_athlete_profile(athlete_id)` |
+| `athlete removes own push tokens` | `athlete_push_tokens` | `delete` | `is_own_athlete_profile(athlete_id)` |
+
+**Why new tables rather than columns on `athletes`.** `athletes` has one
+athlete-facing policy — `"athlete reads own row"` — and deliberately no
+athlete UPDATE policy. RLS is row-level, not column-level, so any policy
+letting an athlete update their own row lets them update *every* column of it:
+`tier`, `status`, `club_id`, `is_subscribed`, `body_fat_pct`. Constraining
+that needs column GRANTs or a guard trigger — the machinery already built for
+`profiles`. That is a lot of risk to buy one preference field. A table the
+athlete owns entirely makes `for all` exactly true.
+
+**Why WITH CHECK is stated as well as USING.** Without it an athlete could
+update a row they legitimately own and set `athlete_id` to somebody else on
+the way out — the same shape of hole migration 007 closed on `comments`.
+
+**No staff or club-manager policy.** A reminder time is not clinical data and
+nothing outside the athlete needs it. The cron job reads both tables with the
+service role, for the reason `lib/complianceAlerts.ts` documents: it runs with
+no JWT, so there is no session for RLS to scope against.
+
+**Why `athlete_push_tokens` has no INSERT or UPDATE policy.** Registration
+goes through `register_push_token(text, text, text)`, a SECURITY DEFINER
+function. Two athletes can legitimately share one physical device (an academy
+tablet, a second-hand phone), and Expo issues the token to the *device*. A
+plain upsert cannot handle the handover: the insert conflicts on
+`expo_push_token`, Postgres takes the UPDATE path, and that path's USING
+clause tests the **existing** row — which the new athlete does not own. The
+write is refused, the new athlete silently never receives reminders, and the
+previous one keeps receiving push for a phone they no longer hold. That is a
+privacy failure, not just a broken feature.
+
+The function resolves the athlete from `current_profile_id()` and **never**
+accepts an athlete id as a parameter, which is what stops it becoming a way to
+point another athlete's token at yourself. Possession of the token is the
+authorisation: the caller got it from the OS on the device in hand. `execute`
+is granted to `authenticated` only; revoked from `public`/`anon`.
