@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/compliance-check",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/checkin-reminders",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
