@@ -134,6 +134,14 @@ function ProductCard({
             Vegan
           </span>
         )}
+        {/* The card already falls back to a CategoryIcon without a photo, but
+            a deliberate placeholder and a missing asset look identical — this
+            says which one it is, and only to the role that can fix it. */}
+        {editing && !p.image_url && (
+          <span className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--warning) 12%, transparent)", color: "var(--warning)" }}>
+            No photo
+          </span>
+        )}
         {(p.allergens ?? []).map((a) => (
           <span key={a} className={BADGE} style={{ backgroundColor: "color-mix(in srgb, var(--warning) 12%, transparent)", color: "var(--warning)" }}>
             Contains: {label(a)}
@@ -228,6 +236,12 @@ export default function CertifiedCatalogue({
   const [category, setCategory] = useState<string>("");
   const [brandId, setBrandId] = useState<string>("");
   const [query, setQuery] = useState<string>("");
+  // Photo-coverage filter (owner ruling 2026-09-02). Populating the catalogue
+  // is a maintenance errand, not a browsing one, so both this and the card's
+  // "No photo" chip are gated on `editing` — the Admin's display-only
+  // catalogue stays clean, and only the role that can actually fix a gap is
+  // told one exists. Bulk filling is scripts/import-product-photos.mjs.
+  const [missingPhotoOnly, setMissingPhotoOnly] = useState(false);
 
   // Adjust-during-render (the repo's sanctioned pattern): when the library
   // GROWS, a new entry was just added — clear every filter so it is visible.
@@ -242,6 +256,7 @@ export default function CertifiedCatalogue({
       setCategory("");
       setBrandId("");
       setQuery("");
+      setMissingPhotoOnly(false);
     }
   }
 
@@ -261,6 +276,32 @@ export default function CertifiedCatalogue({
 
   const migrated = products.some((p) => p.informed_sport !== undefined);
   const label = (code: string) => codeLabels[code] ?? code;
+
+  const missingPhotoCount = useMemo(() => products.filter((p) => !p.image_url).length, [products]);
+
+  // Offered only when there is something to find — the same rule the category
+  // chips follow, so a filter never advertises an empty result. Once the
+  // catalogue is fully photographed this disappears on its own.
+  const missingPhotoToggle = editing && missingPhotoCount > 0 && (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Coverage</span>
+      <button
+        type="button"
+        onClick={() => setMissingPhotoOnly((v) => !v)}
+        aria-pressed={missingPhotoOnly}
+        className={`${CHIP} transition-colors duration-150`}
+        style={{
+          paddingTop: ".375rem",
+          paddingBottom: ".375rem",
+          backgroundColor: missingPhotoOnly ? "color-mix(in srgb, var(--warning) 14%, transparent)" : "var(--bg)",
+          color: missingPhotoOnly ? "var(--warning)" : "var(--text)",
+          border: `1px solid ${missingPhotoOnly ? "var(--warning)" : "var(--border)"}`,
+        }}
+      >
+        No photo ({missingPhotoCount})
+      </button>
+    </div>
+  );
 
   const header = (
     <div className="flex flex-col gap-1">
@@ -333,7 +374,7 @@ export default function CertifiedCatalogue({
     for (const p of products) {
       const key = p.supplement_library_id ?? "";
       if (key && libById.has(key)) allByEntity.set(key, [...(allByEntity.get(key) ?? []), p]);
-      if (!brandId || p.brand_id === brandId) {
+      if ((!brandId || p.brand_id === brandId) && (!missingPhotoOnly || !p.image_url)) {
         if (key && libById.has(key)) {
           productsByEntity.set(key, [...(productsByEntity.get(key) ?? []), p]);
         } else {
@@ -371,10 +412,13 @@ export default function CertifiedCatalogue({
       .filter((g) => !category || g.name === category)
       .map((g) => ({
         ...g,
-        // A brand filter narrows to entities that actually have that brand's
-        // products; without one every entity shows, products or not.
-        entries: (brandId ? g.entries.filter((l) => (productsByEntity.get(l.id) ?? []).length > 0) : g.entries)
-          .filter(entityVisible),
+        // A product-level filter (brand, or photo coverage) narrows to
+        // entities that actually have matching products; with neither active
+        // every entity shows, products or not.
+        entries: (brandId || missingPhotoOnly
+          ? g.entries.filter((l) => (productsByEntity.get(l.id) ?? []).length > 0)
+          : g.entries
+        ).filter(entityVisible),
       }))
       .filter((g) => g.entries.length > 0);
 
@@ -407,6 +451,7 @@ export default function CertifiedCatalogue({
           />
           {brandSelect}
           {searchBox}
+          {missingPhotoToggle}
           <p className="pb-2 text-xs" style={{ color: "var(--text-muted)" }} role="status">
             {visibleEntityCount} of {library.length} entities · {visibleProductCount} of {products.length} products
           </p>
@@ -527,6 +572,7 @@ export default function CertifiedCatalogue({
     (p) =>
       (!category || p.category === category) &&
       (!brandId || p.brand_id === brandId) &&
+      (!missingPhotoOnly || !p.image_url) &&
       (!q || p.name.toLowerCase().includes(q))
   );
 
@@ -539,6 +585,7 @@ export default function CertifiedCatalogue({
         <CategoryChips categories={categories} category={category} setCategory={setCategory} />
         {brandSelect}
         {searchBox}
+        {missingPhotoToggle}
         <p className="pb-2 text-xs" style={{ color: "var(--text-muted)" }} role="status">
           {visible.length} of {products.length} products
         </p>

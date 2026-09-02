@@ -50,3 +50,8 @@ next-env.d.ts
 
 # Supabase CLI link artifacts (contains project connection details)
 /supabase/.temp/
+
+# Staging folder for scripts/import-product-photos.mjs — brand product
+# imagery is licensed asset material that belongs in Supabase Storage,
+# not in the repo.
+/product-photos/
