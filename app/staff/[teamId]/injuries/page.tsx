@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import InjuriesClient, { type InjuryRecord } from "./InjuriesClient";
 import { CARD, NOTICE } from "@/lib/ui";
 import { isWithinEditWindow } from "@/lib/constants";
+import { fetchGateStatuses, fetchSymptomScores } from "@/lib/rtpGateData";
 
 // Formats an embedded profile row into a display name. The provider name
 // used to require a second round trip (fetch ids, then fetch profiles);
@@ -25,6 +26,7 @@ type InjuryRow = {
   rtp_phase: string | null;
   target_return_date: string | null;
   cleared_date: string | null;
+  symptom_gated: boolean;
   provider_id: string;
   created_at: string;
   // Arrives via the FK embed on the query below — replaces a second
@@ -59,7 +61,7 @@ export default async function TeamInjuriesPage({
     const { data, error } = await supabase
       .from("injuries")
       .select(
-        "id, athlete_id, date, type, description, status, rtp_phase, target_return_date, cleared_date, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
+        "id, athlete_id, date, type, description, status, rtp_phase, target_return_date, cleared_date, symptom_gated, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
       )
       .in("athlete_id", athleteIds)
       .order("date", { ascending: false });
@@ -67,6 +69,18 @@ export default async function TeamInjuriesPage({
     injuriesData = (data ?? []) as unknown as InjuryRow[];
   }
 
+  // Symptom scores and the gate verdict, for gated injuries only (migration
+  // 060). Both are scoped to the injuries already fetched above, so RLS has
+  // filtered the set once and neither call can widen it.
+  //
+  // Scores are read for EVERY gated injury in one query; the verdict is one
+  // RPC each, for the reason documented on fetchGateStatuses — the conditions
+  // exist in SQL alone and are not re-derived here.
+  const gatedIds = injuriesData.filter((i) => i.symptom_gated).map((i) => i.id);
+  const [scoresByInjury, gateByInjury] = await Promise.all([
+    fetchSymptomScores(gatedIds),
+    fetchGateStatuses(gatedIds),
+  ]);
 
   const records: InjuryRecord[] = injuriesData.map((i) => {
     const athlete = athleteById.get(i.athlete_id);
@@ -83,6 +97,9 @@ export default async function TeamInjuriesPage({
       clearedDate: i.cleared_date,
       providerName: personName(i.provider),
       isEditable: isWithinEditWindow(i.created_at),
+      symptomGated: i.symptom_gated,
+      gate: gateByInjury.get(i.id) ?? null,
+      symptomScores: scoresByInjury.get(i.id) ?? [],
     };
   });
 

@@ -1822,7 +1822,9 @@ export type Database = {
           id: string
           provider_id: string
           rtp_phase: string | null
+          rtp_phase_entered_at: string | null
           status: string
+          symptom_gated: boolean
           target_return_date: string | null
           type: string
           updated_at: string | null
@@ -1838,7 +1840,9 @@ export type Database = {
           id?: string
           provider_id: string
           rtp_phase?: string | null
+          rtp_phase_entered_at?: string | null
           status?: string
+          symptom_gated?: boolean
           target_return_date?: string | null
           type: string
           updated_at?: string | null
@@ -1854,7 +1858,9 @@ export type Database = {
           id?: string
           provider_id?: string
           rtp_phase?: string | null
+          rtp_phase_entered_at?: string | null
           status?: string
+          symptom_gated?: boolean
           target_return_date?: string | null
           type?: string
           updated_at?: string | null
@@ -1893,6 +1899,61 @@ export type Database = {
           {
             foreignKeyName: "injuries_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      injury_symptom_scores: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          id: string
+          injury_id: string
+          provider_id: string
+          recorded_at: string
+          severity: number
+          symptoms: string | null
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          id?: string
+          injury_id: string
+          provider_id: string
+          recorded_at?: string
+          severity: number
+          symptoms?: string | null
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          id?: string
+          injury_id?: string
+          provider_id?: string
+          recorded_at?: string
+          severity?: number
+          symptoms?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "injury_symptom_scores_injury_fkey"
+            columns: ["injury_id", "athlete_id"]
+            isOneToOne: false
+            referencedRelation: "injuries"
+            referencedColumns: ["id", "athlete_id"]
+          },
+          {
+            foreignKeyName: "injury_symptom_scores_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "injury_symptom_scores_provider_id_fkey"
+            columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -3359,6 +3420,25 @@ export type Database = {
         Args: { p_device_name?: string; p_platform: string; p_token: string }
         Returns: undefined
       }
+      rtp_gate_status: {
+        Args: { p_injury_id: string }
+        Returns: {
+          blocked_reason: string
+          can_graduate: boolean
+          duration_met: boolean
+          gated: boolean
+          injury_id: string
+          last_symptomatic_at: string
+          latest_recorded_at: string
+          latest_severity: number
+          no_recurrence: boolean
+          phase: string
+          phase_entered_at: string
+          scores_in_phase: number
+          symptom_free: boolean
+        }[]
+      }
+      rtp_phase_rank: { Args: { p_phase: string }; Returns: number }
       shares_club_with_staff: {
         Args: { p_profile_id: string }
         Returns: boolean
@@ -3390,12 +3470,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3419,11 +3499,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3444,11 +3524,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3469,11 +3549,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3486,11 +3566,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

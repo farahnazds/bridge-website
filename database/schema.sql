@@ -514,12 +514,224 @@ create table injuries (
   rtp_phase text check (rtp_phase in ('acute','sub_acute','return_to_training','returned')),
   target_return_date date,
   cleared_date date,
+  -- Opt-in to the graduated RTP gate (migration 060). False by default: the
+  -- ladder is shared by every injury in the system and a 24h-per-stage rule
+  -- has no clinical basis on a musculoskeletal one.
+  symptom_gated boolean not null default false,
+  -- When the CURRENT rtp_phase was entered. Maintained by
+  -- trg_injuries_rtp_gate, never written by the application.
+  rtp_phase_entered_at timestamptz,
   validity_tier text not null check (validity_tier in ('club_verified','practitioner_verified','self_reported','bridgetx_verified')),
   provider_id uuid not null references profiles(id),
   created_at timestamptz not null default now(),
   updated_by uuid references profiles(id),
-  updated_at timestamptz
+  updated_at timestamptz,
+  -- Exists solely so injury_symptom_scores can carry a REAL composite foreign
+  -- key on (injury_id, athlete_id). Redundant against the primary key for
+  -- uniqueness; see migration 060.
+  constraint injuries_id_athlete_id_key unique (id, athlete_id)
 );
+
+-- Serial symptom-severity observations against one injury — the longitudinal
+-- record `injuries` could never hold, since an injury is one row edited in
+-- place. Append-only by policy (no UPDATE); a mis-entry is deleted inside the
+-- 7-day window, which is REQUIRED, not a convenience: conditions 1 and 3 of
+-- the gate both read scores in the current phase, and the phase clock only
+-- resets on a phase change that a bad score would itself be blocking.
+--
+-- severity is a generic 0-10 rating, deliberately NOT a reproduction of any
+-- published symptom instrument — the same rule that keeps unsourced
+-- coefficients out of `skinfold_equations`. The gate reads only `severity = 0`.
+-- See migration 060.
+create table injury_symptom_scores (
+  id uuid primary key default gen_random_uuid(),
+  injury_id uuid not null,
+  -- Denormalised so this table's RLS reads exactly like injuries' (the helpers
+  -- all take an athlete id) instead of subquerying injuries inside a policy —
+  -- migration 001 is why that is avoided. Drift is closed by the composite FK
+  -- below, not by convention.
+  athlete_id uuid not null,
+  -- Time of the ASSESSMENT, not of data entry. Every gate condition is
+  -- measured against this. Not-in-the-future is enforced in the server action:
+  -- a CHECK cannot reference now().
+  recorded_at timestamptz not null default now(),
+  severity int not null check (severity between 0 and 10),
+  symptoms text, -- staff-only clinical note, like injuries.description
+  provider_id uuid not null references profiles(id),
+  created_at timestamptz not null default now(),
+  constraint injury_symptom_scores_injury_fkey
+    foreign key (injury_id, athlete_id)
+    references injuries (id, athlete_id)
+    on delete cascade
+);
+
+create index injury_symptom_scores_injury_recent_idx
+  on injury_symptom_scores (injury_id, recorded_at desc);
+
+-- ---- graduated return-to-play gate (migration 060) -------------------------
+-- The three conditions live HERE and nowhere else: the trigger that blocks the
+-- write and the staff UI that explains the block both read this one function.
+-- Two implementations would eventually disagree, and the way that surfaces is
+-- a screen saying an athlete may advance while the database refuses it.
+
+create or replace function rtp_phase_rank(p_phase text) returns int
+language sql
+immutable
+as $$
+  select case p_phase
+    when 'acute'              then 1
+    when 'sub_acute'          then 2
+    when 'return_to_training' then 3
+    when 'returned'           then 4
+    else 0                       -- null / not yet on the ladder
+  end;
+$$;
+
+create or replace function rtp_gate_status(p_injury_id uuid)
+returns table (
+  injury_id           uuid,
+  gated               boolean,
+  phase               text,
+  phase_entered_at    timestamptz,
+  latest_severity     int,
+  latest_recorded_at  timestamptz,
+  scores_in_phase     int,
+  last_symptomatic_at timestamptz,
+  symptom_free        boolean,   -- condition 1
+  duration_met        boolean,   -- condition 2
+  no_recurrence       boolean,   -- condition 3
+  can_graduate        boolean,
+  blocked_reason      text
+)
+language sql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+  with inj as (
+    select
+      i.id,
+      i.symptom_gated,
+      i.rtp_phase,
+      coalesce(i.rtp_phase_entered_at, i.created_at) as entered_at
+    from injuries i
+    where i.id = p_injury_id
+  ),
+  latest as (
+    select s.severity, s.recorded_at
+    from injury_symptom_scores s
+    where s.injury_id = p_injury_id
+    order by s.recorded_at desc, s.created_at desc
+    limit 1
+  ),
+  in_phase as (
+    select
+      count(*)::int as n,
+      max(s.recorded_at) filter (where s.severity > 0) as last_bad
+    from injury_symptom_scores s
+    join inj on inj.id = s.injury_id
+    where s.recorded_at >= inj.entered_at
+  )
+  select
+    inj.id,
+    inj.symptom_gated,
+    inj.rtp_phase,
+    inj.entered_at,
+    l.severity,
+    l.recorded_at,
+    coalesce(p.n, 0),
+    p.last_bad,
+    -- C1: a score exists AND the latest is symptom-free. Existence is part of
+    -- the condition — "no evidence" must never read as "no symptoms".
+    (l.severity is not null and l.severity = 0),
+    -- C2: minimum dwell in THIS phase.
+    (now() - inj.entered_at >= interval '24 hours'),
+    -- C3: nothing symptomatic since entering this phase. Distinct from C1 —
+    -- symptoms that flared then settled leave C1 passing and this failing.
+    (p.last_bad is null),
+    (
+      (l.severity is not null and l.severity = 0)
+      and (now() - inj.entered_at >= interval '24 hours')
+      and (p.last_bad is null)
+    ),
+    case
+      when (l.severity is not null and l.severity = 0)
+       and (now() - inj.entered_at >= interval '24 hours')
+       and (p.last_bad is null)
+        then null
+      when l.severity is null then
+        'no symptom score has been recorded for this injury'
+      when l.severity <> 0 then
+        format('the most recent symptom score is %s of 10, not symptom-free',
+               l.severity)
+      when p.last_bad is not null then
+        format('symptoms recurred in this phase (last symptomatic score %s)',
+               to_char(p.last_bad at time zone 'UTC', 'YYYY-MM-DD HH24:MI "UTC"'))
+      else
+        format('only %s hours have elapsed in this phase; 24 are required',
+               floor(extract(epoch from (now() - inj.entered_at)) / 3600))
+    end
+  from inj
+  left join latest l on true
+  left join in_phase p on true;
+$$;
+
+create or replace function enforce_rtp_graduation_gate() returns trigger
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  -- Scalars, not a record: rtp_gate_status() returns NO rows for an injury
+  -- this session cannot see, and a scalar target is unambiguously NULL then.
+  -- `not coalesce(v_can, false)` blocks — the direction an unreadable gate
+  -- must fail in.
+  v_can    boolean;
+  v_reason text;
+begin
+  if tg_op = 'INSERT' then
+    -- Not gated: logging a historical injury already returned to play is
+    -- legitimate, and there is no prior state to graduate FROM. Not a bypass
+    -- either — club staff have no DELETE policy on `injuries`, so a row
+    -- cannot be replaced by a fresh one at a higher phase.
+    if new.rtp_phase is not null then
+      new.rtp_phase_entered_at := now();
+    end if;
+    return new;
+  end if;
+
+  if new.rtp_phase is distinct from old.rtp_phase then
+    -- OLD or NEW: testing NEW alone would let one UPDATE clear symptom_gated
+    -- and advance the phase in the same statement. Un-gating stays possible as
+    -- a separate, recorded edit — an explicit override, never an invisible one.
+    if (coalesce(old.symptom_gated, false) or coalesce(new.symptom_gated, false))
+       and rtp_phase_rank(new.rtp_phase) > rtp_phase_rank(old.rtp_phase)
+       -- Only movement PAST acute is a graduation. Ranking null at 0 is what
+       -- makes null -> returned a gated three-stage jump rather than a hole.
+       and rtp_phase_rank(new.rtp_phase) > 1
+    then
+      select g.can_graduate, g.blocked_reason
+        into v_can, v_reason
+      from rtp_gate_status(old.id) g;
+      if not coalesce(v_can, false) then
+        raise exception 'Return-to-play graduation blocked: %.',
+          coalesce(v_reason, 'the conditions could not be verified')
+          using errcode = 'check_violation';
+      end if;
+    end if;
+
+    -- Any phase change restarts the clock, demotions included, so an athlete
+    -- moved back cannot re-graduate on time served in the phase they left.
+    new.rtp_phase_entered_at := now();
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger trg_injuries_rtp_gate
+  before insert or update on injuries
+  for each row execute function enforce_rtp_graduation_gate();
 
 create table competitions (
   id uuid primary key default gen_random_uuid(),
@@ -1182,6 +1394,7 @@ alter table assessments enable row level security;
 alter table gps_logs enable row level security;
 alter table vald_data enable row level security;
 alter table injuries enable row level security;
+alter table injury_symptom_scores enable row level security;
 alter table competitions enable row level security;
 alter table training_load_plans enable row level security;
 alter table checkins enable row level security;
@@ -1548,6 +1761,40 @@ comment on view injuries_athlete_view is
   'Athlete-facing simplified injury status — athlete_id, status, rtp_phase only, one row per athlete (their most recent). Never add description, type, or date columns to this view.';
 
 grant select on injuries_athlete_view to authenticated;
+
+-- ---- injury_symptom_scores ----
+-- Mirrors `injuries`, with two deliberate differences:
+--   * NO athlete policy at all. A symptom score is clinical detail of the same
+--     kind as injuries.description, and migration 018 removed the athlete's
+--     read of `injuries` outright. This table is NOT in injuries_athlete_view.
+--   * NO update policy. Scores are append-only; DELETE inside the 7-day window
+--     is the correction path, and it is required rather than optional — see
+--     the note on the table in Section 7.
+create policy "super admin full access" on injury_symptom_scores for all using (is_super_admin());
+create policy "admin scoped access" on injury_symptom_scores for all
+  using (
+    exists (
+      select 1 from athletes a
+      where a.id = injury_symptom_scores.athlete_id
+        and a.club_id is not null
+        and is_admin_for_club(a.club_id)
+    )
+  );
+create policy "club staff read" on injury_symptom_scores for select
+  using (is_assigned_to_athlete_via_team(athlete_id));
+-- No time window on INSERT, unlike editing the injury row itself: a gated
+-- injury is scored for as long as it takes to resolve, routinely longer than
+-- seven days.
+create policy "club staff insert" on injury_symptom_scores for insert
+  with check (is_assigned_to_athlete_via_team(athlete_id));
+create policy "club staff delete within 7 days" on injury_symptom_scores for delete
+  using (is_assigned_to_athlete_via_team(athlete_id) and within_edit_window(created_at, 7));
+create policy "independent practitioner read" on injury_symptom_scores for select
+  using (has_independent_access_to_athlete(athlete_id));
+create policy "independent practitioner insert" on injury_symptom_scores for insert
+  with check (has_independent_access_to_athlete(athlete_id));
+create policy "independent practitioner delete own within 2 days" on injury_symptom_scores for delete
+  using (provider_id = current_profile_id() and within_edit_window(created_at, 2));
 
 -- ---- competitions ----
 create policy "super admin full access" on competitions for all using (is_super_admin());

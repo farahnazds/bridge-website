@@ -7,6 +7,8 @@ import { INJURY_STATUSES, RTP_PHASES } from "@/lib/constants";
 import { useOnSaved } from "@/lib/useOnSaved";
 import AthleteSelectField, { type FieldAthlete } from "@/components/AthleteSelectField";
 import { InjuryDetailModal } from "@/components/EntryDetailModals";
+import RtpGatePanel from "@/components/RtpGatePanel";
+import { MIN_PHASE_HOURS, type RtpGate, type SymptomScore } from "@/lib/rtpGate";
 import { logInjury, updateInjury, type ActionState } from "./actions";
 
 const initialState: ActionState = { error: null };
@@ -45,6 +47,16 @@ export interface InjuryRecord {
   clearedDate: string | null;
   providerName: string;
   isEditable: boolean;
+  /** Opted in to the graduated RTP gate (migration 060). Required, so every
+   *  surface that builds an InjuryRecord has to answer it — an injury silently
+   *  defaulting to ungated on one screen and gated on another is exactly the
+   *  drift this being non-optional prevents. */
+  symptomGated: boolean;
+  /** Supplied only by the Injury Log page, which is the surface that renders
+   *  the protocol panel. Absent elsewhere; never derived locally — the gate is
+   *  computed in SQL and nowhere else (see lib/rtpGate.ts). */
+  gate?: RtpGate | null;
+  symptomScores?: SymptomScore[];
 }
 
 function ErrorBanner({ error }: { error: string | null }) {
@@ -148,6 +160,34 @@ function InjuryFields({ defaults }: { defaults?: Partial<InjuryRecord> }) {
             style={INPUT_STYLE}
           />
         </div>
+      </div>
+
+      {/* Opt-in to the graduated protocol. Off by default and off for every
+          injury logged before migration 060: the ladder is shared by every
+          injury in the system, and a 24-hour-per-stage rule has no clinical
+          basis on a hamstring strain. */}
+      <div className="flex flex-col gap-1.5">
+        <label className="flex items-start gap-2.5">
+          <input
+            type="checkbox"
+            name="symptom_gated"
+            defaultChecked={defaults?.symptomGated ?? false}
+            className="mt-0.5 h-4 w-4 shrink-0"
+            style={{ accentColor: "var(--brand-blue)" }}
+          />
+          <span className="flex flex-col">
+            <span className={labelClass} style={{ color: "var(--text)" }}>
+              Symptom-gated return to play
+            </span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Advancing past Acute will require a symptom-free score,{" "}
+              {MIN_PHASE_HOURS} hours in the phase, and no recurrence since
+              entering it. Turning this off again is permitted and recorded, but
+              it is an override — it cannot be done in the same save that
+              advances the phase.
+            </span>
+          </span>
+        </label>
       </div>
     </>
   );
@@ -339,6 +379,18 @@ function InjuryRow({ teamId, record }: { teamId: string; record: InjuryRecord })
               {RTP_LABEL[record.rtpPhase] ?? record.rtpPhase}
             </span>
           )}
+          {record.symptomGated && (
+            <span
+              className={CHIP}
+              style={{
+                backgroundColor: "var(--bg)",
+                color: "var(--brand-blue)",
+                border: "1px solid var(--brand-blue)",
+              }}
+            >
+              Symptom-gated
+            </span>
+          )}
         </div>
       </div>
 
@@ -346,6 +398,21 @@ function InjuryRow({ teamId, record }: { teamId: string; record: InjuryRecord })
         <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
           {record.description}
         </p>
+      )}
+
+      {/* Stops the row's click-to-open handler: the panel is a working area
+          with its own forms and buttons, so a click inside it must not also
+          open the read-only detail modal over the top of what was clicked. */}
+      {record.symptomGated && (
+        <div onClick={(e) => e.stopPropagation()} className="cursor-default">
+          <RtpGatePanel
+            teamId={teamId}
+            injuryId={record.id}
+            athleteId={record.athleteId}
+            gate={record.gate ?? null}
+            scores={record.symptomScores ?? []}
+          />
+        </div>
       )}
 
       </div>

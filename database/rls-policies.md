@@ -1725,3 +1725,86 @@ accepts an athlete id as a parameter, which is what stops it becoming a way to
 point another athlete's token at yourself. Possession of the token is the
 authorisation: the caller got it from the OS on the device in hand. `execute`
 is granted to `authenticated` only; revoked from `public`/`anon`.
+
+## Migration 060 — `injury_symptom_scores` + the graduated RTP gate (2026-09-04)
+
+One new table holding serial symptom-severity observations against an injury,
+plus two columns on `injuries` (`symptom_gated`, `rtp_phase_entered_at`).
+
+| Policy | Command | Rule |
+|---|---|---|
+| `super admin full access` | `all` | `is_super_admin()` |
+| `admin scoped access` | `all` | athlete's `club_id` is one the admin administers |
+| `club staff read` | `select` | `is_assigned_to_athlete_via_team(athlete_id)` |
+| `club staff insert` | `insert` | `is_assigned_to_athlete_via_team(athlete_id)` |
+| `club staff delete within 7 days` | `delete` | assigned **and** `within_edit_window(created_at, 7)` |
+| `independent practitioner read` | `select` | `has_independent_access_to_athlete(athlete_id)` |
+| `independent practitioner insert` | `insert` | `has_independent_access_to_athlete(athlete_id)` |
+| `independent practitioner delete own within 2 days` | `delete` | `provider_id = current_profile_id()` and `within_edit_window(created_at, 2)` |
+
+This is `injuries`' own policy set, with three deliberate departures.
+
+**No athlete policy of any kind.** Migration 018 removed the athlete's SELECT
+on `injuries` outright and left `injuries_athlete_view` as their only path to
+injury information. A symptom score is clinical detail of exactly the kind
+`injuries.description` is, so athletes get nothing here either, and this table
+is **not** added to that view. The rule from 006/018 stands unchanged: never
+add a column to `injuries_athlete_view` beyond `athlete_id`, `status`,
+`rtp_phase`.
+
+**No UPDATE policy — but a DELETE one, and it is not optional.** Scores are an
+append-only clinical timeline: a changed picture is a new score, not a rewrite
+of an old one. That makes a correction path mandatory rather than a
+convenience. Conditions 1 and 3 of the gate both read scores in the *current*
+phase, and the phase clock only resets on a phase change — so a mistyped
+severity would fail the gate for as long as the athlete stayed in that phase,
+and the phase change that would clear it is the very thing the bad score is
+blocking. Without DELETE the gate deadlocks. The independent-practitioner
+window is 2 days and own-rows-only, matching that role's `vald_data` edit
+policy rather than the club-staff 7.
+
+**No time window on INSERT.** Editing the `injuries` row is capped at 7 days,
+but a gated injury is scored for as long as it takes to resolve, which is
+routinely longer. The action and the policy agree on this by construction —
+`logSymptomScore` performs no window check of its own.
+
+### Why `athlete_id` is denormalised onto the child table
+
+Every RLS helper in this schema takes an athlete id, so carrying the column
+lets these policies read identically to the ones on `injuries` instead of
+subquerying `injuries` inside a policy. Migration 001 exists because RLS
+predicates that reach into other tables are how this schema acquired recursive
+helper functions in the first place; this does not re-open that door.
+
+The drift denormalisation usually buys is closed structurally, not by
+convention: `injuries` gained `unique (id, athlete_id)` and the child carries
+`foreign key (injury_id, athlete_id) references injuries (id, athlete_id)`. A
+score whose `athlete_id` disagrees with its injury's cannot be inserted at all,
+so `logSymptomScore` does not need — and does not have — a second check.
+
+### The gate is not an RLS rule
+
+`trg_injuries_rtp_gate` (BEFORE INSERT OR UPDATE on `injuries`) refuses forward
+movement past `acute` on a `symptom_gated` injury unless `rtp_gate_status()`
+passes all three conditions. That is a clinical rule, not an access boundary,
+and it deliberately applies to **every** role including super admin — a gate
+that the highest-privileged account silently ignores is not a protocol.
+
+It is bypassable, on purpose, by one route only: clear `symptom_gated` in a
+separate, recorded edit and then advance. The trigger tests `OLD.symptom_gated
+OR NEW.symptom_gated` precisely so that un-gating and advancing cannot happen
+in the *same* statement — an explicit clinical override is the intended escape
+hatch, an invisible one is not.
+
+`rtp_gate_status()` is SECURITY INVOKER. Every way it can be starved of data
+fails toward refusing graduation: a caller who cannot read the scores sees zero
+of them, condition 1 fails, and the gate closes.
+
+### Known limitation, recorded deliberately
+
+Symptom-free is an **absolute** zero, not a return to the athlete's own normal,
+because there is no baseline (pre-injury) testing anywhere in this schema to
+compare against. For an athlete whose ordinary baseline is non-zero the gate is
+stricter than it should be. That is the safe direction to be wrong in.
+
+See `database/migrations/060_rtp_symptom_gate.sql`.

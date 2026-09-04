@@ -310,7 +310,7 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     supabase
       .from("injuries")
       .select(
-        "id, athlete_id, date, type, description, status, rtp_phase, target_return_date, cleared_date, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
+        "id, athlete_id, date, type, description, status, rtp_phase, target_return_date, cleared_date, symptom_gated, provider_id, created_at, provider:profiles!provider_id(first_name, last_name)"
       )
       .eq("athlete_id", athleteId)
       .order("date", { ascending: false }),
@@ -420,6 +420,12 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     clearedDate: i.cleared_date as string | null,
     providerName: personName(i.provider),
     isEditable: editable(i.created_at as string),
+    // Carried so this surface can MARK a gated injury and so its edit form
+    // round-trips the flag instead of silently clearing it. The gate verdict
+    // and symptom history are deliberately not loaded here — the protocol
+    // panel lives on the Injury Log / RTP page (migration 060), and an absent
+    // `gate` reads as "not supplied", never as "conditions met".
+    symptomGated: (i.symptom_gated as boolean | null) ?? false,
   }));
 
   const gps: GpsEntry[] = rows(gpsRes).map((g) => ({
