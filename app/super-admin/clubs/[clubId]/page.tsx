@@ -69,8 +69,16 @@ export default async function SuperAdminClubDetailPage({
   if (!club) notFound();
 
   // Everything else keyed off the confirmed club id.
-  const [{ data: teams }, { data: athletes }, { data: staff }, { data: branding }, { data: settings }] =
-    await Promise.all([
+  //
+  // product_requests belongs in this batch, not after it: it filters on
+  // club_id, so it never depended on the athletes result it used to wait for.
+  // Awaiting it separately cost a third sequential round trip to Sydney on the
+  // page a Super Admin opens by clicking a club — the navigation that was
+  // reported as doing nothing at all.
+  const [
+    { data: teams }, { data: athletes }, { data: staff },
+    { data: branding }, { data: settings }, { data: requests },
+  ] = await Promise.all([
       supabase.from("teams").select("id, name, category").eq("club_id", clubId).order("name"),
       supabase.from("athletes").select("id, status").eq("club_id", clubId),
       supabase
@@ -79,13 +87,10 @@ export default async function SuperAdminClubDetailPage({
         .eq("club_id", clubId),
       supabase.from("club_branding").select("logo_url, report_color_hex").eq("club_id", clubId).maybeSingle(),
       supabase.from("club_settings").select("compliance_notify_days, monthly_skip_limit, default_report_language").eq("club_id", clubId).maybeSingle(),
+      supabase.from("product_requests").select("final_price, status").eq("club_id", clubId),
     ]);
 
   const athleteIds = (athletes ?? []).map((a) => a.id as string);
-  const { data: requests } = await supabase
-    .from("product_requests")
-    .select("final_price, status")
-    .eq("club_id", clubId);
 
   // The closest thing to "spend" that exists in the schema: fulfilled product
   // requests. There is no billing/spend model — club contracts are arranged
