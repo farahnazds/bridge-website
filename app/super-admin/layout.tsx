@@ -53,9 +53,16 @@ export default async function SuperAdminLayout({
       <DashboardShell
         sidebar={
           <>
-            {/* Super Admin's club jump-to. Not in the brief's list, but it is
+            {/* Super Admin's club switcher. Not in the brief's list, but it is
                 a switcher in the same slot, and leaving it in the header would
-                have made this the one dashboard that disagreed. */}
+                have made this the one dashboard that disagreed.
+
+                It switches between two modes depending on the page — opening
+                the club's WORKSPACE (/club/<id>) from the launchpad pages, and
+                preserving the current club-scoped tool everywhere else. The
+                whole rule, and why each half is the way it is, lives in
+                SuperAdminClubSwitcher.tsx; it needs the pathname, so it is a
+                client component and this layout only supplies the list. */}
             <SuperAdminClubSwitcher
               clubs={(clubs ?? []).map((c) => ({
                 id: c.id as string,

@@ -133,7 +133,21 @@ export default async function SuperAdminClubDetailPage({
           {club.sport}
           {club.location ? ` · ${club.location}` : ""} · {club.timezone}
         </p>
-        <p className="mt-2 text-sm">
+        {/* "Open club workspace" first, and named as a place rather than a
+            page: this is the way into /club/<id>, where the athlete roster,
+            add-athlete, Teams & Staff and the "Jump to team" switcher into
+            /staff/<teamId> all live, and where Super Admin's club-data write
+            parity (canWriteClubData(), lib/auth.ts, 2026-08-28) actually
+            applies. THIS page is oversight only — managers, products,
+            stop/resume — which is why someone arriving here reasonably reads
+            the missing edit controls as lost access rather than as a
+            different page. The club layout has admitted oversight since the
+            role-cascade fix and RLS does the club-scoping, so the link grants
+            nothing; it only stops hiding what the role already holds. */}
+        <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <Link href={`/club/${clubId}`} className="font-medium underline-offset-2 hover:underline" style={{ color: "var(--brand-blue)" }}>
+            Open club workspace →
+          </Link>
           <Link href={`/super-admin/clubs/${clubId}/products`} className="font-medium underline-offset-2 hover:underline" style={{ color: "var(--brand-blue)" }}>
             Products &amp; Priorities →
           </Link>
