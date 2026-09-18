@@ -416,12 +416,48 @@ These are not preferences — each one came from a concrete failure.
   `database/tables-overview.md` describing it as powering the Activity/History
   feed. Never investigated. **Re-check before drawing conclusions** — a month
   of activity has passed.
-- **Browser verification is currently unavailable.** On 2026-09-18 the Chrome
-  tooling returned `Frame with ID 0 is showing error page` for both
-  `bridgetx.co` and `www.bridgetx.co`, while loading other sites fine. `curl`
-  confirmed both healthy (200), so the site was up and the tooling was not.
-  Likely the extension lacking site permission for the domain. **Until this is
-  resolved, no session can visually confirm its own UI work.**
+- **Browser tooling: RESOLVED 2026-09-18, root cause was transient and will
+  recur.** Earlier that day Chrome returned `Frame with ID 0 is showing error
+  page` for `bridgetx.co` and `www.bridgetx.co` while loading other sites
+  fine, and `curl` needed `--ssl-no-revoke`. Both cleared without any
+  configuration change; Chrome later loaded the production sign-in page
+  normally and `curl` validated 8/8 with revocation checking on.
+
+  **Two independent transient faults, not one:**
+
+  1. **Intermittent local name resolution.** `curl: (6) Could not resolve
+     host` was directly observed on `www.bridgetx.co`, and again later on
+     `thebridgehp.com`, at moments when `nslookup` resolved both fine via the
+     router *and* via 8.8.8.8. That is the client resolver failing, not DNS.
+     It is the best explanation for Chrome's error page. Both domains are
+     Vercel-hosted behind CNAME chains (`…vercel-dns-017.com`,
+     `cname.vercel-dns.com`), needing an extra hop that a flaky resolver can
+     drop; `example.com` is a single long-cached A record, which is why it
+     kept working and made the fault look domain-specific.
+  2. **Cold Windows CRL shard** (explains `curl`/schannel only). The Let's
+     Encrypt cert has **no OCSP** — only a sharded CRL, here
+     `http://yr1.c.lencr.org/56.crl`. Shard 56 was absent from the CryptoAPI
+     cache, so revocation checking failed closed with
+     `CRYPT_E_REVOCATION_OFFLINE`. It is cached now (`certutil -urlcache`),
+     and the CRL refreshes every ~9 days, so **this can return whenever a
+     shard goes cold or the cert renews onto a different shard.** Chrome has
+     no revocation policy set and soft-fails, so this never explained Chrome.
+
+  **Triage, so nobody burns three attempts on it again:** a failure here is
+  *not* evidence the site is down. Check `nslookup <host> 8.8.8.8` and
+  `curl.exe --ssl-no-revoke`; if those pass, it is local and usually clears on
+  its own. **Durable fix, needs the owner to run it:** stop using the Linksys
+  router at `192.168.1.1` as the resolver and point the adapter at
+  `1.1.1.1` / `8.8.8.8`. Not done here — changing system network settings is
+  the owner's call.
+
+- **Authenticated pages cannot be verified by an agent session, ever.** With
+  the tooling working, `https://www.bridgetx.co/super-admin/clubs` still
+  redirects to `/login`: the Chrome profile is not signed in to production.
+  **Signing in is off the table — entering passwords is prohibited.** So any
+  request to "check X live" on an authenticated surface needs the owner
+  already signed into that Chrome profile. Unauthenticated surfaces (landing,
+  `/login`, `/privacy`, `/terms`, `/book`) are fully checkable.
 
 ### Explicitly deferred — do not build
 
@@ -456,8 +492,9 @@ The 2026-08-21 scope hold was lifted 2026-08-29 and most sections are built.
    of them a month old, including a migration whose schema is already live.
    This is the single highest-value action and needs an owner decision, not a
    technical one.
-2. **Fix the browser tooling** (§9) — everything else is easier to verify once
-   a session can actually see the app.
+2. **Sign the working Chrome profile into production** if a session is
+   expected to verify authenticated UI (§9). The tooling itself is fixed; the
+   sign-in is the remaining blocker and only the owner can clear it.
 3. **Close pre-launch items 3, 4 and 5** (§7) — none is blocked, and none has
    moved in a month. Item 3 needs only a look at Vercel execution logs.
 4. **Re-run the production data audit** before any cleanup decision (§4).
