@@ -1,515 +1,286 @@
-# PROJECT STATUS — snapshot, 2026-08-14
+# PROJECT STATUS — snapshot, 2026-09-18
 
 **What this file is.** A handoff snapshot for starting a fresh conversation
 with full context. It is **not a specification and not a source of truth.**
-The numbered docs (`01`–`11`), `database/`, and `prompts/` remain
+The numbered docs (`01`–`13`), `database/`, and `prompts/` remain
 authoritative exactly as `CLAUDE.md` describes. Where this file disagrees with
 them, they win and this file is stale.
 
 **Dated deliberately.** Anything below marked "as of today" should be
-re-checked rather than trusted after 2026-08-14.
+re-checked rather than trusted after 2026-09-18.
+
+**How this snapshot was produced.** Regenerated 2026-09-18 from the git
+history, the migration directory, `vercel.json`, and the numbered docs — all
+re-read, not remembered. The previous snapshot was dated 2026-08-14 and last
+edited 2026-08-16; roughly 139 commits landed after it, so it was rewritten
+rather than patched. **Nothing here was confirmed in a browser** — the Chrome
+tooling could not load either domain during this session (see §9). Claims are
+therefore marked *verified in code* or *unverified*, and the distinction is
+deliberate.
 
 ---
 
-## 1. The headline: pilot launch context
+## 1. The headline: production is three weeks behind the code
 
-The first real pilot club was scheduled to go live **2026-08-15** (tomorrow,
-relative to this snapshot). A five-item pre-launch check was opened today.
-**Only item 1 was investigated, and it was then paused.** Items 2–5 have not
-been started. Do not assume any of them are done.
+This is the most important fact in this file, and the one most likely to
+mislead a future session. **"Built" and "shipped" are not the same thing
+here, and six commits currently sit between them.**
 
----
+Deploys run through the Vercel Git integration: `main` → `bridgetx.co`
+(production), `dev` → `thebridgehp.com` (behind SSO). So the branch state
+*is* the deployment state:
 
-## 2. RESOLVED — the "Supabase 401" was a tooling artifact, not a real fault
+| Ref | HEAD | Dated | Serves |
+|---|---|---|---|
+| `origin/main` | `25a9f2d` | 2026-08-28 | **bridgetx.co — production** |
+| `main` (local) | `cd4f84b` | 2026-09-04 | nothing — 4 commits unpushed |
+| `origin/dev` = `dev` | `697f06d` | 2026-09-18 | thebridgehp.com |
 
-**There was never anything wrong with the credentials, the database, or
-production.** An earlier version of this file recorded a blocking 401. That was
-wrong and is corrected here.
+**Not in production, in order:**
 
-**Root cause: PowerShell 5.1's `Invoke-WebRequest` silently drops the custom
-`apikey` header.** Proven by sending the byte-identical request two ways:
-
-| Headers sent | `curl.exe` | PS `Invoke-WebRequest` |
+| Commit | Dated | What |
 |---|---|---|
-| `apikey` only | **200** | 401 |
-| `Authorization: Bearer` only | 401 | 401 |
-| both | **200** | 401 |
+| `fd7f71b` | 2026-08-29 | Check-in reminders Phase 1: prefs + push tokens (migs 058, 059) |
+| `7917c91` | 2026-08-29 | Check-in reminders Phase 4: missed-yesterday cron + Expo push |
+| `7ce5cd3` | 2026-09-02 | Bulk product-photo import script + photo-coverage filter |
+| `cd4f84b` | 2026-09-04 | Symptom-severity tracking + graduated return-to-play gate (mig 060) |
+| `56e9b5c` | 2026-09-17 | Switcher pending state + the app's first loading boundaries |
+| `697f06d` | 2026-09-18 | Super Admin: entry into the club workspace |
 
-The `Authorization`-only 401 is genuine Supabase behaviour — new-format
-(`sb_secret_…` / `sb_publishable_…`) keys must travel in `apikey`. Because
-PowerShell drops that header, every request degraded to the one combination
-that legitimately fails, and returned a plausible-looking 401.
+The first four are on local `main` and merely **unpushed**; the last two are
+on `dev` awaiting promotion. Note that **pushing `main` is hook-blocked** in
+this repo (see §8), which is why the gap opens quietly and stays open.
 
-**Verified working as of 2026-08-14:** project `pdzxkpahydbtajdjcwwg` is
-healthy. The service key returns 200/206 on table reads, the publishable key
-returns 200 on `/rest/v1/clubs` and `/auth/v1/settings`, and the Storage API
-lists all three buckets.
+### The asymmetry that will bite someone
 
-> **Tooling rule for this project: use `curl.exe` for any Supabase or HTTP API
-> check. Do not trust `Invoke-WebRequest` for authenticated requests.** It fails
-> in a way that looks exactly like a credential problem.
+**Migrations are applied to the shared database regardless of which branch
+ships.** There is exactly one Supabase project (§4), so migrations `058`,
+`059` and `060` are **live in the production database right now**, while the
+code that uses them is **not** in the production app.
 
-**Production is unaffected and always was.** `www.bridgetx.co` serves HTTP 200
-via Vercel; `thebridgehp.com` resolves to the same Vercel apex IP
-(`216.198.79.1`), `www` CNAMEd to `cname.vercel-dns.com`.
+That is not currently breaking anything — the migrations are additive — but
+it means **the database schema is ahead of the production code**, and a
+schema-versus-code comparison against `bridgetx.co` will look wrong when it
+is not. Do not "fix" it by reverting migrations.
 
 ---
 
-## 3. In progress
+## 2. What is built and live in production
 
-### 3a. Report PDF generator — IN PROGRESS (foundation built 2026-08-14)
+Everything in this section is in `origin/main` and therefore serving on
+`bridgetx.co`. Derived from commit history and the route tree; commit
+messages claim live end-to-end verification for most of it, **not
+independently re-checked here.**
 
-**Unblocked.** The ten templates were found in `%TEMP%` (never copied into the
-repo) and installed at `lib/reportPdf/templates/{athlete,practitioner}/`. The
-directory was also renamed `reportPDF` → `reportPdf` to match `reportPdf.ts`
-and avoid a case-sensitivity break on Vercel's Linux build.
-`docs/12-report-pdf-templates.md` **is still empty** — the templates and their
-CSS are being used as the spec, by agreement.
+### Roles, auth, onboarding
 
-**Built and typechecking clean:**
-- `lib/reportPdf/theme.ts` — every design token transcribed from the template
-  CSS, with px→pt conversion (`*0.75`) applied once at the boundary. Copying
-  the CSS px values directly would render the document ~33% oversized.
-- `lib/reportPdf/layout.ts` — the measure-then-place engine. Blocks report true
-  height via `heightOfString` before anything is drawn; atomic blocks never
-  split; `split()` lets tables break between rows; `keepWithNext` stops a
-  section title being stranded. Replaces the guessed constants (40/28/16pt) in
-  `lib/reportPdf.ts:184-186`.
-- `lib/reportPdf/charts.ts` — SVG→PNG via sharp at 3x for ~288dpi.
-  **Live-verified: 15/15 chart SVGs across all ten templates rasterised, 0
-  failures, ~8KB each.**
+- Full role hierarchy and invite-only onboarding; independent athlete
+  self-signup. Roles: super_admin, admin, club_manager, club_practitioner,
+  athlete, brand_partner, partnerships_consultant.
+- **Password reset via `token_hash` and `/auth/confirm`** — device-independent
+  (`ca01dcb`).
+- **Scanner-proof link flow** (`b0df452`): a human click verifies, GET only
+  renders. Both round-trips confirmed. This closed the email-scanner
+  link-burning problem.
+- Security: profiles privilege-escalation closed via trigger-enforced
+  immutability (mig 031).
 
-- `lib/reportPdf/primitives.ts` — drawing helpers. Note the split between
-  `applyFont` (measurement) and `applyStyle` (drawing): `fillColor` writes into
-  the current page's content stream, which is null before the first `addPage()`,
-  so measuring with a colour set throws.
-- `lib/reportPdf/blocks.ts` — the block vocabulary: `section-title`,
-  `status-row`, `interp`, `callout`, `precision-box`, `means-box`, `rx`,
-  `rec-item`, `citation-list`, `summarybar`, `weekstrip`, `missing-note`,
-  `adbanner`, `charts-row`, and a splittable `table` that repeats its header.
-- `lib/reportPdf/chrome.ts` — gradient header band, brandbar with club logo,
-  and deferred footer numbering (`bufferPages` + `finalise()`), because
-  "Page 2 of 2" cannot be known until the last block is placed.
+### Club and team workspaces
 
-> **The two dev harness routes under `app/api/dev/` were DELETED on 2026-08-15**,
-> once the real end-to-end pass under RLS had proved the structured path.
-> Every reference to `/api/dev/pdf-smoke` or `/api/dev/report-preview` below is
-> a record of how something was verified at the time, not a route that still
-> exists. Nothing in `lib/` or `app/` imports them.
->
-> They were worth keeping until the end: the placement traces and self-tests
-> they exposed caught four defects the type checker could not see. If this work
-> is picked up again, recreating an equivalent harness is cheaper than
-> debugging a layout by opening PDFs.
+- **Club Manager ⇄ practitioner navigation parity** (`d00a405`, `4be2184`,
+  2026-08-17): jump-to-team switcher, symmetrical shell, club sidebar trimmed
+  to genuinely club-scoped items.
+- **Club Manager write parity** (phases 1–4, 2026-08-17) — manager and
+  practitioner treated identically through one shared `isClubStaff()` gate.
+- **Super Admin write parity** (`1b45fdb`, `d7a3090`, `4a310a3`, mig 053,
+  2026-08-28): `canWriteClubData()` gates every club-data write and admits
+  super_admin. Super Admin entries are stamped `bridgetx_verified`, never
+  `club_verified`. **The Admin role is deliberately excluded** — owner ruling,
+  revisited separately.
+- Super Admin can invite/remove Club Managers on an existing club (`1b45fdb`).
 
-**Live-verified 2026-08-14** via a temporary dev-only route,
-`app/api/dev/pdf-smoke/route.ts` (since deleted — see the note above).
-`?trace=1` returned the placement of every block and asserted the invariants:
+### Athlete-facing
 
-```
-pages 2 · blocks 22 · overflows 0 · overlaps 0
-table:split   p1  top 725.7  h  87.9  bottom 813.6  limit 817
-table         p2  top 129.4  h 260.9  bottom 390.3  limit 817
-```
+- Athlete Profile with quick-add entry points and deep-link report generation.
+- Daily Check-In — 7-day date strip, backfill, 7-day edit window (mig 034),
+  compliance/nutrition scoring, supplement-protocol integration.
+- Training Load Plan — date strip, three-state markers, jump-to-date, colored
+  intensity; athlete-facing read-only view; duplicate prevention (migs 040,
+  041).
+- Athletes read their own club **name** (mig 050) and can list who they may
+  message (mig 051) — both via caller-scoped views.
 
-No block extends past the content bottom, none overlaps its predecessor, the
-22-row table split between rows across the page boundary, and the preceding
-`section-title` was not stranded. That is `page-break-inside: avoid` working
-without Chromium.
+### Clinical and assessment
 
-**Athlete compliance layout — DONE and proven against live data (2026-08-14).**
-`lib/reportPdf/layouts/athleteCompliance.ts`, plus `model.ts` (the typed
-measured/narrative split), `svgChart.ts` (charts generated from live points —
-the template SVGs hold specimen values and cannot be reused), and `logo.ts`.
+- Assessments across four body-composition methods (Tanita/InBody/Skinfold/
+  DEXA), server-side skinfold derivation, prompt hard-gating against
+  cross-method trend fabrication.
+- Injury log, compliance tracking, GPS/VALD performance.
+- Comments (official/private) with the Club Manager `reflect_in_ai` toggle.
+- Clinical research library; messenger; segments; branding.
 
-Rendered through `app/api/dev/report-preview?code=…&trace=1` against all three
-real athletes in the database:
+### Supplements
 
-```
-TES-0001  rows=14  rendered=57%      adherence=60%            36 KB  1p  ovf=0 olp=0
-TES-0002  rows=0   rendered=No data  adherence=Not recorded   14 KB  1p  ovf=0 olp=0
-CLB-9001  rows=1   rendered=100%     adherence=Not recorded   11 KB  1p  ovf=0 olp=0
-```
+- **Certified supplement catalogue** — 70 branded products, two-layer
+  (`f87cd6e`); product-level allergens enforced structurally (`6ef7557`).
+- **Supplement Library as a first-class Super Admin page** (2026-08-28 batch):
+  clinical-first layout with entities and nested products, safe editing via
+  vocabulary pickers rather than free text, search, authoritative
+  `typical_dosing` (mig 056), one category vocabulary (mig 054), product
+  images (mig 055), club product priorities (mig 057).
+- Supplement Protocol management with safety gates and overlap rejection;
+  week agenda as the page's primary view.
 
-Real club branding (accent `#00B3A6` from `club_branding`), the real uploaded
-logo embedded, real citations from `clinical_research_library`, and the ad
-banner correctly not rendered.
+### Reports
 
-**Two defects the live check caught:**
-1. **2.5 MB PDFs.** The club logo was over 99% of the file (2,535,563 bytes vs
-   10,831 for a club with no logo) — the hazard `lib/reportPdfDelivery.ts:74-91`
-   documents. Fixed by `lib/reportPdf/logo.ts`, sized to this layout's 24pt box
-   rather than sharing the old renderer's constant. Now 36 KB.
-2. **"0%" for an athlete with no check-ins.** `rateOfCalendar` computes an
-   arithmetically correct 0% from zero rows, which states a finding the record
-   does not support — precisely the fallback-to-default the spec forbids. Now
-   `headlineRate()` returns null and the card reads "No data". Exported so the
-   rendered value and the asserted value are the same expression.
+- **Structured PDF renderer wired into delivery** (`ecd7c5c`, `48c7450`,
+  `f0c82b2`) — measure-then-place layout engine, 17 block renderers, five
+  athlete layouts, markdown→Narrative parse. The original renderer is kept
+  beneath it as a fallback. The `report-pdf-generator` branch is **merged**;
+  the branch ref still exists but is no longer where the work lives.
+- `docs/12-report-pdf-templates.md` records the template rules.
+- Report generation with audience split, safety architecture, single-athlete
+  combining (up to 3 types), share flow, history search/filter/sort.
+- Nutrition report: day-type structure, prompt-to-parser contract, provenance
+  (mig 043); day-specific period cap raised 5 → 12 days on the real 800s Pro
+  ceiling.
+- **Report language: Spanish in the selectors, Arabic parked** (`2de4d50`).
+  The club-default migration is **deferred** pending owner review of Spanish
+  reports.
+- Citations verified structurally after generation rather than trusted from
+  the prompt (`1ded759`).
 
-**Body-composition, performance and injury layouts — DONE and proven
-(2026-08-14).** `athleteBodyComposition.ts`, `athletePerformance.ts`,
-`athleteInjury.ts`, plus `layouts/common.ts` for the shared tail
-(Interpretation → Recommendations → Monitoring → Sources → banner), so the five
-documents cannot drift in the parts meant to be identical.
+### Platform and design
 
-**All four types × all three real athletes = 12 renders, every one clean:**
+- **`DashboardShell` is platform-wide** (`87a9dd5`, 2026-08-21) — responsive
+  rail ≥lg, drawer below, adopted across athlete, staff, club, admin and
+  super-admin.
+- Full mobile pass: landing, athlete pages, dashboards, report forms.
+- Notifications: report outcomes + staff header bell, unread-until-opened,
+  mobile sheet with touch-close and scroll lock.
+- Dark theme across the signed-in app; accessibility pass (`role=status` on 41
+  fetch-failure notices).
+- Email templates rebuilt on Resend with inline CID logo; two Supabase
+  templates delivered as paste-ready files.
+- **Booking**: two-step Book-a-Meeting flow against the real Google Calendar,
+  OAuth consent-capture route, real Meet link, branded confirmation email,
+  visitor-timezone slots.
+- **Legal**: Privacy Policy and Terms of Service drafted and linked from
+  sign-in (`019a50d`, `dc8c6c1`). **First drafts, pending review.** Privacy §8
+  discloses data residency in Australia — see §4.
+- Supabase generated types on all four clients (`ec4392b`); Supabase CLI
+  adoption with a `db push` ledger (`d993d59`).
 
-```
-TES-0001  compliance        checkins=14              36 KB  10 blocks  ovf=0 olp=0
-TES-0001  body_composition  assessments=4 methods=1  30 KB  12 blocks  ovf=0 olp=0
-TES-0001  performance       gps=4 vald=4             33 KB  12 blocks  ovf=0 olp=0
-TES-0001  injury            injuries=4               15 KB  12 blocks  ovf=0 olp=0
-TES-0002  (all four, zero rows in every table)        9–14 KB          ovf=0 olp=0
-CLB-9001  (all four, one row each)                   11–12 KB          ovf=0 olp=0
-```
+---
 
-TES-0002 has no rows in any table and renders correctly as missing-notes rather
-than zeros — the empty-data path is genuinely covered, not assumed.
+## 3. Built but NOT yet in production
 
-**Two things worth knowing:**
+Full commit list in §1. What the six commits actually contain:
 
-1. **The ≠ cross-method branch is NOT exercised by live data.** Every athlete
-   in the database has `methods=1`, so no real report can reach it. It is
-   instead asserted directly via
-   `/api/dev/report-preview?selftest=1` — 7/7 checks on `latestDelta()`,
-   covering same-method, cross-method, single-scan and no-scan. Claiming it
-   "works" off the 12 renders would have been unsupported.
-2. **The prescribed-targets `darkpanel` cannot be populated.** Both
-   body-composition and injury carry a panel of daily energy / protein /
-   carbohydrate / energy-availability targets. Those are *prescribed* values
-   from the nutrition planner, not measurements — nothing in `assessments`,
-   `gps_logs` or `vald_data` holds them and no table stores a current macro
-   prescription. Both layouts render `prescribedTargetsMissing()` saying so
-   explicitly rather than estimating.
+### Check-in reminder notifications — Phases 1 and 4 (migs 058, 059)
 
-**CORRECTED 2026-08-15 — the injury layout was dropping the injury.** An earlier
-version of this file recorded, as a feature, that `InjuryRow` deliberately had
-no `description` field, reasoning from `injuries_athlete_view` (migrations
-006/018). **That was wrong.**
-`app/staff/[teamId]/reports/injuryPromptBuilder.ts:100-112` states the opposite
-rule explicitly:
+Athlete notification preferences and Expo push tokens, a `*/15 * * * *`
+`/api/cron/checkin-reminders` cron, and a missed-yesterday follow-up.
+**Android-only in v1.** Phase 2 needs a native build cycle. Migration 058 also
+fixed a volatility bug in the check-in window function.
 
-> "The free-text clinical description still enters the prompt for BOTH
-> audiences... An athlete-audience injury report is framed more plainly but is
-> not a thinner document — it must not quietly drop the clinical picture."
->
-> "Do not omit or generalise away a diagnosis, mechanism, or complication
-> because the athlete may read it — an injury report that leaves out the injury
-> is not safer, it is wrong."
+### Bulk product-photo import + photo-coverage filter
 
-Two different surfaces were conflated. The **athlete's dashboard** is restricted
-to status/rtp_phase through `injuries_athlete_view` — unchanged, and this layout
-does not touch it. The **injury report** is a clinical document carrying type and
-clinical description at either register; whether an athlete receives it stays the
-practitioner's decision at sharing time (`reports.shared_with`).
+A script plus a catalogue filter for finding products missing photos.
 
-`InjuryRow` now carries `type`, `description` and `carriedIn`, and an "Injury
-log" section renders each injury as its own atomic panel — matching the required
-structure at `injuryPromptBuilder.ts:116`. Re-verified: TES-0001 17 blocks
-(4 interp panels, one per injury) / TES-0002 5 blocks / CLB-9001 14 blocks, all
-0 overflows and 0 overlaps.
+### Symptom-severity tracking + graduated return-to-play gate (mig 060)
 
-**markdown→Narrative parse — DONE and proven (2026-08-14).**
-`lib/reportPdf/narrative.ts` maps generated markdown onto the Narrative slots,
-matching the section names `prompts/report-generation.md` asks for (Executive
-summary → means-box, Compliance-linked analysis and unrecognised sections →
-interps, Goals for next period / Monitoring → monitoring, Practitioner
-recommendations → rec-items).
+Migration **applied and verified live 2026-09-04**; the code is on `dev` and
+on local `main`, not in production.
 
-**The failure-mode contract holds: 12/12, nothing threw.**
-`/api/dev/report-preview?selftest=narrative` covers null, undefined, empty,
-whitespace-only, headings-with-no-content, unmatched headings, no headings at
-all, malformed tables, unterminated emphasis, deep headings, and the full
-sample. Every failure returns `EMPTY_NARRATIVE`; nothing raises.
+### Switcher pending state + first loading boundaries
 
-End-to-end across compliance and body-composition × two athletes × three
-narrative modes — 12 renders, 0 overflows, 0 overlaps:
+Picking a club used to leave no trace for the 2–3s the destination took to
+render, which read as "the click did nothing". Adds a pending state and the
+app's first loading boundaries.
 
-```
-none     compliance  TES-0001  means=F interps=0 recs=0  36152B  1p  10 blk
-sample   compliance  TES-0001  means=T interps=2 recs=3  48325B  2p  20 blk
-garbage  compliance  TES-0001  means=F interps=0 recs=0  36152B  1p  10 blk
-```
+### Super Admin entry into the club workspace (2026-09-18)
 
-`garbage` is byte-identical to `none` — a broken parse degrades to exactly the
-structural-only render, which is the requirement.
+Super Admin held write parity since 2026-08-28 but **nothing in the Super
+Admin area ever linked to `/club/*`** — clicking a club landed on
+`/super-admin/clubs/<id>`, the oversight summary, which has no athlete or team
+editing. The parity powers were reachable only by typing the URL.
 
-**One defect the garbage case caught.** The no-headings fallback promoted
-leftover punctuation (`|||`, `**`) into the athlete-facing "What this means"
-panel. Now guarded by `looksLikeProse()`, which counts LETTERS rather than
-characters, so markdown debris scores zero however long it is.
+Not a regression: `git log -S` finds no commit that ever added such a link.
+`app/admin/layout.tsx` had already fixed the identical gap for Admin — so
+Admin, which is *excluded* from write parity, could enter the workspace while
+Super Admin could not.
 
-**Nutrition layout — DONE and proven (2026-08-15).** All five athlete layouts
-now exist. `lib/reportPdf/layouts/athleteNutrition.ts`.
+Adds an "Open club workspace" link on the club detail page, and gives the
+sidebar switcher two modes: current-context on club-scoped tools
+(`/super-admin/clubs/<id>/products` ticks the club and preserves the page when
+switching), jump-to-workspace everywhere else.
 
-**Nutrition splits differently from the other four, deliberately.** Everywhere
-else the rule is that every figure comes from the database. Here roughly two
-thirds of the document is a PRESCRIPTION, not a measurement — daily energy and
-macro targets, meal timing by day type, food portion examples. No table stores
-any of it and none should: it is produced by the nutrition engine and confirmed
-by a practitioner. So this layout draws from three labelled sources:
+---
 
-- **MEASURED** — `training_load_plans` (periodisation strip),
-  `supplement_protocols` (confirmed stack), `assessments` + `checkins` (summary
-  bar). Same rule as the other four.
-- **PRESCRIBED** — meal-blocks and daily targets, read back out of the generated
-  markdown via `extractPrescribedTables()`. `proseOf()` still drops tables
-  everywhere else, for the opposite reason: a table in a compliance narrative
-  would restate measured data at figures the model chose.
-- **STANDING** — the anti-doping precision box, which is fixed text and renders
-  unconditionally.
+## 4. Database
 
-**Verified across three athletes × three narrative modes, 9 renders, plus a
-full five-type regression of 15 renders — 0 overflows, 0 overlaps throughout:**
-
-```
-none     TES-0001  days=11 prot=2 tables=0  20283B 1p 15 blk
-sample   TES-0001  days=11 prot=2 tables=3  35078B 2p 26 blk
-garbage  TES-0001  days=11 prot=2 tables=0  20283B 1p 15 blk
-```
-
-`garbage` is byte-identical to `none` here too. Invariants asserted
-mechanically rather than eyeballed: the anti-doping box is present in **all 9**
-renders including those where every data section is empty; meal-blocks appear
-only when a plan exists; the targets `darkpanel` appears only when targets
-exist. `training_load_plans.intensity` is `medium` where the template's tone
-class is `mod`, mapped in `dayTag()` so neither has to move for the other; a
-`session_type` of `match` outranks intensity.
-
-**Still to build:** wiring into `lib/reportPdfDelivery.ts`, deleting the two dev
-harness routes, and a real pass under RLS.
-
-### Unresolved before any wiring: which layout serves a practitioner report
-
-The five layouts built are ATHLETE-audience. `reportAudience.ts` defaults to
-`practitioner` (`FALLBACK_AUDIENCE`), and the practitioner squad templates are
-deferred (see `docs/09-roadmap.md`). So a practitioner-audience report has no
-layout in the new system. That question must be answered before
-`generateAndStoreReportPdf` is switched over — options are to route
-practitioner-audience reports to the athlete layouts at clinical register, or
-keep them on the existing generator until the squad work lands.
-
-**Narrative parsing is built** — see the markdown→Narrative section above. What
-remains is not the parser but the *plumbing*: the report actions still produce a
-single markdown string and nothing calls `parseNarrative()` on the real path
-yet. That happens as part of wiring into `lib/reportPdfDelivery.ts`.
-
-**Deferred:** the five practitioner squad layouts — written up as its own
-roadmap item in `docs/09-roadmap.md` ("Deferred feature, scheduled separately:
-squad-level practitioner reports").
-
-**The existing generator is untouched and remains the live path.**
-`git diff` against `lib/reportPdf.ts`, `lib/reportPdfDelivery.ts`,
-`lib/reportContent.ts` and `app/staff` is empty. `lib/reportPdf.ts` (file) and
-`lib/reportPdf/` (directory) coexist safely because Node resolves the file
-first, so every existing `@/lib/reportPdf` import still reaches the old
-renderer. Nothing is wired up until the new path is proven end to end.
-
-**Known architectural gap to close next.** `generateAndStoreReportPdf`
-(`lib/reportPdfDelivery.ts:63-72`) takes only `markdown`. The templates carry
-structured figures — `InBody 15.4% 11.0% +4.4`, training-day strips, compliance
-percentages — which must come from the database, not from generated prose
-(there is already a hard gate against cross-method fabrication). So the report
-actions need to assemble a typed report model alongside the narrative. That
-touches all five report actions plus `nutrition/generateReport.ts`.
-
-#### Original blocking analysis (retained for context)
-
-Requested: build the real PDF generator rendering five report types across two
-audiences (Compliance, Body Composition, Nutrition, Performance, Injury ×
-Practitioner/Athlete).
-
-**Blocked because the spec does not exist in this project.**
-`docs/12-report-pdf-templates.md` and the referenced templates folder are
-absent. Verified: not in `docs/` (which holds `01`–`11` + `CHEATSHEET.md`); no
-`templates/` directory anywhere; `git diff main origin/dev -- docs templates`
-empty; `git log --all --diff-filter=A` shows no such file ever added on any
-branch; `git status` clean; not in Desktop/Downloads/Documents/OneDrive. The
-only "template" file is `components/DownloadCsvTemplateButton.tsx` (CSV
-importer, unrelated).
-
-Related vocabulary ("Precision box", "page-break-inside", "cross-method")
-appears nowhere in the project. One item **does** exist: the `≠` cross-method
-marker is implemented at
-`app/club/[clubId]/body-composition/page.tsx:218`.
-
-**Correction to a premise:** there is no wkhtmltopdf-style pipeline. The only
-match for `wkhtmltopdf|puppeteer|playwright|chromium` in tracked files is
-`package-lock.json` metadata. The real pipeline is **pdfkit**:
-`lib/reportPdf.ts` (337-line branded renderer) + `lib/reportPdfDelivery.ts`.
-It is not "basic text output" — it has fixed header/footer bands, per-page logo
-embedding, brand-colour validation, and full table layout.
-
-**Architecture decision reached (not yet implemented): stay on pdfkit.**
-
-- wkhtmltopdf is a native binary — cannot run on Vercel's Node serverless
-  runtime.
-- The realistic HTML alternative (`puppeteer-core` + `@sparticuz/chromium`) is
-  50MB+ compressed against Hobby's 250MB unzipped limit, with 2–5s cold
-  starts. Latency is already a concern (see §6).
-- `next.config.ts` documents that *both* bundled pdfkit variants fail — font
-  metrics ENOENT one way, Buffer identity the other. That debugging is
-  already paid for.
-
-**The real work when unblocked:** pdfkit has no `page-break-inside: avoid`.
-`blockNeedsRoom()` at `lib/reportPdf.ts:184-186` *guesses* fixed heights (40pt
-heading, 28pt paragraph line, 16pt rule). That is exactly the mid-element cut
-risk the requirement targets, and it will not hold for compound blocks. Fix is
-**measure-then-place**: compute each block's true height before drawing. The
-table renderer already half does this via `heightOfString` at `:301-304`.
-
-**Two things that cannot be delivered today regardless of templates:**
-- **Arabic/RTL.** pdfkit's built-in Helvetica has no Arabic coverage and
-  pdfkit does no bidi shaping. `docs/08-integrations.md:58-62` requires RTL in
-  the generator. Needs an embedded Arabic face plus a shaping layer.
-- **Brand typography.** `lib/reportPdf.ts:41-45` records that General Sans and
-  Inter are not vendored — no `.ttf` in the repo.
-
-### 3b. Database separation (staging split) — PRIORITIZED 2026-08-15 (was: paused)
-
-**Status change, 2026-08-15, by the owner's direction: a real client is now
-live, so this split moves from paused to prioritized.** The shared database
-stopped being a tidiness problem and became a live-client problem:
-
-- Every dev-session and staging test writes into the same database the
-  client's staff use. The 2026-08-15 dev session alone generated test
-  reports (the TEST1 team's count moved 48 → 50), wrote supplement-protocol
-  test rows, and exercised report generation end-to-end — all of it landing
-  beside real client data. RLS keeps the client from *seeing* the test
-  fixtures; nothing keeps the test volume from *accumulating* around them.
-- **The audit below is now stale, and so is the recommendation built on it.**
-  The 2026-08-14 audit found "no pilot club exists yet" and concluded
-  production could be the clean project — "either the new one, or the current
-  one wiped and reseeded". With a real client live, **wipe-and-reseed of the
-  current project is off the table** unless a fresh audit proves their data
-  is elsewhere. Re-run the audit and re-decide the direction (most likely:
-  new project becomes STAGING after all, and the client's current database
-  is kept and cleaned deliberately, test fixtures removed with the
-  orphaned-PDF trap from `docs/08-integrations.md:13-28` in mind) before
-  creating anything.
-- The two traps below (storage buckets absent from migrations;
-  `NEXT_PUBLIC_*` inlined at build time) still hold and are the first things
-  the split will hit.
-
-Goal: a second Supabase project so staging (`thebridgehp.com`) stops sharing a
-database with production (`bridgetx.co`). Already the documented intent —
-`docs/08-integrations.md:8-11`.
-
-Investigated, nothing changed, no project created. State:
-
-- One Supabase project currently serves both domains.
-- Schema is **42 files**: `database/schema.sql` + `001`–`041` in
+- **Exactly one Supabase project**, region **`ap-southeast-2` "Oceania
+  (Sydney)"**, instance `t3.nano`. Confirmed. `thebridgehp.com` is **not** a
+  separate database — it is the same project behind a different domain.
+  **Privacy Policy §8 discloses Australia and must be changed if the region
+  ever does.**
+- **Schema is 61 files**: `database/schema.sql` + `001`–`060` in
   `database/migrations/`, numeric order, **no runner script**.
-- Branches `main` and `dev` exist, matching the documented split at
-  `docs/08-integrations.md:30-34`.
+- Generated types live at **`lib/supabase/database.types.ts`** (not
+  `database/`). **Regenerate after every migration.**
+- `supabase db push` works without the DB password.
 
-**Two traps found, neither documented elsewhere:**
+### The staging/production split — still not done
 
-1. **Storage buckets are not in the migrations.** Migrations `002`, `016`,
-   `019` write RLS policies referencing `profile-photos`, `club-branding`, and
-   `report-pdfs`, but nothing does `insert into storage.buckets`. Running all
-   42 files against a fresh project yields policies and **no buckets** — every
-   upload path fails silently. Create all three by hand first.
-2. **`NEXT_PUBLIC_*` are inlined at build time.** If the Supabase vars are
-   saved as "All Environments" in Vercel, Preview inherits Production's values.
-   The shared var must be deleted and recreated as two environment-scoped
-   copies, and the dev branch then needs a **rebuild without cache**, not a
-   plain redeploy. Preview-scoped vars also apply to *every* branch preview,
-   not just `dev`.
+This was §3b of the previous snapshot and the reasoning has since moved into
+`docs/09-roadmap.md` under **"Infrastructure, scheduled together: compute
+upgrade + the staging/production split"**. Read it there; it is current.
 
-**Unresolved decision — which project becomes which.** The instruction was:
-new project = staging, production keeps the current database. The concern is
-that production then carries every test fixture into the client's live
-environment, and cleaning in place is messy (`docs/08-integrations.md:13-28`
-records that deleting `reports` rows orphans PDFs in the bucket; migration
-`019` grants storage DELETE to super admins only).
+What has not changed: **dev sessions and staging tests still write into the
+same database the live client's staff use.** Hence the working rule in §8.
 
-An earlier recommendation was to keep the original direction, on the grounds
-that Supabase cannot migrate `auth.users` password hashes between projects, so
-a fresh production database would mean re-inviting every account.
+**The 2026-08-14 data audit in the previous snapshot has been deleted rather
+than carried forward.** It concluded "production contains only test data" and
+recommended wiping and reseeding. A real client went live 2026-08-15, which
+invalidated both the audit and its recommendation. Reproducing a stale table
+of row counts next to a live client is worse than having none —
+**re-run the audit before acting on anything in this area.**
 
-**That reasoning no longer holds — the audit has now been run (2026-08-14) and
-it flips the recommendation.**
+### Two traps for any fresh project
 
-### Audit results — production contains only test data
-### (STALE as of 2026-08-15 — a real client is now live; re-run before acting)
+1. **Storage buckets are not in the migrations.** Migs `002`, `016`, `019`
+   write RLS policies referencing `profile-photos`, `club-branding` and
+   `report-pdfs`, but nothing does `insert into storage.buckets`. A fresh
+   project gets policies and **no buckets** — every upload fails silently.
+   All three are confirmed present on the current project.
+2. **`NEXT_PUBLIC_*` are inlined at build time.** A Supabase var saved as "All
+   Environments" means Preview inherits Production's values. It must be
+   deleted and recreated as two environment-scoped copies, and `dev` then
+   needs a **rebuild without cache**, not a plain redeploy.
 
-| Table | Count | | Table | Count |
-|---|---|---|---|---|
-| profiles | 10 | | reports | 56 (48 with PDFs) |
-| clubs | 2 | | checkins | 15 |
-| teams | 3 | | training_load_plans | 15 |
-| athletes | **3** | | injuries | 5 |
-| club_staff | 4 | | notifications | 7 |
-| club_branding | 1 | | audit_log | **0** |
-| subscriptions | **0** | | comments | 0 |
+### Security posture
 
-**Nothing in there is a real client:**
-
-- **Clubs are `test1` and `Rival Academy (Club B)`** — both scaffolding. No
-  pilot club exists yet.
-- **Athletes are `TES-0001`, `TES-0002`, `CLB-9001`** — all test codes.
-- **Profiles are a one-or-two-per-role test matrix**: 1 super_admin, 1 admin,
-  2 club_manager, 2 club_practitioner, 2 athlete, 1 brand_partner,
-  1 partnerships_consultant.
-- **All 56 reports** were generated against those test athletes.
-
-**So there are zero real accounts to re-invite**, and the only argument for
-keeping the current database as production disappears.
-
-**Revised recommendation: production should be the clean project** (either the
-new one, or the current one wiped and reseeded). Item 4 of the pre-launch
-checklist then costs nothing instead of being a risky in-place delete against
-a live client database.
-
-**Real reference data that would need recreating** — the only thing of value
-in there: `clinical_research_library` 43, `supplement_library` 10,
-`elite_benchmarks` 6, `products` 2, `club_brand_products` 1, and one
-`club_branding` row carrying a genuine uploaded logo
-(`…/logo-1786090262617.png`). The first two have import scripts
-(`import-clinical-library.mjs`, `import-supplement-library.mjs`); branding and
-benchmarks are hand-entered and would need redoing.
-
-**Storage buckets confirmed present** on the current project: `report-pdfs`
-(private, 10MB, `application/pdf`), `profile-photos` (private, 5MB), and
-`club-branding` (private, 5MB, incl. SVG). They are still **not created by any
-migration** — trap 1 above stands for any fresh project.
-
-### Two observations worth confirming
-
-- **`audit_log` is empty (0 rows)** despite `database/tables-overview.md`
-  describing it as powering the per-athlete/per-practitioner Activity/History
-  feed. After this much development, zero rows suggests nothing writes to it.
-  Not investigated.
-- **`subscriptions` is empty** while both clubs show
-  `subscription_status: active`. Possibly by design — the `clubs` table carries
-  its own subscription dates and `docs/09-roadmap.md` treats the separate
-  `plans`/subscription tables as foundation-only. Worth a glance.
+- Mig **052** put `security_barrier` on all four SECURITY DEFINER views. The
+  demonstrated pushdown leak is **closed**; all four views verified correctly
+  scoped live. Supabase lint 0010 still fires **by design** — it flags the
+  pattern, not a fault.
+- Migs 049/050/051 replaced broad reads with caller-scoped views.
 
 ---
 
-## 4. Pre-launch checklist — actual state
-
-| # | Item | State |
-|---|---|---|
-| 1 | Database separation | Investigated, plan drafted, **paused**. Nothing created or changed. |
-| 2 | Production env vars in Vercel | **Done + guarded (2026-08-16)**, the hard way: `ANTHROPIC_API_KEY` was missing from Vercel and broke every AI feature on the live pilot until added. Now enforced — see "Required environment variables" below. |
-| 3 | Compliance-alert cron genuinely firing | **Code reviewed only.** Never confirmed against real execution logs. |
-| 4 | Test-data cleanup in production | **Not started**, but the audit is done — see §3b. Production currently holds *only* test data: 2 test clubs, 3 test athletes, 56 test reports. |
-| 5 | Full production smoke test | **Not started.** |
-
-### Required environment variables (authoritative checklist, added 2026-08-16)
+## 5. Environment variables
 
 **The machine truth is `lib/envManifest.ts`** — this table mirrors it for
 humans. Every variable must be set in Vercel for **Production AND Preview**
 (and in `.env.local` for local work). Two guards enforce the list, born of a
-real incident (2026-08-16: `ANTHROPIC_API_KEY` was never configured in
-Vercel; the app deployed fine and all seven AI call sites failed one
-practitioner at a time):
+real incident (2026-08-16: `ANTHROPIC_API_KEY` was never configured in Vercel;
+the app deployed fine and all seven AI call sites failed one practitioner at a
+time):
 
-- **Build gate** — `next.config.ts` refuses to build when a required
-  variable is missing or malformed, so a misconfigured deploy fails red in
-  Vercel instead of going live half-broken.
+- **Build gate** — `next.config.ts` refuses to build when a required variable
+  is missing or malformed, so a misconfigured deploy fails red in Vercel
+  instead of going live half-broken.
 - **Runtime check** — `GET /api/health` reports, for the deployment actually
   serving, which variables are missing/malformed (names only, never values).
   200 when healthy, 503 when not.
@@ -521,172 +292,173 @@ practitioner at a time):
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | public booking, clinical library, compliance alert fan-out, admin client |
 | `ANTHROPIC_API_KEY` | yes | ALL AI: Nutrition Planner + every report generator |
 | `RESEND_API_KEY` | yes | every outbound email |
-| `CRON_SECRET` | yes | daily compliance cron silently never runs |
+| `CRON_SECRET` | yes | both crons silently never run |
 | `RESEND_FROM_EMAIL` | fallback exists | From address falls back to a hardcoded default that may not match the verified sending domain |
 | `AUTH_CONTEXT_SECRET` | fallback exists | per-request auth optimisation off; full `getUser()` round trip every request |
 | `NEXT_PUBLIC_SITE_URL` | fallback exists | email links fall back to the request's own host |
 
 **When adding a new variable:** add it to `lib/envManifest.ts` in the same
-change that introduces it, and add it to Vercel before merging. The build
-gate then makes it impossible to deploy an environment that lacks it.
-
-**On item 3, what is known:** the cron is declared in `vercel.json:2-7` —
-`/api/cron/compliance-check`, schedule `0 6 * * *`. The route
-(`app/api/cron/compliance-check/route.ts`) is well built: fails closed if
-`CRON_SECRET` is unset, constant-time comparison, accepts `Authorization:
-Bearer` or `x-cron-secret`. **But whether it is actually firing in production
-was never verified** — that needs Vercel execution logs. Also note **Vercel
-cron only runs against Production deployments**, so staging will never
-exercise it.
+change that introduces it, and add it to Vercel before merging. The build gate
+then makes it impossible to deploy an environment that lacks it.
 
 ---
 
-## 5. Completed today (uncommitted as of this snapshot)
+## 6. Cron jobs
 
-**Removed "AI" framing from Nutrition Planner UI text.** Rationale: the
-practitioner confirms everything, so the platform should not market itself as
-AI-powered.
+`vercel.json` declares **two**:
 
-- `app/staff/[teamId]/reports/nutrition/SelectionStep.tsx` — submit button
-  went from `Generate plan · 2 AI calls covering 7 days each` to
-  `Generate plans · 2 athletes, 7 days each`; singular/plural and the "each"
-  suffix handled. Helper text: "One AI call is made per selected athlete" →
-  "One plan is built per selected athlete."
-- `app/staff/[teamId]/reports/nutrition/ReviewStep.tsx` — "2 AI calls — one
-  per athlete…" → "2 plans prepared — one per athlete…". This is *more*
-  accurate: `modelCalls` is `rows.filter((r) => r.error === null).length`
-  (`nutrition/actions.ts:472`), i.e. successful rows only.
-- `docs/03-site-map.md:109` — same phrase, updated to match.
+| Path | Schedule | State |
+|---|---|---|
+| `/api/cron/compliance-check` | `0 6 * * *` | **Never verified firing in production.** |
+| `/api/cron/checkin-reminders` | `*/15 * * * *` | **Not in production** — ships with the check-in reminder commits (§3). |
 
-**Verification done:** `npx tsc --noEmit` clean; dev server compiled and
-served (`/` and `/login` both 200); all label permutations confirmed by
-running the exact expression from the file.
-
-**Verification NOT done:** the planner was never rendered in a browser.
-`/staff/[teamId]/reports/nutrition` 307s to login when unauthenticated. This
-was originally attributed to the §2 "blocker"; that blocker was not real, so
-**nothing now prevents signing in and confirming the button visually** — it
-simply has not been done yet.
-
-### Remaining "AI" in user-facing text — audited, NOT yet changed
-
-Code comments mentioning AI were left alone throughout; only rendered strings
-are listed.
-
-1. **Comments feature — 9 strings.** `CommentsClient.tsx:148,183,223,225,226`
-   and `EntryDetailModals.tsx:571,573,574,587`. "Reflect in AI reports",
-   "Turn off AI reflection", "AI reflection turned off by Club Manager", "Not
-   marked for AI reflection", "never reaches an AI report". Most visible
-   cluster. Suggested: "Include in reports" / "Turn off inclusion" /
-   "Inclusion turned off by Club Manager" / "Not marked for inclusion". The DB
-   column `reflect_in_ai` can stay — no migration needed.
-   **Constraint:** `EntryDetailModals.tsx:567` carries a comment requiring
-   both surfaces to describe this status identically. All nine must change
-   together.
-2. **Error messages — 15 occurrences.** `reports/actions.ts` (10),
-   `nutrition/actions.ts` (3), `nutrition/generateReport.ts` (2). "The AI
-   declined…", "The AI returned an empty response.", "…wasn't valid structured
-   data." Worth doing, but the three variants encode genuinely different
-   failures — do not collapse them into one message.
-3. **Super Admin explanatory copy — 3 strings.** `BrandingForm.tsx:235`,
-   `clinical-research/LibraryClient.tsx:89`,
-   `clinical-research/page.tsx:37`. **Recommendation: leave these.**
-   Super-Admin-only screens, internal audience, and "the AI" is clearer than a
-   euphemism. No club or athlete sees them.
+The compliance route is well built — fails closed if `CRON_SECRET` is unset,
+constant-time comparison, accepts `Authorization: Bearer` or `x-cron-secret`.
+Whether it actually fires needs **Vercel execution logs**, which have never
+been checked. Note **Vercel cron only runs against Production deployments**,
+so staging will never exercise either one.
 
 ---
 
-## 6. Known open issues
+## 7. Pre-launch checklist — actual state
 
-**Documented in `docs/09-roadmap.md` — read there for full detail:**
+| # | Item | State |
+|---|---|---|
+| 1 | Database separation | **Not done.** Moved into `docs/09-roadmap.md` and bundled with the compute upgrade. See §4. |
+| 2 | Production env vars in Vercel | **Done + guarded (2026-08-16).** See §5. |
+| 3 | Compliance cron genuinely firing | **Still code-reviewed only.** Never confirmed against execution logs. Unchanged since 2026-08-16. |
+| 4 | Test-data cleanup in production | **Not started**, and the audit it depended on is stale. See §4. |
+| 5 | Full production smoke test | **Not started.** |
 
-- **"Today" is computed in UTC** (raised 2026-08-13). App-wide convention,
-  not a per-page bug. Pilot market is UAE at UTC+4, so **20:00–midnight local
-  the whole app is a day behind**. Client and server currently agree, so a
-  partial fix is worse than none. Must be fixed as one shared `todayFor(club)`
-  helper adopted everywhere at once. **Scheduled as its own task — never fix
-  piecemeal.**
-- **Multi-athlete training-load save can write partially** (raised
-  2026-08-14). `saveTrainingLoad` loops one row per athlete with no
-  transaction. Error messaging is already honest about how many saved.
-  Leaning Option B (pre-flight conflict check). Only fires when an athlete is
-  on two teams — none currently is.
+**Items 3, 4 and 5 have not moved in a month.** None of them is blocked by
+anything technical.
 
-**Documented in `docs/08-integrations.md:13-28`:**
+---
+
+## 8. Working practices and traps that have cost real time
+
+These are not preferences — each one came from a concrete failure.
+
+- **Never write to the database without per-session go-ahead.** It is a shared
+  production database until the split (§4). Reads are free. Any test rows must
+  use clearly marked test ids.
+- **Use `curl.exe`, never PowerShell `Invoke-WebRequest`.** PS 5.1 silently
+  drops the custom `apikey` header, degrading every Supabase request to the one
+  combination that legitimately 401s. This produced a confident and completely
+  wrong "the credentials are dead" diagnosis. New-format
+  (`sb_secret_…`/`sb_publishable_…`) keys must travel in `apikey`.
+  - Related, found 2026-09-18: local `curl.exe` can also fail with
+    `CRYPT_E_REVOCATION_OFFLINE` against these domains. `--ssl-no-revoke`
+    clears it. That is a local TLS revocation-check failure, **not** a site
+    outage.
+- **Commit multi-line messages with `git commit -F <file>`.** PowerShell
+  here-strings break `-m` into pathspecs.
+- **Check for a running dev server before building.** `next build` rewrites
+  `.next` underneath a live `next start` and broke all styling on :3000 once.
+- **Pushing `main` is hook-blocked.** This is why production drifts behind
+  (§1). Promotions need a deliberate step.
+- **Vercel CLI is not installed or authenticated.** Deploys go through the Git
+  integration only. `vercel env pull`, `vercel logs` etc. are unavailable.
+- **`thebridgehp.com` sits behind SSO** — a `200` from it can be a *login
+  page*, not the app.
+- **Blocked skinfold equations.** Three equations remain blocked in the DB
+  pending primary-source PDFs. **Coefficients must never be filled from
+  recall.**
+
+---
+
+## 9. Known open issues
+
+**Documented in `docs/09-roadmap.md` — that file is current (last edited
+2026-08-29) and is the place to read the full reasoning:**
+
+- **"Today" is computed in UTC** (raised 2026-08-13). App-wide convention, not
+  a per-page bug. **The bad window is 00:00–04:00 local, not the evening.**
+  > The previous snapshot said "20:00–midnight local". That was a sign error,
+  > corrected in the roadmap on 2026-08-29 and corrected here. For a zone at
+  > UTC+X the local date runs *ahead* of UTC, so they disagree only from
+  > 00:00 to X:00 — at UTC+4, midnight to 04:00.
+
+  Client and server currently agree, so a partial fix is worse than none. Must
+  become one shared `todayFor(club)` helper adopted everywhere at once.
+  **Scheduled as its own task — never fix piecemeal.**
+- **Multi-athlete training-load save can write partially.** No transaction
+  around the per-athlete loop. Only fires when an athlete is on two teams —
+  none currently is.
+- **Long day-specific Nutrition reports vs the 300s timeout.**
+- **Squad-level practitioner reports** — deferred feature, scheduled
+  separately.
+- **Daily target panels have no source** — the spec says where it is.
+- **Persist the report markdown** — deferred, with the real answer recorded.
+
+**Documented in `docs/08-integrations.md`:**
 
 - **Orphaned report PDFs on report deletion.** Latent, not active: there is no
-  report-delete path in the app at all (verified 2026-08-13). Four orphans
-  were swept 2026-08-13. Close it *when* a delete path is built. Trap:
-  migration 019 grants storage DELETE to super admins only, so a
-  practitioner-facing delete would remove the row and silently leave the file.
+  report-delete path in the app at all. Trap: mig 019 grants storage DELETE to
+  super admins only, so a practitioner-facing delete would remove the row and
+  silently leave the file.
 
-**Raised today, not yet documented elsewhere:**
+**Tracked, not yet scheduled:**
 
-- **Rx block on report PDFs has no data source (tracked 2026-08-16, its own
-  task — deliberately NOT folded into the report-design Phase 2).** The
-  layout (`rxStrip`, ordering fixed per the approved design) exists but never
-  renders: delivery wires `prescriber: null` because `profiles` carries only
-  `title`/`specialty` — no credentials, no board-registration number, and
-  nothing models an Rx code or issue/review dates (docs/12 requires all of
-  them). Needs: a migration adding `credentials` + `registration_no` to
-  profiles (shared prod DB — owner go-ahead required), a My Profile edit
-  surface, delivery wiring, and a decision on Rx-code/issue-date semantics.
-  Until then the strip stays dark rather than rendering a name-only block.
+- **Rx block on report PDFs has no data source.** The `rxStrip` layout exists
+  but never renders — delivery wires `prescriber: null` because `profiles`
+  carries only `title`/`specialty`: no credentials, no board-registration
+  number, nothing modelling an Rx code or issue/review dates. Needs a
+  migration (shared prod DB — owner go-ahead required), a My Profile edit
+  surface, delivery wiring, and a semantics decision. The strip stays dark
+  rather than rendering a name-only block.
+- **Perceived 1–1.5s click latency** on both domains. Suspected Vercel Hobby
+  cold starts; **never investigated**. Now partly addressed in perception by
+  the loading boundaries in `56e9b5c`, which is not the same as fixing it.
+- **Email deliverability.** The scanner-proof link flow is closed. Stella /
+  quarantine status is **unknown** and was never confirmed.
+- **`audit_log` was empty** at the last check (2026-08-14) despite
+  `database/tables-overview.md` describing it as powering the Activity/History
+  feed. Never investigated. **Re-check before drawing conclusions** — a month
+  of activity has passed.
+- **Browser verification is currently unavailable.** On 2026-09-18 the Chrome
+  tooling returned `Frame with ID 0 is showing error page` for both
+  `bridgetx.co` and `www.bridgetx.co`, while loading other sites fine. `curl`
+  confirmed both healthy (200), so the site was up and the tooling was not.
+  Likely the extension lacking site permission for the domain. **Until this is
+  resolved, no session can visually confirm its own UI work.**
 
-- **Perceived 1–1.5s click latency** on both domains. Suspected Vercel
-  Hobby cold starts given low traffic, but **never investigated** — the
-  investigation was requested and then superseded. No Speed Insights or
-  Analytics status was ever confirmed. Relevant to §3a: it is the main reason
-  not to put Chromium on the report path.
-- **Blocked skinfold equations.** Three equations remain blocked in the DB
-  pending primary-source PDFs. Coefficients must never be filled from recall.
+### Explicitly deferred — do not build
 
----
+`CLAUDE.md` makes this binding: do not build anything on this list unless
+explicitly asked. Authoritative copy is `docs/09-roadmap.md:22-35`.
 
-## 7. What is built (derived from history, not re-verified here)
+- Independent Athlete subscription/payment
+- Live payment gateway for product requests (`bridge_checkout` /
+  `redirect_affiliate` modes) — schema field exists, not activated
+- Per-supplement-category prescription brand granularity (currently one brand
+  per club/segment)
+- Full clinical injury note visibility to athletes (currently status-only)
+- Automated report confirmation (currently a manual gate)
+- City/sport-specific independent athlete segments beyond "Default"
+- Legal/compliance review of "no individual guardian consent for club-athlete
+  minors" — required before scaling past pilot; a policy decision, not code
 
-Per `docs/09-roadmap.md` §"In scope now" and the commit history through
-`e5456fb` (2026-08-14). Commit messages claim live end-to-end verification for
-most of these; **that was not independently re-checked in this session.**
+Also parked: the **report club-default language migration**, pending owner
+review of Spanish reports (§2), and **Arabic** report language.
 
-- Full role hierarchy and invite-only onboarding; independent athlete
-  self-signup.
-- Athlete Profile with quick-add entry points and smart deep-link report
-  generation.
-- Daily Check-In — 7-day date strip, backfill, 7-day edit window (migration
-  034), compliance/nutrition scoring, supplement-protocol integration.
-- Training Load Plan — date strip, three-state markers, jump-to-date, colored
-  intensity; athlete-facing read-only view; duplicate prevention via
-  migrations 040 and 041.
-- Assessments across four body-composition methods (Tanita/InBody/Skinfold/
-  DEXA) with server-side skinfold derivation and prompt hard-gating against
-  cross-method trend fabrication.
-- Nutrition Planner — bulk day-by-day supplement planning, review grid,
-  split confirm (protocol write + per-athlete report generation).
-- Supplement Protocol management page with safety gates and overlap rejection.
-- Report generation with audience split, safety architecture, single-athlete
-  combining (up to 3 types), share flow, history search/filter/sort.
-- Compliance, GPS/VALD tracking, injury log, comments (official/private),
-  messenger, clinical research library, branding, segments.
-- PDF export via pdfkit (see §3a for its limits).
-- Dark theme across the signed-in app; accessibility pass (`role=status` on 41
-  fetch-failure notices).
-- Security: profiles privilege-escalation closed via trigger-enforced
-  immutability (migration 031).
+### Not in this repo
 
-**Deferred — do not build** (see `docs/09-roadmap.md:22-35`): independent
-athlete payments, live payment gateway, per-category brand granularity, full
-clinical injury notes to athletes, automated report confirmation, segments
-beyond "Default".
+The **Expo athlete mobile app** lives in a sibling repo, `bridgetx-mobile`.
+The 2026-08-21 scope hold was lifted 2026-08-29 and most sections are built.
+**There is no OTA channel — every change is a new APK.**
 
 ---
 
-## 8. Suggested order for the next session
+## 10. Suggested order for the next session
 
-1. Decide the database-split direction — the audit is done and points to
-   making production the clean project (§3b).
-2. Get the PDF templates, or agree to draft the spec as its own task (§3a).
-3. Resume pre-launch items 2–5 (§4) — none of them are blocked.
-4. Visually confirm the Nutrition Planner button, then decide on the remaining
-   "AI" text groups 1 and 2 (§5).
-5. Check the two anomalies in §3b: empty `audit_log`, empty `subscriptions`.
+1. **Decide whether to promote `dev` to production** (§1). Six commits, four
+   of them a month old, including a migration whose schema is already live.
+   This is the single highest-value action and needs an owner decision, not a
+   technical one.
+2. **Fix the browser tooling** (§9) — everything else is easier to verify once
+   a session can actually see the app.
+3. **Close pre-launch items 3, 4 and 5** (§7) — none is blocked, and none has
+   moved in a month. Item 3 needs only a look at Vercel execution logs.
+4. **Re-run the production data audit** before any cleanup decision (§4).
+5. Re-check `audit_log` (§9) now that a month of real activity has accrued.
