@@ -17,7 +17,9 @@ listed here as deferred, do not build it unless explicitly instructed.
 - Injury log (status-level detail to athlete)
 - Segments for independent athlete brand targeting (single "Default"
   segment to start)
-- Brand Partner and Partnerships Consultant dashboards
+- Brand Partner and Partnerships Consultant dashboards (Partnerships
+  Consultant now includes Super Admin management, not just the
+  consultant's own read-only view — see the dated entry below)
 
 ## Explicitly deferred (v3+)
 
@@ -33,6 +35,35 @@ listed here as deferred, do not build it unless explicitly instructed.
 - Legal/compliance review of "no individual guardian consent for
   club-athlete minors" — required before scaling past pilot, not a code
   change but a policy decision to revisit
+
+## Built: Partnerships Consultant, Super Admin side (2026-09-23)
+
+Requested as a fresh "Consultant/Partner" feature; investigation found the
+consultant-facing half already built and RLS-verified live (migrations
+024/025, `app/partner-consultant/[id]`) — only the Super Admin management
+side was actually missing (`/admin/partnerships` was a `ComingSoon` stub).
+
+**Built:** `/super-admin/partnerships` — list consultants with owed/paid
+totals, invite a new consultant (same profile+invite pattern as
+`createClub`), assign a club with stage/deal-value/commission-%, record
+payments against a commission (migration 061: `amount_paid`, `last_paid_at`,
+`notes` on `partnerships_consultant_clubs`). Super-Admin-only — moved off
+the shared `/admin` nav entirely (same treatment as Clinical + Research and
+Branding), since commission/payment terms are financial data. The
+consultant's own dashboard now also shows what they've been paid, still
+scoped to their own rows only.
+
+**Confirmed with the owner before building, not guessed:** one-time
+commission only (no recurring-%-of-subscription — there's no live billing
+feed to calculate that against yet, Stripe is not active); the existing
+four-stage pipeline (contacted/pilot/signed/churned) kept as-is; paid-vs-owed
+tracked, not just displayed; Admin gets no access at all, not even
+view-only.
+
+**Not built, deliberately out of scope:** Brand Partners' own admin page
+(`/admin/brand-partners`) is a separate, simpler concept — one brand,
+aggregate data, no commission — and stays a stub until asked for
+separately.
 
 ## Known issue, scheduled separately: "today" is computed in UTC
 

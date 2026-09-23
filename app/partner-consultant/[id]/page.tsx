@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 import { BADGE, CARD, NOTICE, NOTICE_EMPTY } from "@/lib/ui";
+import { PARTNERSHIP_STAGES, PARTNERSHIP_STAGE_STYLE } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Referral Pipeline — Bridgetx" };
 
@@ -19,20 +20,13 @@ export const metadata: Metadata = { title: "Referral Pipeline — Bridgetx" };
 // consultant's own rows in partnerships_consultant_clubs). Verified live: as a
 // consultant, athletes / reports / checkins / product_requests all return 0
 // rows.
-
-const STAGE_LABEL: Record<string, string> = {
-  contacted: "Contacted",
-  pilot: "Pilot",
-  signed: "Signed",
-  churned: "Churned",
-};
-const STAGE_COLOR: Record<string, string> = {
-  contacted: "var(--text-muted)",
-  pilot: "var(--brand-sky)",
-  signed: "var(--success)",
-  churned: "var(--danger)",
-};
-const STAGES = ["contacted", "pilot", "signed", "churned"];
+//
+// amount_paid/last_paid_at (migration 061) are deliberately selected and
+// shown here: they live on the consultant's OWN row, so "what have I already
+// been paid" stays inside "own referral pipeline only". `notes` is NOT
+// selected — that column is Super Admin's own working note
+// (database/rls-policies.md, "Added: payment-tracking columns…") and this
+// page simply doesn't ask for it, even though RLS would allow it.
 
 export default async function PartnerConsultantPage({
   params,
@@ -67,7 +61,7 @@ export default async function PartnerConsultantPage({
   const [pipelineRes, clubRes] = await Promise.all([
     supabase
       .from("partnerships_consultant_clubs")
-      .select("id, club_id, stage, deal_value, commission_percent, created_at")
+      .select("id, club_id, stage, deal_value, commission_percent, amount_paid, created_at")
       .eq("consultant_id", id)
       .order("created_at", { ascending: false }),
     supabase.from("consultant_referred_clubs").select("id, name"),
@@ -75,7 +69,7 @@ export default async function PartnerConsultantPage({
 
   type Row = {
     id: string; club_id: string; stage: string | null;
-    deal_value: number | null; commission_percent: number | null; created_at: string;
+    deal_value: number | null; commission_percent: number | null; amount_paid: number; created_at: string;
   };
   const pipeline = (pipelineRes.data ?? []) as Row[];
   const clubNameById = new Map(
@@ -102,12 +96,12 @@ export default async function PartnerConsultantPage({
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {STAGES.map((s) => (
+          {PARTNERSHIP_STAGES.map((s) => (
             <div key={s} className={`${CARD} p-4`}
               style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{STAGE_LABEL[s]}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{PARTNERSHIP_STAGE_STYLE[s].label}</p>
               <p className="mt-1 text-xl font-semibold"
-                style={{ fontFamily: "var(--font-heading)", color: STAGE_COLOR[s], fontVariantNumeric: "tabular-nums" }}>
+                style={{ fontFamily: "var(--font-heading)", color: PARTNERSHIP_STAGE_STYLE[s].color, fontVariantNumeric: "tabular-nums" }}>
                 {pipeline.filter((r) => r.stage === s).length}
               </p>
             </div>
@@ -141,12 +135,18 @@ export default async function PartnerConsultantPage({
                     <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Stage</th>
                     <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Deal value</th>
                     <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Commission</th>
+                    <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Owed / Paid</th>
                     <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Referred</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pipeline.map((r, i) => {
-                    const color = STAGE_COLOR[r.stage ?? ""] ?? "var(--text-muted)";
+                    const style = PARTNERSHIP_STAGE_STYLE[r.stage ?? ""] ?? { label: "—", color: "var(--text-muted)" };
+                    const commission =
+                      r.deal_value !== null && r.commission_percent !== null
+                        ? (Number(r.deal_value) * Number(r.commission_percent)) / 100
+                        : null;
+                    const owed = commission !== null ? Math.max(commission - Number(r.amount_paid), 0) : null;
                     return (
                       <tr key={r.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
                         <td className="px-5 py-3 font-medium" style={{ color: "var(--text)" }}>
@@ -154,8 +154,8 @@ export default async function PartnerConsultantPage({
                         </td>
                         <td className="px-5 py-3">
                           <span className={BADGE}
-                            style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
-                            {STAGE_LABEL[r.stage ?? ""] ?? "—"}
+                            style={{ backgroundColor: `color-mix(in srgb, ${style.color} 12%, transparent)`, color: style.color }}>
+                            {style.label}
                           </span>
                         </td>
                         <td className="px-5 py-3" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
@@ -163,6 +163,20 @@ export default async function PartnerConsultantPage({
                         </td>
                         <td className="px-5 py-3" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                           {r.commission_percent === null ? "—" : `${Number(r.commission_percent)}%`}
+                        </td>
+                        <td className="px-5 py-3" style={{ fontVariantNumeric: "tabular-nums" }}>
+                          {owed === null ? (
+                            <span style={{ color: "var(--text-muted)" }}>—</span>
+                          ) : (
+                            <>
+                              <span style={{ color: owed > 0 ? "var(--warning)" : "var(--success)" }}>
+                                AED {owed.toFixed(0)} owed
+                              </span>
+                              {Number(r.amount_paid) > 0 && (
+                                <span style={{ color: "var(--text-muted)" }}> · AED {Number(r.amount_paid).toFixed(0)} paid</span>
+                              )}
+                            </>
+                          )}
                         </td>
                         <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
                           {String(r.created_at).slice(0, 10)}

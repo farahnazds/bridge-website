@@ -56,14 +56,21 @@ career, not their login. The two are cross-linked, not merged.
   Arabic format, Additional-Instructions guardrails)
 - Segments (Guided/Independent athlete groupings for brand/AI targeting)
 - Staff & Permissions — ceiling-level matrix, admin↔club assignments
-- Partnerships Consultants, Brand Partners — add, assign, view as
+- **Partnerships** — `/super-admin/partnerships` (Super Admin only, built
+  2026-09-23 — see `09-roadmap.md`): invite a consultant, assign clubs with
+  commission terms, track what's owed/paid. The consultant's own read-only
+  dashboard stays at `/partner-consultant/[id]`, unchanged.
+- Brand Partners — add, assign, view as (still `/admin/brand-partners`,
+  still a stub — unrelated to the Partnerships build above, no commission
+  data of its own)
 - Settings — platform config, translation keys, email templates
 
 ## Admin — `/admin`
 
 Same structure as Super Admin, scoped to assigned clubs. No access to
-Clinical + Research library or Club Branding/Report Templates (Super
-Admin only).
+Clinical + Research library, Club Branding/Report Templates, or
+Partnerships (Super Admin only — commission/payment data, same
+sensitivity class as Billing).
 
 ## Club Manager — `/club/[club-id]`
 

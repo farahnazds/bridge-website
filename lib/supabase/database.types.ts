@@ -2185,30 +2185,39 @@ export type Database = {
       }
       partnerships_consultant_clubs: {
         Row: {
+          amount_paid: number
           club_id: string
           commission_percent: number | null
           consultant_id: string
           created_at: string
           deal_value: number | null
           id: string
+          last_paid_at: string | null
+          notes: string | null
           stage: string | null
         }
         Insert: {
+          amount_paid?: number
           club_id: string
           commission_percent?: number | null
           consultant_id: string
           created_at?: string
           deal_value?: number | null
           id?: string
+          last_paid_at?: string | null
+          notes?: string | null
           stage?: string | null
         }
         Update: {
+          amount_paid?: number
           club_id?: string
           commission_percent?: number | null
           consultant_id?: string
           created_at?: string
           deal_value?: number | null
           id?: string
+          last_paid_at?: string | null
+          notes?: string | null
           stage?: string | null
         }
         Relationships: [

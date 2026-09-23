@@ -350,6 +350,18 @@ export const RTP_PHASE_LABEL: Record<string, string> = {
   returned: "Returned",
 };
 
+/** partnerships_consultant_clubs.stage — shared by the consultant's own
+ *  read-only pipeline (app/partner-consultant/[id]) and Super Admin's
+ *  partnerships management (app/super-admin/partnerships), so the two never
+ *  drift onto different labels/colors for the same stage. */
+export const PARTNERSHIP_STAGES = ["contacted", "pilot", "signed", "churned"] as const;
+export const PARTNERSHIP_STAGE_STYLE: Record<string, { label: string; color: string }> = {
+  contacted: { label: "Contacted", color: "var(--text-muted)" },
+  pilot: { label: "Pilot", color: "var(--brand-sky)" },
+  signed: { label: "Signed", color: "var(--success)" },
+  churned: { label: "Churned", color: "var(--danger)" },
+};
+
 // `vald_data.test_type` is free text (schema.sql comments it "e.g. cmj,
 // nordic_curl"), so this is an open list with an "Other" escape hatch —
 // same pattern as SPORTS / SPECIALTIES. VALD's own device lineup changes

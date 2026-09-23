@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Building2, CircleCheckBig, ClipboardList, Contact, CreditCard, FileText, Handshake, HeartPulse, Layers, LayoutDashboard, Newspaper, Package, Settings, ShieldCheck, ShoppingCart, Store, Trophy, Users } from "lucide-react";
+import { Building2, CircleCheckBig, ClipboardList, Contact, CreditCard, FileText, HeartPulse, Layers, LayoutDashboard, Newspaper, Package, Settings, ShieldCheck, ShoppingCart, Store, Trophy, Users } from "lucide-react";
 import { getAssignedClubs } from "@/lib/adminScope";
 import ContextSwitcher from "@/components/ContextSwitcher";
 import SidebarNav from "@/components/SidebarNav";
@@ -7,11 +7,15 @@ import DashboardHeader from "@/components/DashboardHeader";
 import DashboardShell from "@/components/DashboardShell";
 import { getCurrentProfile } from "@/lib/auth";
 
-// Mirrors the Super Admin section list (docs/03-site-map.md) minus the two
+// Mirrors the Super Admin section list (docs/03-site-map.md) minus the
 // sections that are explicitly Super Admin-only per that same doc and
-// docs/02-roles-and-permissions.md: Clinical + Research Library, and Club
-// Branding & Report Templates. Those are deliberately absent here, not
-// stubbed — an Admin should never see an entry point to them at all.
+// docs/02-roles-and-permissions.md: Clinical + Research Library, Club
+// Branding & Report Templates, and (2026-09-23) Partnerships — consultant
+// commission/payment terms are financial data, same sensitivity class as
+// Billing (which Admin only gets view-only). Those are deliberately absent
+// here, not stubbed — an Admin should never see an entry point to them at
+// all. Brand Partners stays for now: unlike Partnerships it carries no
+// commission/payment data, only a stub page.
 // Grouped per the Phase 2 brief: frequent items first, admin/config last.
 const NAV_GROUPS = [
   { label: null, items: [
@@ -35,7 +39,6 @@ const NAV_GROUPS = [
   { label: "ADMIN", items: [
     { label: "Segments", href: "/admin/segments", icon: Layers },
     { label: "Staff & Permissions", href: "/admin/staff-permissions", icon: ShieldCheck },
-    { label: "Partnerships", href: "/admin/partnerships", icon: Handshake },
     { label: "Brand Partners", href: "/admin/brand-partners", icon: Store },
     { label: "Content/Relay", href: "/admin/content", icon: Newspaper },
     { label: "Settings", href: "/admin/settings", icon: Settings },

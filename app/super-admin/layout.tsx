@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { BookOpen, Building2, LayoutDashboard, Palette, Pill, Telescope } from "lucide-react";
+import { BookOpen, Building2, Handshake, LayoutDashboard, Palette, Pill, Telescope } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardShell from "@/components/DashboardShell";
@@ -19,6 +19,7 @@ const NAV_GROUPS = [
     { label: "Supplement Library", href: "/super-admin/supplement-library", icon: Pill },
     { label: "Clinical + Research", href: "/super-admin/clinical-research", icon: BookOpen },
     { label: "Branding & Templates", href: "/super-admin/branding", icon: Palette },
+    { label: "Partnerships", href: "/super-admin/partnerships", icon: Handshake },
   ] },
   { label: "OVERSIGHT", items: [
     { label: "All club data", href: "/admin", icon: Telescope },

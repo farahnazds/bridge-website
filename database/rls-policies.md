@@ -1808,3 +1808,40 @@ compare against. For an athlete whose ordinary baseline is non-zero the gate is
 stricter than it should be. That is the safe direction to be wrong in.
 
 See `database/migrations/060_rtp_symptom_gate.sql`.
+
+## Added: payment-tracking columns on the consultant pipeline (2026-09-23)
+
+Migration 061. Found while investigating the "Consultant/Partner" feature
+request: the Partnerships Consultant role, its tables, and its RLS were
+already built and live (migrations 024/025 above), but nothing recorded
+whether a commission had actually been paid, and the Super Admin management
+UI to set commission terms in the first place had never been built at all
+(`/admin/partnerships` was a `ComingSoon` stub).
+
+`partnerships_consultant_clubs` gains `amount_paid` (numeric, `>= 0`,
+defaults 0), `last_paid_at` (nullable timestamptz), `notes` (nullable text).
+
+**No new policy.** Both existing policies on this table already cover the new
+columns:
+
+```
+"super admin full access"       for all    using (is_super_admin())
+"consultant reads own pipeline" for select using (own row only, via
+                                                    partnerships_consultants.profile_id)
+```
+
+This is a deliberate choice, not an oversight: `amount_paid` and
+`last_paid_at` become visible to the consultant **on their own row** — a
+partner can reasonably see what they've already been paid against their own
+commission, which is still "own referral pipeline only," not a new
+disclosure class. `notes` rides along on the same row for simplicity (Super
+Admin's own working note, e.g. "paid via bank transfer ref #1234"); it is
+not column-scoped away from the consultant the way `clubs` had to be in
+migration 025, because unlike that case there is no separate sensitive
+record being reached into — it is one free-text field on a row already
+fully visible to its owner.
+
+Super Admin write access continues to come from the same `for all` policy
+every other write in this feature relies on — no change needed there either.
+
+See `database/migrations/061_partnerships_consultant_payment_tracking.sql`.
