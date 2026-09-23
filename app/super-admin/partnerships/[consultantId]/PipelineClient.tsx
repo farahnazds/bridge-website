@@ -175,7 +175,23 @@ export default function PipelineClient({
       ) : (
         <div className={`overflow-hidden ${CARD}`} style={{ borderColor: "var(--border)", backgroundColor: "var(--surface)" }}>
           {pipeline.map((row) => (
-            <PipelineRowForm key={row.id} row={row} consultantId={consultantId} />
+            // Keyed on the row's own saved values, not just row.id: every field
+            // below is an uncontrolled input (defaultValue), which only applies
+            // on mount. After a successful save this component stays mounted —
+            // useActionState re-renders it in place — so a fresh `row` prop
+            // (server-refetched via revalidatePath) would silently NOT reach an
+            // already-mounted <select>/<input>'s displayed value, even though
+            // the underlying data (and the badge / computed Owed line, both
+            // plain render output) are correct. Changing the key forces React
+            // to remount the row exactly when its saved values actually change,
+            // which resyncs every defaultValue at once. Typing mid-edit is
+            // unaffected — this key only changes after a real save, since that
+            // is the only time the parent Server Component refetches `row`.
+            <PipelineRowForm
+              key={`${row.id}:${row.stage}:${row.dealValue}:${row.commissionPercent}:${row.amountPaid}:${row.notes}`}
+              row={row}
+              consultantId={consultantId}
+            />
           ))}
         </div>
       )}
