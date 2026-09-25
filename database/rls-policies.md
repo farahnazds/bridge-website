@@ -1845,3 +1845,52 @@ Super Admin write access continues to come from the same `for all` policy
 every other write in this feature relies on — no change needed there either.
 
 See `database/migrations/061_partnerships_consultant_payment_tracking.sql`.
+
+## Added: recurring monthly commission + an immutable payment ledger (2026-09-25)
+
+Migration 062. Extends 061: `partnerships_consultant_clubs` gains
+`commission_type` (`one_time` | `recurring_monthly`, default `one_time`) and
+`recurring_monthly_amount` (nullable numeric). Both ride on the existing two
+policies on that table — no change needed, same reasoning as 061.
+
+A new table, `partnerships_commission_payments`, is the payment ledger for
+recurring rows (one_time rows keep using `amount_paid`/`last_paid_at`
+untouched). Its RLS is a deliberate departure from this feature's usual
+pattern:
+
+```
+"super admin reads all"              for select using (is_super_admin())
+"super admin logs payments"          for insert with check (is_super_admin())
+"consultant reads own logged payments" for select using (own pipeline row only,
+                                                            via pipeline_row_id ->
+                                                            partnerships_consultant_clubs.consultant_id ->
+                                                            partnerships_consultants.profile_id)
+```
+
+No UPDATE or DELETE policy exists for anyone, including Super Admin — every
+other table here gives Super Admin `for all`, this one intentionally does
+not. This is financial payment history, held to a stricter standard than
+pipeline stage/notes: a logged payment is never edited or removed, by
+anyone, at the database level, not just by app-code convention. A mistake is
+corrected with a new entry (e.g. a negative adjustment against the same
+month), never a rewrite. With RLS enabled and no UPDATE/DELETE policy
+defined, Postgres denies both outright regardless of what any future UI
+does. Two knock-on effects: `amount` allows negative values (a correction is
+a normal entry, only `<> 0` is enforced), and there is no
+`unique(pipeline_row_id, period_month)` — a correction targets the month
+it's fixing, so a month can carry more than one row; "what was paid for
+month X" is `sum(amount)` across its rows, never a single value.
+
+`commission_type` is locked once any payment exists against a row (one_time:
+`amount_paid > 0`; recurring: any row in the new ledger) — enforced in
+`app/super-admin/partnerships/actions.ts`, not the database, since it needs
+to check both signals and return a user-facing error rather than a bare
+constraint violation.
+
+Consultant visibility follows 061's precedent exactly: a partner seeing
+their own logged payments (amount + which month) is still "own referral
+pipeline only." `deal_value` remains legal on a recurring row too, but purely
+as Super Admin's own reference note — never read in any commission
+calculation for a recurring row.
+
+See `database/migrations/062_partnerships_recurring_commission.sql`.

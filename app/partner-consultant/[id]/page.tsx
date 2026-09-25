@@ -61,7 +61,7 @@ export default async function PartnerConsultantPage({
   const [pipelineRes, clubRes] = await Promise.all([
     supabase
       .from("partnerships_consultant_clubs")
-      .select("id, club_id, stage, deal_value, commission_percent, amount_paid, created_at")
+      .select("id, club_id, stage, deal_value, commission_percent, commission_type, recurring_monthly_amount, amount_paid, created_at")
       .eq("consultant_id", id)
       .order("created_at", { ascending: false }),
     supabase.from("consultant_referred_clubs").select("id, name"),
@@ -69,7 +69,8 @@ export default async function PartnerConsultantPage({
 
   type Row = {
     id: string; club_id: string; stage: string | null;
-    deal_value: number | null; commission_percent: number | null; amount_paid: number; created_at: string;
+    deal_value: number | null; commission_percent: number | null; commission_type: string;
+    recurring_monthly_amount: number | null; amount_paid: number; created_at: string;
   };
   const pipeline = (pipelineRes.data ?? []) as Row[];
   const clubNameById = new Map(
@@ -142,8 +143,14 @@ export default async function PartnerConsultantPage({
                 <tbody>
                   {pipeline.map((r, i) => {
                     const style = PARTNERSHIP_STAGE_STYLE[r.stage ?? ""] ?? { label: "—", color: "var(--text-muted)" };
+                    const isRecurring = r.commission_type === "recurring_monthly";
+                    // One-time has a fixed target (deal_value × %), so "owed"
+                    // is computable. Recurring never computes an "owed"
+                    // figure here — no live billing feed to check against
+                    // (database/migrations/062) — it only shows what's been
+                    // paid to date.
                     const commission =
-                      r.deal_value !== null && r.commission_percent !== null
+                      !isRecurring && r.deal_value !== null && r.commission_percent !== null
                         ? (Number(r.deal_value) * Number(r.commission_percent)) / 100
                         : null;
                     const owed = commission !== null ? Math.max(commission - Number(r.amount_paid), 0) : null;
@@ -162,10 +169,20 @@ export default async function PartnerConsultantPage({
                           {r.deal_value === null ? "—" : `AED ${Number(r.deal_value).toFixed(0)}`}
                         </td>
                         <td className="px-5 py-3" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-                          {r.commission_percent === null ? "—" : `${Number(r.commission_percent)}%`}
+                          {isRecurring
+                            ? r.recurring_monthly_amount === null
+                              ? "Recurring"
+                              : `AED ${Number(r.recurring_monthly_amount).toFixed(0)}/mo`
+                            : r.commission_percent === null ? "—" : `${Number(r.commission_percent)}%`}
                         </td>
                         <td className="px-5 py-3" style={{ fontVariantNumeric: "tabular-nums" }}>
-                          {owed === null ? (
+                          {isRecurring ? (
+                            Number(r.amount_paid) > 0 ? (
+                              <span style={{ color: "var(--text-muted)" }}>AED {Number(r.amount_paid).toFixed(0)} paid to date</span>
+                            ) : (
+                              <span style={{ color: "var(--text-muted)" }}>—</span>
+                            )
+                          ) : owed === null ? (
                             <span style={{ color: "var(--text-muted)" }}>—</span>
                           ) : (
                             <>

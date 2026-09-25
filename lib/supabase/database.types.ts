@@ -2183,41 +2183,82 @@ export type Database = {
           },
         ]
       }
+      partnerships_commission_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          paid_at: string
+          period_month: string
+          pipeline_row_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          paid_at?: string
+          period_month: string
+          pipeline_row_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          paid_at?: string
+          period_month?: string
+          pipeline_row_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnerships_commission_payments_pipeline_row_id_fkey"
+            columns: ["pipeline_row_id"]
+            isOneToOne: false
+            referencedRelation: "partnerships_consultant_clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partnerships_consultant_clubs: {
         Row: {
           amount_paid: number
           club_id: string
           commission_percent: number | null
+          commission_type: string
           consultant_id: string
           created_at: string
           deal_value: number | null
           id: string
           last_paid_at: string | null
           notes: string | null
+          recurring_monthly_amount: number | null
           stage: string | null
         }
         Insert: {
           amount_paid?: number
           club_id: string
           commission_percent?: number | null
+          commission_type?: string
           consultant_id: string
           created_at?: string
           deal_value?: number | null
           id?: string
           last_paid_at?: string | null
           notes?: string | null
+          recurring_monthly_amount?: number | null
           stage?: string | null
         }
         Update: {
           amount_paid?: number
           club_id?: string
           commission_percent?: number | null
+          commission_type?: string
           consultant_id?: string
           created_at?: string
           deal_value?: number | null
           id?: string
           last_paid_at?: string | null
           notes?: string | null
+          recurring_monthly_amount?: number | null
           stage?: string | null
         }
         Relationships: [

@@ -362,6 +362,14 @@ export const PARTNERSHIP_STAGE_STYLE: Record<string, { label: string; color: str
   churned: { label: "Churned", color: "var(--danger)" },
 };
 
+/** partnerships_consultant_clubs.commission_type — chosen per (consultant,
+ *  club) pairing, not partner-wide. See database/migrations/062. */
+export const COMMISSION_TYPES = ["one_time", "recurring_monthly"] as const;
+export const COMMISSION_TYPE_LABEL: Record<string, string> = {
+  one_time: "One-time",
+  recurring_monthly: "Recurring (monthly)",
+};
+
 // `vald_data.test_type` is free text (schema.sql comments it "e.g. cmj,
 // nordic_curl"), so this is an open list with an "Other" escape hatch —
 // same pattern as SPORTS / SPECIALTIES. VALD's own device lineup changes

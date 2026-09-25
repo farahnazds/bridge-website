@@ -1,14 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { CARD, INPUT, INPUT_STYLE, NOTICE, NOTICE_EMPTY, BADGE } from "@/lib/ui";
-import { PARTNERSHIP_STAGES, PARTNERSHIP_STAGE_STYLE } from "@/lib/constants";
+import { PARTNERSHIP_STAGES, PARTNERSHIP_STAGE_STYLE, COMMISSION_TYPES, COMMISSION_TYPE_LABEL } from "@/lib/constants";
 import {
-  assignClubToConsultant, updatePipelineRow, removeConsultantAssignment,
+  assignClubToConsultant, updatePipelineRow, removeConsultantAssignment, recordMonthlyPayment,
   type PipelineState,
 } from "../actions";
 
+export interface PaymentEntry {
+  id: string;
+  periodMonth: string; // date, first-of-month
+  amount: number;
+  paidAt: string;
+}
 export interface PipelineRow {
   id: string;
   clubId: string;
@@ -16,10 +22,14 @@ export interface PipelineRow {
   stage: string;
   dealValue: number | null;
   commissionPercent: number | null;
+  commissionType: string;
+  recurringMonthlyAmount: number | null;
   amountPaid: number;
   lastPaidAt: string | null;
   notes: string | null;
   createdAt: string;
+  typeLocked: boolean;
+  payments: PaymentEntry[];
 }
 export interface ClubOption {
   id: string;
@@ -86,10 +96,71 @@ function RemoveRow({ id, consultantId }: { id: string; consultantId: string }) {
   );
 }
 
+function MonthlyPaymentForm({ pipelineRowId, consultantId }: { pipelineRowId: string; consultantId: string }) {
+  const [state, action] = useActionState(recordMonthlyPayment, assignInitial);
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-3">
+      <input type="hidden" name="pipeline_row_id" value={pipelineRowId} />
+      <input type="hidden" name="consultant_id" value={consultantId} />
+      <div className="flex flex-col gap-1.5">
+        <label className={labelClass} style={{ color: "var(--text-muted)" }}>Month</label>
+        <input name="period_month" type="month" required className={INPUT} style={INPUT_STYLE} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className={labelClass} style={{ color: "var(--text-muted)" }}>Amount (AED)</label>
+        <input name="amount" type="number" step="0.01" required placeholder="negative to correct a mistake" className={INPUT} style={{ ...INPUT_STYLE, width: "12rem" }} />
+      </div>
+      <Submit label="Log payment" />
+      {state.error && <p role="alert" className="text-sm" style={{ color: "var(--danger)" }}>{state.error}</p>}
+    </form>
+  );
+}
+
+function PaymentLedger({ payments }: { payments: PaymentEntry[] }) {
+  if (payments.length === 0) {
+    return <p className="text-xs" style={{ color: "var(--text-muted)" }}>No months logged yet.</p>;
+  }
+  // Immutable ledger: every entry (including corrections) stays visible,
+  // grouped by month since a correction targets the same period_month as
+  // the entry it's fixing rather than replacing it — see migration 062.
+  const byMonth = new Map<string, PaymentEntry[]>();
+  for (const p of payments) {
+    const list = byMonth.get(p.periodMonth) ?? [];
+    list.push(p);
+    byMonth.set(p.periodMonth, list);
+  }
+  const months = [...byMonth.keys()].sort((a, b) => b.localeCompare(a));
+  return (
+    <ul className="flex flex-col gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+      {months.map((month) => {
+        const entries = byMonth.get(month)!;
+        const total = entries.reduce((sum, e) => sum + e.amount, 0);
+        return (
+          <li key={month} className="flex flex-wrap items-baseline gap-2">
+            <span style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{month.slice(0, 7)}</span>
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>AED {total.toFixed(0)}</span>
+            {entries.length > 1 && (
+              <span>
+                ({entries.map((e) => `${e.amount > 0 ? "+" : ""}${e.amount.toFixed(0)}`).join(", ")})
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function PipelineRowForm({ row, consultantId }: { row: PipelineRow; consultantId: string }) {
   const [state, action] = useActionState(updatePipelineRow, assignInitial);
+  const [commissionType, setCommissionType] = useState(row.commissionType);
+  const isRecurring = commissionType === "recurring_monthly";
+
   const commission =
-    row.dealValue !== null && row.commissionPercent !== null ? (row.dealValue * row.commissionPercent) / 100 : null;
+    !isRecurring && row.dealValue !== null && row.commissionPercent !== null
+      ? (row.dealValue * row.commissionPercent) / 100
+      : null;
+  const paidToDate = (payments: PaymentEntry[]) => payments.reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <form action={action} className="flex flex-col gap-4 p-5" style={{ borderTop: "1px solid var(--border)" }}>
@@ -125,17 +196,45 @@ function PipelineRowForm({ row, consultantId }: { row: PipelineRow; consultantId
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className={labelClass} style={{ color: "var(--text-muted)" }}>Deal value (AED)</label>
+          <label className={labelClass} style={{ color: "var(--text-muted)" }}>
+            Commission type{row.typeLocked ? " (locked)" : ""}
+          </label>
+          <select
+            name="commission_type"
+            value={commissionType}
+            onChange={(e) => setCommissionType(e.target.value)}
+            disabled={row.typeLocked}
+            className={INPUT}
+            style={INPUT_STYLE}
+          >
+            {COMMISSION_TYPES.map((t) => (
+              <option key={t} value={t}>{COMMISSION_TYPE_LABEL[t]}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className={labelClass} style={{ color: "var(--text-muted)" }}>
+            Deal value (AED){isRecurring ? " — reference only" : ""}
+          </label>
           <input name="deal_value" type="number" min="0" step="0.01" defaultValue={row.dealValue ?? ""} className={INPUT} style={INPUT_STYLE} />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label className={labelClass} style={{ color: "var(--text-muted)" }}>Commission %</label>
-          <input name="commission_percent" type="number" min="0" max="100" step="0.1" defaultValue={row.commissionPercent ?? ""} className={INPUT} style={INPUT_STYLE} />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className={labelClass} style={{ color: "var(--text-muted)" }}>Amount paid (AED)</label>
-          <input name="amount_paid" type="number" min="0" step="0.01" defaultValue={row.amountPaid} className={INPUT} style={INPUT_STYLE} />
-        </div>
+        {isRecurring ? (
+          <div className="flex flex-col gap-1.5">
+            <label className={labelClass} style={{ color: "var(--text-muted)" }}>Monthly amount (AED)</label>
+            <input name="recurring_monthly_amount" type="number" min="0" step="0.01" defaultValue={row.recurringMonthlyAmount ?? ""} className={INPUT} style={INPUT_STYLE} />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <label className={labelClass} style={{ color: "var(--text-muted)" }}>Commission %</label>
+            <input name="commission_percent" type="number" min="0" max="100" step="0.1" defaultValue={row.commissionPercent ?? ""} className={INPUT} style={INPUT_STYLE} />
+          </div>
+        )}
+        {!isRecurring && (
+          <div className="flex flex-col gap-1.5">
+            <label className={labelClass} style={{ color: "var(--text-muted)" }}>Amount paid (AED)</label>
+            <input name="amount_paid" type="number" min="0" step="0.01" defaultValue={row.amountPaid} className={INPUT} style={INPUT_STYLE} />
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -155,6 +254,16 @@ function PipelineRowForm({ row, consultantId }: { row: PipelineRow; consultantId
       </div>
 
       {state.error && <p role="alert" className={NOTICE} style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>{state.error}</p>}
+
+      {isRecurring && (
+        <div className="flex flex-col gap-3 rounded-lg p-4" style={{ backgroundColor: "var(--bg)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-medium" style={{ color: "var(--text)" }}>
+            Paid to date: AED {paidToDate(row.payments).toFixed(0)}
+          </p>
+          <PaymentLedger payments={row.payments} />
+          <MonthlyPaymentForm pipelineRowId={row.id} consultantId={consultantId} />
+        </div>
+      )}
     </form>
   );
 }
@@ -188,7 +297,7 @@ export default function PipelineClient({
             // unaffected — this key only changes after a real save, since that
             // is the only time the parent Server Component refetches `row`.
             <PipelineRowForm
-              key={`${row.id}:${row.stage}:${row.dealValue}:${row.commissionPercent}:${row.amountPaid}:${row.notes}`}
+              key={`${row.id}:${row.stage}:${row.commissionType}:${row.dealValue}:${row.commissionPercent}:${row.recurringMonthlyAmount}:${row.amountPaid}:${row.notes}:${row.payments.length}`}
               row={row}
               consultantId={consultantId}
             />

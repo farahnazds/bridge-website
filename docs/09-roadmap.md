@@ -65,6 +65,38 @@ view-only.
 aggregate data, no commission — and stays a stub until asked for
 separately.
 
+## Built: recurring monthly commission + immutable payment ledger (2026-09-25)
+
+Extends the Partnerships build above. `commission_type` (migration 062:
+`one_time` default, or `recurring_monthly`) is chosen per (consultant, club)
+row — confirmed already true of `commission_percent`/`deal_value` before
+building anything, so this follows the same shape rather than introducing a
+new scoping model. One consultant can have a one-time deal on one club and a
+recurring deal on another.
+
+Recurring commission is a fixed `recurring_monthly_amount` Super Admin
+enters manually, not a computed percentage — still no live billing feed to
+calculate against (Stripe inactive, same reason 061 deferred this). Payments
+against a recurring row are logged into a new append-only ledger table,
+`partnerships_commission_payments`, one entry per "log this month's
+payment" action; `amount_paid`/`last_paid_at` on the pipeline row become a
+maintained cache of that ledger for recurring rows (one-time rows keep
+hand-editing them directly, unchanged).
+
+**Confirmed with the owner before building, not guessed:**
+- The ledger is immutable — no UPDATE/DELETE policy exists for anyone,
+  including Super Admin. A mistaken entry is corrected with a new entry
+  (negative amount allowed), never edited or removed. Stricter than every
+  other table in this feature, which give Super Admin full CRUD.
+- `commission_type` locks once any payment exists against the row (enforced
+  in `actions.ts`, since it needs to check both the one-time and recurring
+  signals and return a user-facing error).
+- No computed "owed" figure for recurring rows — no start date and no
+  billing feed makes one safe to derive. Only "paid to date" is shown.
+- `deal_value` stays legal on a recurring row, but purely as Super Admin's
+  own reference note ("expected annual value") — never read in any
+  calculation for a recurring row.
+
 ## Known issue, scheduled separately: "today" is computed in UTC
 
 **Raised 2026-08-13. Not a bug in any one feature — an app-wide convention,

@@ -19,7 +19,10 @@ export const metadata: Metadata = { title: "Partnerships — Super Admin — Bri
 
 type ProfileRow = { first_name: string | null; last_name: string | null; email: string };
 type ConsultantRow = { id: string; created_at: string; profiles: ProfileRow | null };
-type PipelineRow = { consultant_id: string; deal_value: number | null; commission_percent: number | null; amount_paid: number };
+type PipelineRow = {
+  consultant_id: string; deal_value: number | null; commission_percent: number | null;
+  commission_type: string; recurring_monthly_amount: number | null; amount_paid: number;
+};
 
 export default async function PartnershipsPage() {
   const supabase = await createClient();
@@ -31,21 +34,30 @@ export default async function PartnershipsPage() {
       .order("created_at", { ascending: false }),
     supabase
       .from("partnerships_consultant_clubs")
-      .select("consultant_id, deal_value, commission_percent, amount_paid"),
+      .select("consultant_id, deal_value, commission_percent, commission_type, recurring_monthly_amount, amount_paid"),
   ]);
 
   const consultants = (consultantsRes.data ?? []) as unknown as ConsultantRow[];
   const pipeline = (pipelineRes.data ?? []) as PipelineRow[];
 
-  const totalsByConsultant = new Map<string, { clubs: number; owed: number; paid: number }>();
+  // "Owed" only ever applies to one_time rows — it needs a fixed target
+  // (deal_value × %) to compute against. Recurring rows have no such target
+  // (no billing feed to check against, see database/migrations/062), so they
+  // contribute to "Paid" (their logged-payments cache) and to a separate
+  // "Recurring/mo" figure, never to "Owed" — deliberately, not an omission.
+  const totalsByConsultant = new Map<string, { clubs: number; owed: number; paid: number; recurringMonthly: number }>();
   for (const row of pipeline) {
-    const t = totalsByConsultant.get(row.consultant_id) ?? { clubs: 0, owed: 0, paid: 0 };
+    const t = totalsByConsultant.get(row.consultant_id) ?? { clubs: 0, owed: 0, paid: 0, recurringMonthly: 0 };
     t.clubs += 1;
-    const commission =
-      row.deal_value !== null && row.commission_percent !== null
-        ? (Number(row.deal_value) * Number(row.commission_percent)) / 100
-        : 0;
-    t.owed += Math.max(commission - Number(row.amount_paid), 0);
+    if (row.commission_type === "recurring_monthly") {
+      t.recurringMonthly += Number(row.recurring_monthly_amount ?? 0);
+    } else {
+      const commission =
+        row.deal_value !== null && row.commission_percent !== null
+          ? (Number(row.deal_value) * Number(row.commission_percent)) / 100
+          : 0;
+      t.owed += Math.max(commission - Number(row.amount_paid), 0);
+    }
     t.paid += Number(row.amount_paid);
     totalsByConsultant.set(row.consultant_id, t);
   }
@@ -96,11 +108,12 @@ export default async function PartnershipsPage() {
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Clubs</th>
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Owed</th>
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Paid</th>
+                <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Recurring/mo</th>
               </tr>
             </thead>
             <tbody>
               {consultants.map((c, i) => {
-                const t = totalsByConsultant.get(c.id) ?? { clubs: 0, owed: 0, paid: 0 };
+                const t = totalsByConsultant.get(c.id) ?? { clubs: 0, owed: 0, paid: 0, recurringMonthly: 0 };
                 const name = [c.profiles?.first_name, c.profiles?.last_name].filter(Boolean).join(" ") || c.profiles?.email || "—";
                 return (
                   <tr key={c.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
@@ -122,6 +135,9 @@ export default async function PartnershipsPage() {
                     </td>
                     <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
                       AED {t.paid.toFixed(0)}
+                    </td>
+                    <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                      {t.recurringMonthly > 0 ? `AED ${t.recurringMonthly.toFixed(0)}` : "—"}
                     </td>
                   </tr>
                 );
