@@ -13,6 +13,8 @@ import {
   CONTRACT_DOC_MAX_BYTES,
   CONTRACT_DOC_MAX_FILES,
   CONTRACT_DOC_ALLOWED_TYPES,
+  PAYMENT_PROOF_MAX_BYTES,
+  PAYMENT_PROOF_ALLOWED_TYPES,
 } from "@/lib/partnershipSchedule";
 
 // Super Admin-only management for the Partnerships Consultant pipeline.
@@ -21,15 +23,20 @@ import {
 // here is gated on super_admin, mirroring createClub()
 // (app/super-admin/clubs/new/actions.ts).
 //
-// Rewritten for migration 063's relationship/contract/schedule split. Three
-// concepts, three action groups below:
+// Rewritten for migration 063's relationship/contract/schedule split. Four
+// concepts, four action groups below:
 //   relationship  — partnerships_consultant_clubs: stage only, as before.
 //   contract      — partnership_contracts + auto-generated
 //                   partnership_payment_schedule rows + document uploads,
 //                   created together in one action.
-//   (schedule rows are NOT independently mutable in this phase — Phase 3
-//    adds "mark paid" and payment-proof upload. This phase's detail view is
-//    read-only on the schedule.)
+//   schedule row  — mark/unmark paid + optional proof upload (Phase 3).
+//                   RLS check performed live before building this (see
+//                   database/rls-policies.md, Phase 3 section): migration
+//                   063's existing `for all using (is_super_admin())` policy
+//                   on partnership_payment_schedule already covers UPDATE —
+//                   confirmed with a real PATCH through a Super Admin
+//                   session, not assumed from the policy text. No new
+//                   migration was needed for this phase.
 
 const VALID_STAGES = PARTNERSHIP_STAGES as readonly string[];
 const VALID_COMMISSION_TYPES = COMMISSION_TYPES as readonly string[];
@@ -554,6 +561,159 @@ export async function updateContract(
     })
     .eq("id", id);
   if (error) return { error: `Couldn't save: ${error.message}`, saved: false };
+
+  revalidatePath(`/super-admin/partnerships/${consultantId}`);
+  revalidatePath("/super-admin/partnerships");
+  return { error: null, saved: true };
+}
+
+// ---------------------------------------------------------------------------
+// Payment schedule rows (Phase 3)
+// ---------------------------------------------------------------------------
+// Deliberately NOT gated on the parent contract's end_date anywhere below —
+// a late payment arriving after a contract has ended is a normal, expected
+// case (owner-confirmed), not an edge case to block.
+
+function validateProof(file: File): string | null {
+  if (file.size > PAYMENT_PROOF_MAX_BYTES) return `"${file.name}" is over the 5MB limit.`;
+  if (!PAYMENT_PROOF_ALLOWED_TYPES.has(file.type)) {
+    return `"${file.name}" is not a supported file type (PDF, JPG, PNG only).`;
+  }
+  return null;
+}
+
+/**
+ * Marks a schedule row paid — or, called again on an already-paid row,
+ * EDITS the paid date and/or replaces its proof. One action covers both,
+ * since both are "set paid_at (and optionally a proof) on this row"; the UI
+ * just opens the same form pre-filled when editing.
+ *
+ * paid_date defaults to today when omitted, but the caller may pick any
+ * other date — logging a payment that actually arrived last week is a real,
+ * expected case, not a correction.
+ *
+ * A single UPDATE statement is already atomic on its own (unlike
+ * createContract's two-table write, migration 065 does not apply here).
+ * The proof upload happens first, before the row is touched: if it fails,
+ * the row is still updated with the new paid_at (marking paid must not be
+ * blocked by a flaky upload), and the failure is reported rather than
+ * hidden. A REPLACED proof's old storage object is deleted only after the
+ * new one is confirmed attached, so a failed upload never destroys a proof
+ * that was already there.
+ */
+export async function markSchedulePaid(
+  _prev: ContractState,
+  formData: FormData
+): Promise<ContractState> {
+  if (!(await hasRole("super_admin"))) {
+    return { error: "You don't have permission to do this.", saved: false };
+  }
+
+  const scheduleId = String(formData.get("schedule_id") ?? "").trim();
+  const consultantId = String(formData.get("consultant_id") ?? "").trim();
+  const paidDateRaw = String(formData.get("paid_date") ?? "").trim();
+  const proofFile = formData.get("proof");
+
+  if (!scheduleId) return { error: "Missing schedule row.", saved: false };
+  if (paidDateRaw && !DATE_RE.test(paidDateRaw)) {
+    return { error: "Enter a valid paid date.", saved: false };
+  }
+  const paidAt = paidDateRaw ? `${paidDateRaw}T00:00:00.000Z` : new Date().toISOString();
+
+  const hasProofFile = proofFile instanceof File && proofFile.size > 0;
+  if (hasProofFile) {
+    const proofError = validateProof(proofFile);
+    if (proofError) return { error: proofError, saved: false };
+  }
+
+  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+
+  const { data: existing } = await supabase
+    .from("partnership_payment_schedule")
+    .select("payment_proof_url")
+    .eq("id", scheduleId)
+    .maybeSingle();
+  if (!existing) return { error: "Schedule row not found.", saved: false };
+  const previousProofPath = existing.payment_proof_url as string | null;
+
+  let newProofPath: string | null = null;
+  let uploadError: string | null = null;
+  if (hasProofFile && profile) {
+    const path = `${scheduleId}/${Date.now()}.${extFromFile(proofFile)}`;
+    const { error } = await supabase.storage
+      .from("partnership-payment-proofs")
+      .upload(path, proofFile, { contentType: proofFile.type });
+    if (error) uploadError = error.message;
+    else newProofPath = path;
+  }
+
+  const { error: updateError } = await supabase
+    .from("partnership_payment_schedule")
+    .update({
+      paid_at: paidAt,
+      ...(newProofPath ? { payment_proof_url: newProofPath } : {}),
+    })
+    .eq("id", scheduleId);
+  if (updateError) {
+    // Roll back the just-uploaded object rather than leave it orphaned —
+    // the row update is what makes it "attached"; without that it is dead.
+    if (newProofPath) await supabase.storage.from("partnership-payment-proofs").remove([newProofPath]);
+    return { error: `Couldn't mark this paid: ${updateError.message}`, saved: false };
+  }
+
+  // Only now, after the new proof is confirmed attached, remove the one it
+  // replaced — best-effort, and never blocks reporting success.
+  if (newProofPath && previousProofPath) {
+    await supabase.storage.from("partnership-payment-proofs").remove([previousProofPath]);
+  }
+
+  revalidatePath(`/super-admin/partnerships/${consultantId}`);
+  revalidatePath("/super-admin/partnerships");
+
+  if (uploadError) {
+    return { error: `Marked paid, but the proof file failed to upload: ${uploadError}`, saved: true };
+  }
+  return { error: null, saved: true };
+}
+
+/**
+ * Reverts a schedule row to unpaid — clears paid_at AND any attached proof
+ * (a proof of payment sitting on a row that is, per this action, not paid
+ * would be a contradictory state, so it goes too, not just the date). The
+ * storage object is deleted only after the row update succeeds.
+ */
+export async function unmarkSchedulePaid(
+  _prev: ContractState,
+  formData: FormData
+): Promise<ContractState> {
+  if (!(await hasRole("super_admin"))) {
+    return { error: "You don't have permission to do this.", saved: false };
+  }
+
+  const scheduleId = String(formData.get("schedule_id") ?? "").trim();
+  const consultantId = String(formData.get("consultant_id") ?? "").trim();
+  if (!scheduleId) return { error: "Missing schedule row.", saved: false };
+
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from("partnership_payment_schedule")
+    .select("payment_proof_url")
+    .eq("id", scheduleId)
+    .maybeSingle();
+  if (!existing) return { error: "Schedule row not found.", saved: false };
+  const previousProofPath = existing.payment_proof_url as string | null;
+
+  const { error } = await supabase
+    .from("partnership_payment_schedule")
+    .update({ paid_at: null, payment_proof_url: null })
+    .eq("id", scheduleId);
+  if (error) return { error: `Couldn't unmark this: ${error.message}`, saved: false };
+
+  if (previousProofPath) {
+    await supabase.storage.from("partnership-payment-proofs").remove([previousProofPath]);
+  }
 
   revalidatePath(`/super-admin/partnerships/${consultantId}`);
   revalidatePath("/super-admin/partnerships");

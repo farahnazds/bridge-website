@@ -390,8 +390,32 @@ export default function PipelineClient({
   const [openContractId, setOpenContractId] = useState<string | null>(null);
   const openContract = contracts.find((c) => c.id === openContractId) ?? null;
 
+  // At-a-glance overdue visibility (owner-required, not optional): the whole
+  // point of a real schedule is that an overdue payment doesn't get missed
+  // by having to click into every contract's modal to discover it.
+  const overdueRows = contracts.flatMap((c) => c.schedule.filter((s) => s.status === "overdue"));
+  const overdueCount = overdueRows.length;
+  const overdueAmount = overdueRows.reduce((sum, s) => sum + s.expectedAmount, 0);
+
   return (
     <div className="flex flex-col gap-8">
+      {overdueCount > 0 && (
+        <p
+          role="status"
+          className={NOTICE}
+          style={{
+            borderColor: "var(--danger)",
+            color: "var(--text)",
+            backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+          }}
+        >
+          <span className="font-semibold" style={{ color: "var(--danger)" }}>
+            {overdueCount} payment{overdueCount === 1 ? "" : "s"} overdue
+          </span>{" "}
+          — AED {overdueAmount.toFixed(0)} total, in the contracts below.
+        </p>
+      )}
+
       <section className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
           Relationships

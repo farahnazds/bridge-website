@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { BTN_PRIMARY, CARD, NOTICE } from "@/lib/ui";
+import { BADGE, BTN_PRIMARY, CARD, NOTICE } from "@/lib/ui";
+import { deriveScheduleStatus, todayInDubai } from "@/lib/partnershipSchedule";
 
 export const metadata: Metadata = { title: "Partnerships — Super Admin — Bridgetx" };
 
@@ -28,7 +29,7 @@ type ProfileRow = { first_name: string | null; last_name: string | null; email: 
 type ConsultantRow = { id: string; created_at: string; profiles: ProfileRow | null };
 type RelationshipRow = { id: string; consultant_id: string };
 type ContractRow = { id: string; pipeline_row_id: string };
-type ScheduleRow = { contract_id: string; expected_amount: number; paid_at: string | null };
+type ScheduleRow = { contract_id: string; expected_amount: number; paid_at: string | null; due_date: string };
 
 export default async function PartnershipsPage() {
   const supabase = await createClient();
@@ -40,7 +41,7 @@ export default async function PartnershipsPage() {
       .order("created_at", { ascending: false }),
     supabase.from("partnerships_consultant_clubs").select("id, consultant_id"),
     supabase.from("partnership_contracts").select("id, pipeline_row_id"),
-    supabase.from("partnership_payment_schedule").select("contract_id, expected_amount, paid_at"),
+    supabase.from("partnership_payment_schedule").select("contract_id, expected_amount, paid_at, due_date"),
   ]);
 
   const consultants = (consultantsRes.data ?? []) as unknown as ConsultantRow[];
@@ -55,12 +56,12 @@ export default async function PartnershipsPage() {
 
   const totalsByConsultant = new Map<
     string,
-    { clubs: number; contracts: number; paid: number; outstanding: number }
+    { clubs: number; contracts: number; paid: number; outstanding: number; overdueCount: number; overdueAmount: number }
   >();
   const ensure = (consultantId: string) => {
     const existing = totalsByConsultant.get(consultantId);
     if (existing) return existing;
-    const fresh = { clubs: 0, contracts: 0, paid: 0, outstanding: 0 };
+    const fresh = { clubs: 0, contracts: 0, paid: 0, outstanding: 0, overdueCount: 0, overdueAmount: 0 };
     totalsByConsultant.set(consultantId, fresh);
     return fresh;
   };
@@ -71,12 +72,28 @@ export default async function PartnershipsPage() {
     const consultantId = consultantByContract.get(contract.id);
     if (consultantId) ensure(consultantId).contracts += 1;
   }
+  // One "today" for the whole page — matches lib/checkinReminders.ts's
+  // discipline (docs/09-roadmap.md's app-wide UTC "today" bug) even though
+  // the stakes here are a page render, not a delivery window: this is
+  // financial data, held to the same rigor everywhere else in this feature.
+  const today = todayInDubai();
+  let overdueCount = 0;
+  let overdueAmount = 0;
   for (const row of scheduleRows) {
     const consultantId = consultantByContract.get(row.contract_id);
     if (!consultantId) continue;
     const t = ensure(consultantId);
-    if (row.paid_at) t.paid += Number(row.expected_amount);
-    else t.outstanding += Number(row.expected_amount);
+    if (row.paid_at) {
+      t.paid += Number(row.expected_amount);
+      continue;
+    }
+    t.outstanding += Number(row.expected_amount);
+    if (deriveScheduleStatus(row.paid_at, row.due_date, today) === "overdue") {
+      t.overdueCount += 1;
+      t.overdueAmount += Number(row.expected_amount);
+      overdueCount += 1;
+      overdueAmount += Number(row.expected_amount);
+    }
   }
 
   const error = consultantsRes.error ?? relationshipsRes.error ?? contractsRes.error ?? scheduleRes.error;
@@ -100,6 +117,23 @@ export default async function PartnershipsPage() {
           + Invite Consultant
         </Link>
       </div>
+
+      {!error && overdueCount > 0 && (
+        <p
+          role="status"
+          className={NOTICE}
+          style={{
+            borderColor: "var(--danger)",
+            color: "var(--text)",
+            backgroundColor: "color-mix(in srgb, var(--danger) 8%, transparent)",
+          }}
+        >
+          <span className="font-semibold" style={{ color: "var(--danger)" }}>
+            {overdueCount} payment{overdueCount === 1 ? "" : "s"} overdue
+          </span>{" "}
+          across all consultants — AED {overdueAmount.toFixed(0)} total.
+        </p>
+      )}
 
       {error && (
         <p role="status" className={NOTICE} style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
@@ -125,12 +159,13 @@ export default async function PartnershipsPage() {
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Clubs</th>
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Contracts</th>
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Outstanding</th>
+                <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Overdue</th>
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Paid</th>
               </tr>
             </thead>
             <tbody>
               {consultants.map((c, i) => {
-                const t = totalsByConsultant.get(c.id) ?? { clubs: 0, contracts: 0, paid: 0, outstanding: 0 };
+                const t = totalsByConsultant.get(c.id) ?? { clubs: 0, contracts: 0, paid: 0, outstanding: 0, overdueCount: 0, overdueAmount: 0 };
                 const name = [c.profiles?.first_name, c.profiles?.last_name].filter(Boolean).join(" ") || c.profiles?.email || "—";
                 return (
                   <tr key={c.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
@@ -152,6 +187,18 @@ export default async function PartnershipsPage() {
                     </td>
                     <td className="px-5 py-3" style={{ color: t.outstanding > 0 ? "var(--warning)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                       AED {t.outstanding.toFixed(0)}
+                    </td>
+                    <td className="px-5 py-3" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {t.overdueCount > 0 ? (
+                        <span
+                          className={BADGE}
+                          style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}
+                        >
+                          {t.overdueCount} · AED {t.overdueAmount.toFixed(0)}
+                        </span>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
                       AED {t.paid.toFixed(0)}

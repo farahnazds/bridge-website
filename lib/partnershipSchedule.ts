@@ -94,6 +94,18 @@ export const CONTRACT_DOC_ALLOWED_TYPES = new Set([
   "image/heic",
 ]);
 
+// Payment proof (Phase 3): single file per schedule row, deliberately
+// narrower than contract documents — one image or PDF of a receipt, not a
+// multi-page bundle.
+export const PAYMENT_PROOF_MAX_BYTES = 5 * 1024 * 1024;
+export const PAYMENT_PROOF_ACCEPT = ".pdf,.jpg,.jpeg,.png";
+export const PAYMENT_PROOF_ALLOWED_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+]);
+
 export type ScheduleStatus = "paid" | "overdue" | "pending";
 
 /**
