@@ -130,8 +130,14 @@ export async function inviteConsultant(
 
   const baseUrl = await getBaseUrl();
   const adminClient = createAdminClient();
+  // invite_type distinguishes this from the other four invite call sites
+  // (club practitioner, club manager x2, athlete) for the shared Supabase
+  // "Invite user" template — this role never joins a club, so club_name is
+  // never set here, and the template branches on invite_type instead of
+  // falling into the club_name-absent "your club" copy. See
+  // docs/emails/supabase-invite.html.
   const { data: invite, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    data: { first_name: firstName, last_name: lastName },
+    data: { first_name: firstName, last_name: lastName, invite_type: "consultant" },
     redirectTo: `${baseUrl}/staff/activate`,
   });
 
