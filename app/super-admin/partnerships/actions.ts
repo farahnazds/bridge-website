@@ -4,16 +4,73 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { hasRole } from "@/lib/auth";
+import { hasRole, getCurrentProfile } from "@/lib/auth";
 import { getBaseUrl } from "@/lib/site";
-import { PARTNERSHIP_STAGES, COMMISSION_TYPES } from "@/lib/constants";
+import { PARTNERSHIP_STAGES, COMMISSION_TYPES, PAYMENT_FREQUENCIES } from "@/lib/constants";
+import {
+  computeOneTimeAmount,
+  generateScheduleDueDates,
+  CONTRACT_DOC_MAX_BYTES,
+  CONTRACT_DOC_MAX_FILES,
+  CONTRACT_DOC_ALLOWED_TYPES,
+} from "@/lib/partnershipSchedule";
 
 // Super Admin-only management for the Partnerships Consultant pipeline.
 // docs/02-roles-and-permissions.md: this role has no write access of its
 // own anywhere ("Read-only, own referral pipeline only") — every action
 // here is gated on super_admin, mirroring createClub()
-// (app/super-admin/clubs/new/actions.ts), which is the pattern this whole
-// file follows: profile row -> role-specific row -> invite by email.
+// (app/super-admin/clubs/new/actions.ts).
+//
+// Rewritten for migration 063's relationship/contract/schedule split. Three
+// concepts, three action groups below:
+//   relationship  — partnerships_consultant_clubs: stage only, as before.
+//   contract      — partnership_contracts + auto-generated
+//                   partnership_payment_schedule rows + document uploads,
+//                   created together in one action.
+//   (schedule rows are NOT independently mutable in this phase — Phase 3
+//    adds "mark paid" and payment-proof upload. This phase's detail view is
+//    read-only on the schedule.)
+
+const VALID_STAGES = PARTNERSHIP_STAGES as readonly string[];
+const VALID_COMMISSION_TYPES = COMMISSION_TYPES as readonly string[];
+const VALID_FREQUENCIES = PAYMENT_FREQUENCIES as readonly string[];
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * create_partnership_contract's generated Args type (migration 065) marks
+ * every parameter non-nullable — a `supabase gen types` limitation for
+ * plpgsql function arguments, which are typed from the declared SQL
+ * parameter type, not from whether the underlying column actually allows
+ * null (it does, for every field below except the id/date/type/schedule
+ * ones). This is a type-generation gap, not a real constraint: the function
+ * body and the columns it inserts into both accept null. This local type is
+ * the honest shape; the cast at the one call site below is scoped to
+ * exactly this known gap, not a general escape hatch.
+ */
+type CreateContractArgs = {
+  p_pipeline_row_id: string;
+  p_start_date: string;
+  p_end_date: string | null;
+  p_commission_type: string;
+  p_payment_frequency: string | null;
+  p_deal_value: number | null;
+  p_commission_percent: number | null;
+  p_recurring_amount: number | null;
+  p_notes: string | null;
+  p_created_by: string | null;
+  p_schedule: { due_date: string; expected_amount: number }[];
+};
+
+function parseOptionalNumber(raw: FormDataEntryValue | null): number | null {
+  const s = String(raw ?? "").trim();
+  return s === "" ? null : Number(s);
+}
+
+// ---------------------------------------------------------------------------
+// Invite / relationship (largely unchanged from pre-063 — these never
+// touched the columns that moved to partnership_contracts)
+// ---------------------------------------------------------------------------
 
 export interface InviteState {
   error: string | null;
@@ -84,18 +141,15 @@ export async function inviteConsultant(
   redirect(`/super-admin/partnerships/${consultant.id}`);
 }
 
-export interface PipelineState {
+export interface RelationshipState {
   error: string | null;
   saved: boolean;
 }
 
-const VALID_STAGES = PARTNERSHIP_STAGES as readonly string[];
-const VALID_COMMISSION_TYPES = COMMISSION_TYPES as readonly string[];
-
 export async function assignClubToConsultant(
-  _prev: PipelineState,
+  _prev: RelationshipState,
   formData: FormData
-): Promise<PipelineState> {
+): Promise<RelationshipState> {
   if (!(await hasRole("super_admin"))) {
     return { error: "You don't have permission to do this.", saved: false };
   }
@@ -107,8 +161,7 @@ export async function assignClubToConsultant(
 
   const supabase = await createClient();
 
-  // A club could otherwise be double-assigned to the same consultant, which
-  // would double-count in the "total owed" rollup on the list page.
+  // A club could otherwise be double-assigned to the same consultant.
   const { count } = await supabase
     .from("partnerships_consultant_clubs")
     .select("*", { count: "exact", head: true })
@@ -127,10 +180,17 @@ export async function assignClubToConsultant(
   return { error: null, saved: true };
 }
 
-export async function updatePipelineRow(
-  _prev: PipelineState,
+/**
+ * The ONE place stage changes (migration 063 — the relationship row no
+ * longer carries any deal terms, so this replaces the old updatePipelineRow
+ * entirely). Advancing pilot -> signed, or marking a relationship
+ * terminated, is always a manual, separate action here — creating a
+ * contract never touches this.
+ */
+export async function updateRelationshipStage(
+  _prev: RelationshipState,
   formData: FormData
-): Promise<PipelineState> {
+): Promise<RelationshipState> {
   if (!(await hasRole("super_admin"))) {
     return { error: "You don't have permission to do this.", saved: false };
   }
@@ -138,97 +198,16 @@ export async function updatePipelineRow(
   const id = String(formData.get("id") ?? "").trim();
   const consultantId = String(formData.get("consultant_id") ?? "").trim();
   const stage = String(formData.get("stage") ?? "").trim();
-  const commissionType = String(formData.get("commission_type") ?? "one_time").trim();
-  const dealValueRaw = String(formData.get("deal_value") ?? "").trim();
-  const commissionRaw = String(formData.get("commission_percent") ?? "").trim();
-  const recurringAmountRaw = String(formData.get("recurring_monthly_amount") ?? "").trim();
-  const amountPaidRaw = String(formData.get("amount_paid") ?? "").trim();
-  const notes = String(formData.get("notes") ?? "").trim();
-
-  if (!id) return { error: "Missing pipeline row.", saved: false };
+  if (!id) return { error: "Missing relationship.", saved: false };
   if (!VALID_STAGES.includes(stage)) {
     return { error: `Stage must be one of: ${VALID_STAGES.join(", ")}.`, saved: false };
   }
-  if (!VALID_COMMISSION_TYPES.includes(commissionType)) {
-    return { error: "Invalid commission type.", saved: false };
-  }
-
-  // deal_value stays legal for both types — for recurring it's just Super
-  // Admin's own reference note (e.g. "expected annual value"), never used in
-  // a calculation. commission_percent, by contrast, is one_time-specific
-  // (it's meaningless against a fixed monthly amount) and is force-nulled
-  // below whenever commission_type is recurring, so a stale percent from a
-  // prior one_time period can never silently resurface if the row switches
-  // back and forth before any payment locks it.
-  const dealValue = dealValueRaw === "" ? null : Number(dealValueRaw);
-  const commissionPercent = commissionRaw === "" ? null : Number(commissionRaw);
-  const recurringMonthlyAmount = recurringAmountRaw === "" ? null : Number(recurringAmountRaw);
-  const amountPaid = amountPaidRaw === "" ? 0 : Number(amountPaidRaw);
-
-  if (dealValue !== null && (!Number.isFinite(dealValue) || dealValue < 0)) {
-    return { error: "Deal value must be a positive number.", saved: false };
-  }
-  if (commissionPercent !== null && (!Number.isFinite(commissionPercent) || commissionPercent < 0 || commissionPercent > 100)) {
-    return { error: "Commission must be a percentage between 0 and 100.", saved: false };
-  }
-  if (recurringMonthlyAmount !== null && (!Number.isFinite(recurringMonthlyAmount) || recurringMonthlyAmount < 0)) {
-    return { error: "Monthly amount must be a positive number.", saved: false };
-  }
-  if (!Number.isFinite(amountPaid) || amountPaid < 0) {
-    return { error: "Amount paid must be a positive number.", saved: false };
-  }
 
   const supabase = await createClient();
-
-  const { data: existing } = await supabase
-    .from("partnerships_consultant_clubs")
-    .select("amount_paid, commission_type")
-    .eq("id", id)
-    .single();
-  if (!existing) return { error: "Pipeline row not found.", saved: false };
-
-  // commission_type is locked once any payment exists against this row —
-  // switching it afterward would leave the history ambiguous (was a logged
-  // one-time payment actually "month 1" of a later recurring deal, or
-  // something else?). See database/migrations/062.
-  if (commissionType !== existing.commission_type) {
-    const hasOneTimePayment = existing.commission_type === "one_time" && Number(existing.amount_paid) > 0;
-    let hasRecurringPayments = false;
-    if (existing.commission_type === "recurring_monthly") {
-      const { count } = await supabase
-        .from("partnerships_commission_payments")
-        .select("*", { count: "exact", head: true })
-        .eq("pipeline_row_id", id);
-      hasRecurringPayments = (count ?? 0) > 0;
-    }
-    if (hasOneTimePayment || hasRecurringPayments) {
-      return { error: "Can't change commission type once a payment has been recorded against this row.", saved: false };
-    }
-  }
-
-  const isRecurring = commissionType === "recurring_monthly";
-
-  // amount_paid/last_paid_at are hand-edited only for one_time rows. For
-  // recurring rows they are a cache the "log this month" action (below)
-  // maintains — this form never writes them for a recurring row, so an old
-  // one_time figure can't be typed back in through a field the recurring UI
-  // doesn't even show.
-  const paidChanged = !isRecurring && Number(existing.amount_paid) !== amountPaid;
-
   const { error } = await supabase
     .from("partnerships_consultant_clubs")
-    .update({
-      stage,
-      commission_type: commissionType,
-      deal_value: dealValue,
-      commission_percent: isRecurring ? null : commissionPercent,
-      recurring_monthly_amount: isRecurring ? recurringMonthlyAmount : null,
-      notes: notes || null,
-      ...(isRecurring ? {} : { amount_paid: amountPaid }),
-      ...(paidChanged ? { last_paid_at: new Date().toISOString() } : {}),
-    })
+    .update({ stage })
     .eq("id", id);
-
   if (error) return { error: `Couldn't save: ${error.message}`, saved: false };
 
   revalidatePath(`/super-admin/partnerships/${consultantId}`);
@@ -236,87 +215,345 @@ export async function updatePipelineRow(
   return { error: null, saved: true };
 }
 
-export async function recordMonthlyPayment(
-  _prev: PipelineState,
+export async function removeConsultantAssignment(
+  _prev: RelationshipState,
   formData: FormData
-): Promise<PipelineState> {
+): Promise<RelationshipState> {
   if (!(await hasRole("super_admin"))) {
     return { error: "You don't have permission to do this.", saved: false };
   }
-
-  const pipelineRowId = String(formData.get("pipeline_row_id") ?? "").trim();
+  const id = String(formData.get("id") ?? "").trim();
   const consultantId = String(formData.get("consultant_id") ?? "").trim();
-  const periodMonthRaw = String(formData.get("period_month") ?? "").trim(); // "YYYY-MM" from <input type="month">
-  const amountRaw = String(formData.get("amount") ?? "").trim();
-
-  if (!pipelineRowId) return { error: "Missing pipeline row.", saved: false };
-  if (!/^\d{4}-\d{2}$/.test(periodMonthRaw)) return { error: "Pick a month.", saved: false };
-
-  const amount = Number(amountRaw);
-  // Zero is excluded (matches the DB's `amount <> 0` check) — a no-op entry
-  // isn't a real ledger event. Negative IS allowed: that's how a mistaken
-  // entry gets corrected (see database/migrations/062) — this action never
-  // edits or deletes a prior row, only ever appends.
-  if (!Number.isFinite(amount) || amount === 0) {
-    return { error: "Enter a non-zero amount (negative for a correcting adjustment).", saved: false };
-  }
+  if (!id) return { error: "Missing relationship.", saved: false };
 
   const supabase = await createClient();
 
-  const { data: pipelineRow } = await supabase
-    .from("partnerships_consultant_clubs")
-    .select("commission_type")
-    .eq("id", pipelineRowId)
-    .single();
-  if (!pipelineRow) return { error: "Pipeline row not found.", saved: false };
-  if (pipelineRow.commission_type !== "recurring_monthly") {
-    return { error: "This row isn't set to recurring commission.", saved: false };
+  // partnership_contracts.pipeline_row_id cascades on delete — removing the
+  // relationship would silently take every contract (and its schedule and
+  // documents) with it. Blocked rather than allowed-with-a-warning: this is
+  // financial history, not a pipeline note.
+  const { count } = await supabase
+    .from("partnership_contracts")
+    .select("*", { count: "exact", head: true })
+    .eq("pipeline_row_id", id);
+  if ((count ?? 0) > 0) {
+    return {
+      error: `Can't remove — ${count} contract${count === 1 ? "" : "s"} exist under this relationship. Contracts are permanent financial records and are never deleted from here.`,
+      saved: false,
+    };
   }
 
-  const { error: insertError } = await supabase.from("partnerships_commission_payments").insert({
-    pipeline_row_id: pipelineRowId,
-    period_month: `${periodMonthRaw}-01`,
-    amount,
-  });
-  if (insertError) return { error: `Couldn't log payment: ${insertError.message}`, saved: false };
-
-  // amount_paid/last_paid_at on the pipeline row are a maintained cache of
-  // the ledger sum, so every existing reader (rollup totals, the
-  // consultant's own dashboard) keeps working without a query change. Read
-  // the current cached total rather than assuming this insert is the first,
-  // since a recurring row can accumulate many log entries over time.
-  const { data: current } = await supabase
-    .from("partnerships_consultant_clubs")
-    .select("amount_paid")
-    .eq("id", pipelineRowId)
-    .single();
-  const newTotal = Number(current?.amount_paid ?? 0) + amount;
-
-  const { error: updateError } = await supabase
-    .from("partnerships_consultant_clubs")
-    .update({ amount_paid: newTotal, last_paid_at: new Date().toISOString() })
-    .eq("id", pipelineRowId);
-  if (updateError) return { error: `Payment logged, but the running total failed to update: ${updateError.message}`, saved: false };
+  const { error } = await supabase.from("partnerships_consultant_clubs").delete().eq("id", id);
+  if (error) return { error: `Couldn't remove: ${error.message}`, saved: false };
 
   revalidatePath(`/super-admin/partnerships/${consultantId}`);
   revalidatePath("/super-admin/partnerships");
   return { error: null, saved: true };
 }
 
-export async function removeConsultantAssignment(
-  _prev: PipelineState,
+// ---------------------------------------------------------------------------
+// Contracts
+// ---------------------------------------------------------------------------
+
+export interface ContractState {
+  error: string | null;
+  saved: boolean;
+}
+
+function extFromFile(file: File): string {
+  const fromName = file.name.split(".").pop();
+  if (fromName && /^[a-z0-9]{2,5}$/i.test(fromName)) return fromName.toLowerCase();
+  const fromType = file.type.split("/").pop();
+  return fromType ?? "bin";
+}
+
+/**
+ * Uploaded documents are validated as a whole BEFORE anything is written —
+ * a bad file in the batch must fail cleanly with no contract row created,
+ * not leave an orphaned contract with a partial document set.
+ */
+function validateDocuments(files: File[]): string | null {
+  if (files.length > CONTRACT_DOC_MAX_FILES) {
+    return `Attach at most ${CONTRACT_DOC_MAX_FILES} files (${files.length} selected).`;
+  }
+  for (const file of files) {
+    if (file.size > CONTRACT_DOC_MAX_BYTES) {
+      return `"${file.name}" is over the 10MB limit.`;
+    }
+    if (!CONTRACT_DOC_ALLOWED_TYPES.has(file.type)) {
+      return `"${file.name}" is not a supported file type (PDF, JPG, PNG, HEIC only).`;
+    }
+  }
+  return null;
+}
+
+/**
+ * partnership_contract_documents.file_url stores the STORAGE PATH, not a
+ * public URL — partnership-contract-docs is a private bucket (same
+ * convention as reports.file_url; see lib/reportPdfDelivery.ts). Callers
+ * mint a short-lived signed URL at download time instead
+ * (app/api/partnerships/contract-documents/[documentId]/route.ts).
+ *
+ * Best-effort per file: one failed upload does not lose the others, or the
+ * contract/schedule already committed. Returns how many of the given files
+ * actually made it in, and the first error message if any didn't.
+ */
+async function uploadContractDocuments(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  contractId: string,
+  files: File[],
+  uploadedBy: string
+): Promise<{ uploaded: number; failed: number; firstError: string | null }> {
+  let uploaded = 0;
+  let failed = 0;
+  let firstError: string | null = null;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const path = `${contractId}/${Date.now()}-${i}.${extFromFile(file)}`;
+    const { error: uploadError } = await supabase.storage
+      .from("partnership-contract-docs")
+      .upload(path, file, { contentType: file.type });
+    if (uploadError) {
+      failed++;
+      firstError ??= `"${file.name}": ${uploadError.message}`;
+      continue;
+    }
+    const { error: rowError } = await supabase.from("partnership_contract_documents").insert({
+      contract_id: contractId,
+      file_url: path,
+      file_name: file.name,
+      uploaded_by: uploadedBy,
+    });
+    if (rowError) {
+      failed++;
+      firstError ??= `"${file.name}" uploaded but wasn't recorded: ${rowError.message}`;
+      // Otherwise this leaves an orphaned object with nothing pointing to it
+      // — the same gap lib/reportPdfDelivery.ts documents as still open for
+      // report PDFs (migration 065's header). Best-effort: if the delete
+      // itself fails there is nothing more useful to do than move on.
+      await supabase.storage.from("partnership-contract-docs").remove([path]);
+      continue;
+    }
+    uploaded++;
+  }
+
+  return { uploaded, failed, firstError };
+}
+
+/**
+ * Creates a contract and its full payment schedule together, ATOMICALLY, via
+ * the create_partnership_contract() RPC (migration 065) — a contract can
+ * never be left committed without the schedule the UI's "at a glance" view
+ * depends on, because both inserts happen inside one Postgres function call.
+ *
+ * Document uploads happen after, as a separate, best-effort step — Storage
+ * objects are not part of any Postgres transaction, so they cannot be folded
+ * into the same atomic step; a failure there never risks the contract or
+ * schedule, which are already committed by then.
+ *
+ * commission_type does NOT require the relationship to be at any particular
+ * stage (owner-confirmed, not guessed: a contract can be created during
+ * `pilot`) and never advances stage itself — that stays a separate,
+ * deliberate action (updateRelationshipStage).
+ *
+ * INTERIM UI CONSTRAINT, not a schema rule: a recurring contract must have
+ * an end_date here, because auto-generating a schedule needs a bound.
+ * partnership_contracts.end_date itself stays nullable at the database
+ * level (migration 063 allows open-ended contracts) — a one_time contract
+ * may still be created with no end_date, since it only ever gets the one
+ * schedule row regardless of dates.
+ */
+export async function createContract(
+  _prev: ContractState,
   formData: FormData
-): Promise<PipelineState> {
+): Promise<ContractState> {
   if (!(await hasRole("super_admin"))) {
     return { error: "You don't have permission to do this.", saved: false };
   }
+
+  const pipelineRowId = String(formData.get("pipeline_row_id") ?? "").trim();
+  const consultantId = String(formData.get("consultant_id") ?? "").trim();
+  const startDate = String(formData.get("start_date") ?? "").trim();
+  const endDateRaw = String(formData.get("end_date") ?? "").trim();
+  const commissionType = String(formData.get("commission_type") ?? "").trim();
+  const paymentFrequencyRaw = String(formData.get("payment_frequency") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const dealValue = parseOptionalNumber(formData.get("deal_value"));
+  const commissionPercent = parseOptionalNumber(formData.get("commission_percent"));
+  const recurringAmount = parseOptionalNumber(formData.get("recurring_amount"));
+
+  if (!pipelineRowId) return { error: "Missing relationship.", saved: false };
+  if (!DATE_RE.test(startDate)) return { error: "Enter a valid start date.", saved: false };
+  if (!VALID_COMMISSION_TYPES.includes(commissionType)) {
+    return { error: "Invalid commission type.", saved: false };
+  }
+  const endDate = endDateRaw === "" ? null : endDateRaw;
+  if (endDate !== null && !DATE_RE.test(endDate)) {
+    return { error: "Enter a valid end date.", saved: false };
+  }
+  if (endDate !== null && endDate < startDate) {
+    return { error: "End date can't be before the start date.", saved: false };
+  }
+
+  const isRecurring = commissionType === "recurring";
+  let paymentFrequency: string | null = null;
+  let scheduleRows: { due_date: string; expected_amount: number }[] = [];
+
+  if (isRecurring) {
+    paymentFrequency = paymentFrequencyRaw;
+    if (!VALID_FREQUENCIES.includes(paymentFrequency)) {
+      return { error: "Pick a payment frequency (monthly or yearly).", saved: false };
+    }
+    if (endDate === null) {
+      return { error: "A recurring contract needs an end date — it's what bounds the generated payment schedule.", saved: false };
+    }
+    if (recurringAmount === null || !Number.isFinite(recurringAmount) || recurringAmount <= 0) {
+      return { error: "Enter the amount due per payment.", saved: false };
+    }
+    const dueDates = generateScheduleDueDates(startDate, endDate, paymentFrequency as "monthly" | "yearly");
+    if (dueDates.length === 0) {
+      return { error: "No payment dates fall between the start and end date.", saved: false };
+    }
+    scheduleRows = dueDates.map((due_date) => ({ due_date, expected_amount: recurringAmount }));
+  } else {
+    if (dealValue !== null && (!Number.isFinite(dealValue) || dealValue < 0)) {
+      return { error: "Deal value must be a positive number.", saved: false };
+    }
+    if (commissionPercent !== null && (!Number.isFinite(commissionPercent) || commissionPercent < 0 || commissionPercent > 100)) {
+      return { error: "Commission must be a percentage between 0 and 100.", saved: false };
+    }
+    const amount = computeOneTimeAmount(dealValue, commissionPercent);
+    if (amount === null || amount <= 0) {
+      return { error: "Enter a deal value (and, optionally, a commission %) that gives a positive one-time amount.", saved: false };
+    }
+    scheduleRows = [{ due_date: startDate, expected_amount: amount }];
+  }
+
+  const documentFiles = formData
+    .getAll("documents")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+  const docError = validateDocuments(documentFiles);
+  if (docError) return { error: docError, saved: false };
+
+  const profile = await getCurrentProfile();
+  const supabase = await createClient();
+
+  // Contract + schedule land together via a single RPC (migration 065),
+  // which Postgres runs as one implicit transaction — either both are
+  // written or neither is. Two separate .insert() calls here previously
+  // left a real gap: a contract could commit with zero schedule rows if the
+  // second call failed. See migration 065's header for the full account.
+  const rpcArgs: CreateContractArgs = {
+    p_pipeline_row_id: pipelineRowId,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_commission_type: commissionType,
+    p_payment_frequency: paymentFrequency,
+    p_deal_value: dealValue,
+    p_commission_percent: isRecurring ? null : commissionPercent,
+    p_recurring_amount: isRecurring ? recurringAmount : null,
+    p_notes: notes || null,
+    p_created_by: profile?.id ?? null,
+    p_schedule: scheduleRows,
+  };
+  const { data: contractId, error: rpcError } = await supabase.rpc(
+    "create_partnership_contract",
+    rpcArgs as unknown as Parameters<typeof supabase.rpc<"create_partnership_contract">>[1]
+  );
+  if (rpcError || !contractId) {
+    return { error: `Couldn't save the contract: ${rpcError?.message ?? "unknown error"}`, saved: false };
+  }
+
+  // Storage objects are never part of a Postgres transaction — this step is
+  // best-effort, deliberately, and can never roll back the contract/schedule
+  // above (those are already committed by this point). Cleanup-on-failure
+  // for an individual file lives inside uploadContractDocuments itself.
+  if (documentFiles.length > 0 && profile) {
+    const { failed, firstError } = await uploadContractDocuments(supabase, contractId, documentFiles, profile.id);
+    if (failed > 0) {
+      revalidatePath(`/super-admin/partnerships/${consultantId}`);
+      return {
+        error: `Contract and payment schedule saved, but ${failed} of ${documentFiles.length} document(s) failed to upload: ${firstError}`,
+        saved: true,
+      };
+    }
+  }
+
+  revalidatePath(`/super-admin/partnerships/${consultantId}`);
+  revalidatePath("/super-admin/partnerships");
+  return { error: null, saved: true };
+}
+
+/**
+ * Terms-only edit. commission_type and payment_frequency are deliberately
+ * NOT editable here (locked after creation, always — this phase does not
+ * attempt schedule regeneration on an edit; changing the payment cadence of
+ * an existing contract, if ever needed, is a delete-and-recreate). The
+ * payment schedule itself is not touched by this action at all.
+ */
+export async function updateContract(
+  _prev: ContractState,
+  formData: FormData
+): Promise<ContractState> {
+  if (!(await hasRole("super_admin"))) {
+    return { error: "You don't have permission to do this.", saved: false };
+  }
+
   const id = String(formData.get("id") ?? "").trim();
   const consultantId = String(formData.get("consultant_id") ?? "").trim();
-  if (!id) return { error: "Missing pipeline row.", saved: false };
+  const startDate = String(formData.get("start_date") ?? "").trim();
+  const endDateRaw = String(formData.get("end_date") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const dealValue = parseOptionalNumber(formData.get("deal_value"));
+  const commissionPercent = parseOptionalNumber(formData.get("commission_percent"));
+  const recurringAmount = parseOptionalNumber(formData.get("recurring_amount"));
+  const terminated = formData.get("terminated") === "on";
+
+  if (!id) return { error: "Missing contract.", saved: false };
+  if (!DATE_RE.test(startDate)) return { error: "Enter a valid start date.", saved: false };
+  const endDate = endDateRaw === "" ? null : endDateRaw;
+  if (endDate !== null && !DATE_RE.test(endDate)) {
+    return { error: "Enter a valid end date.", saved: false };
+  }
+  if (endDate !== null && endDate < startDate) {
+    return { error: "End date can't be before the start date.", saved: false };
+  }
+  if (dealValue !== null && (!Number.isFinite(dealValue) || dealValue < 0)) {
+    return { error: "Deal value must be a positive number.", saved: false };
+  }
+  if (commissionPercent !== null && (!Number.isFinite(commissionPercent) || commissionPercent < 0 || commissionPercent > 100)) {
+    return { error: "Commission must be a percentage between 0 and 100.", saved: false };
+  }
+  if (recurringAmount !== null && (!Number.isFinite(recurringAmount) || recurringAmount < 0)) {
+    return { error: "Amount per payment must be a positive number.", saved: false };
+  }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("partnerships_consultant_clubs").delete().eq("id", id);
-  if (error) return { error: `Couldn't remove: ${error.message}`, saved: false };
+
+  const { data: existing } = await supabase
+    .from("partnership_contracts")
+    .select("commission_type, terminated_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing) return { error: "Contract not found.", saved: false };
+
+  const isRecurring = existing.commission_type === "recurring";
+  const terminatedAt = terminated ? existing.terminated_at ?? new Date().toISOString() : null;
+
+  const { error } = await supabase
+    .from("partnership_contracts")
+    .update({
+      start_date: startDate,
+      end_date: endDate,
+      deal_value: dealValue,
+      commission_percent: isRecurring ? null : commissionPercent,
+      recurring_amount: isRecurring ? recurringAmount : null,
+      notes: notes || null,
+      terminated_at: terminatedAt,
+    })
+    .eq("id", id);
+  if (error) return { error: `Couldn't save: ${error.message}`, saved: false };
 
   revalidatePath(`/super-admin/partnerships/${consultantId}`);
   revalidatePath("/super-admin/partnerships");

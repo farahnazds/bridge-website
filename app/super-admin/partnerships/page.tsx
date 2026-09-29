@@ -6,63 +6,80 @@ import { BTN_PRIMARY, CARD, NOTICE } from "@/lib/ui";
 export const metadata: Metadata = { title: "Partnerships — Super Admin — Bridgetx" };
 
 // docs/03-site-map.md: "Partnerships Consultants, Brand Partners — add,
-// assign, view as". This page covers Partnerships Consultants only —
-// Brand Partners is a separate, simpler concept (one brand, aggregate data,
-// no commission) and stays out of scope here; its own admin page
-// (/admin/brand-partners) is untouched.
+// assign, view as". This page covers Partnerships Consultants only.
 //
 // Super-Admin-only, same class as Billing (view-only for Admin) and the
-// Clinical Library (hidden from Admin entirely) — commission/payment figures
-// are financial data. Lives under /super-admin, not the shared /admin
-// layout, for that reason: app/super-admin/layout.tsx already redirects
-// anyone who isn't super_admin, so there is no separate check needed here.
+// Clinical Library (hidden from Admin entirely) — financial data. Lives
+// under /super-admin; app/super-admin/layout.tsx already redirects anyone
+// who isn't super_admin.
+//
+// RELATIONSHIP-LEVEL ONLY (migration 063). Deal totals (owed/paid) used to
+// roll up here directly from partnerships_consultant_clubs; that data now
+// lives on partnership_contracts/partnership_payment_schedule, several rows
+// per relationship. This page reads those base tables DIRECTLY — not the
+// partnership_consultant_totals view (migration 063), which is scoped by
+// `where cons.profile_id = current_profile_id()` for the CONSULTANT's own
+// read path and returns nothing for Super Admin, whose profile never
+// matches that predicate. Super Admin already has its own `for all`
+// policy on the base tables, so this page just reads them straight and
+// aggregates here, same as the pre-063 version did.
 
 type ProfileRow = { first_name: string | null; last_name: string | null; email: string };
 type ConsultantRow = { id: string; created_at: string; profiles: ProfileRow | null };
-type PipelineRow = {
-  consultant_id: string; deal_value: number | null; commission_percent: number | null;
-  commission_type: string; recurring_monthly_amount: number | null; amount_paid: number;
-};
+type RelationshipRow = { id: string; consultant_id: string };
+type ContractRow = { id: string; pipeline_row_id: string };
+type ScheduleRow = { contract_id: string; expected_amount: number; paid_at: string | null };
 
 export default async function PartnershipsPage() {
   const supabase = await createClient();
 
-  const [consultantsRes, pipelineRes] = await Promise.all([
+  const [consultantsRes, relationshipsRes, contractsRes, scheduleRes] = await Promise.all([
     supabase
       .from("partnerships_consultants")
       .select("id, created_at, profiles!profile_id(first_name, last_name, email)")
       .order("created_at", { ascending: false }),
-    supabase
-      .from("partnerships_consultant_clubs")
-      .select("consultant_id, deal_value, commission_percent, commission_type, recurring_monthly_amount, amount_paid"),
+    supabase.from("partnerships_consultant_clubs").select("id, consultant_id"),
+    supabase.from("partnership_contracts").select("id, pipeline_row_id"),
+    supabase.from("partnership_payment_schedule").select("contract_id, expected_amount, paid_at"),
   ]);
 
   const consultants = (consultantsRes.data ?? []) as unknown as ConsultantRow[];
-  const pipeline = (pipelineRes.data ?? []) as PipelineRow[];
+  const relationships = (relationshipsRes.data ?? []) as RelationshipRow[];
+  const contracts = (contractsRes.data ?? []) as ContractRow[];
+  const scheduleRows = (scheduleRes.data ?? []) as ScheduleRow[];
 
-  // "Owed" only ever applies to one_time rows — it needs a fixed target
-  // (deal_value × %) to compute against. Recurring rows have no such target
-  // (no billing feed to check against, see database/migrations/062), so they
-  // contribute to "Paid" (their logged-payments cache) and to a separate
-  // "Recurring/mo" figure, never to "Owed" — deliberately, not an omission.
-  const totalsByConsultant = new Map<string, { clubs: number; owed: number; paid: number; recurringMonthly: number }>();
-  for (const row of pipeline) {
-    const t = totalsByConsultant.get(row.consultant_id) ?? { clubs: 0, owed: 0, paid: 0, recurringMonthly: 0 };
-    t.clubs += 1;
-    if (row.commission_type === "recurring_monthly") {
-      t.recurringMonthly += Number(row.recurring_monthly_amount ?? 0);
-    } else {
-      const commission =
-        row.deal_value !== null && row.commission_percent !== null
-          ? (Number(row.deal_value) * Number(row.commission_percent)) / 100
-          : 0;
-      t.owed += Math.max(commission - Number(row.amount_paid), 0);
-    }
-    t.paid += Number(row.amount_paid);
-    totalsByConsultant.set(row.consultant_id, t);
+  const consultantByRelationship = new Map(relationships.map((r) => [r.id, r.consultant_id]));
+  const consultantByContract = new Map(
+    contracts.map((c) => [c.id, consultantByRelationship.get(c.pipeline_row_id) ?? null])
+  );
+
+  const totalsByConsultant = new Map<
+    string,
+    { clubs: number; contracts: number; paid: number; outstanding: number }
+  >();
+  const ensure = (consultantId: string) => {
+    const existing = totalsByConsultant.get(consultantId);
+    if (existing) return existing;
+    const fresh = { clubs: 0, contracts: 0, paid: 0, outstanding: 0 };
+    totalsByConsultant.set(consultantId, fresh);
+    return fresh;
+  };
+  for (const rel of relationships) {
+    ensure(rel.consultant_id).clubs += 1;
+  }
+  for (const contract of contracts) {
+    const consultantId = consultantByContract.get(contract.id);
+    if (consultantId) ensure(consultantId).contracts += 1;
+  }
+  for (const row of scheduleRows) {
+    const consultantId = consultantByContract.get(row.contract_id);
+    if (!consultantId) continue;
+    const t = ensure(consultantId);
+    if (row.paid_at) t.paid += Number(row.expected_amount);
+    else t.outstanding += Number(row.expected_amount);
   }
 
-  const error = consultantsRes.error ?? pipelineRes.error;
+  const error = consultantsRes.error ?? relationshipsRes.error ?? contractsRes.error ?? scheduleRes.error;
 
   return (
     <div className="flex flex-col gap-8">
@@ -106,14 +123,14 @@ export default async function PartnershipsPage() {
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Consultant</th>
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Clubs</th>
-                <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Owed</th>
+                <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Contracts</th>
+                <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Outstanding</th>
                 <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Paid</th>
-                <th className="px-5 py-3 font-medium" style={{ color: "var(--text-muted)" }}>Recurring/mo</th>
               </tr>
             </thead>
             <tbody>
               {consultants.map((c, i) => {
-                const t = totalsByConsultant.get(c.id) ?? { clubs: 0, owed: 0, paid: 0, recurringMonthly: 0 };
+                const t = totalsByConsultant.get(c.id) ?? { clubs: 0, contracts: 0, paid: 0, outstanding: 0 };
                 const name = [c.profiles?.first_name, c.profiles?.last_name].filter(Boolean).join(" ") || c.profiles?.email || "—";
                 return (
                   <tr key={c.id} style={{ borderTop: i > 0 ? "1px solid var(--border)" : undefined }}>
@@ -130,14 +147,14 @@ export default async function PartnershipsPage() {
                     <td className="px-5 py-3" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
                       {t.clubs}
                     </td>
-                    <td className="px-5 py-3" style={{ color: t.owed > 0 ? "var(--warning)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
-                      AED {t.owed.toFixed(0)}
+                    <td className="px-5 py-3" style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+                      {t.contracts}
+                    </td>
+                    <td className="px-5 py-3" style={{ color: t.outstanding > 0 ? "var(--warning)" : "var(--text)", fontVariantNumeric: "tabular-nums" }}>
+                      AED {t.outstanding.toFixed(0)}
                     </td>
                     <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
                       AED {t.paid.toFixed(0)}
-                    </td>
-                    <td className="px-5 py-3" style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
-                      {t.recurringMonthly > 0 ? `AED ${t.recurringMonthly.toFixed(0)}` : "—"}
                     </td>
                   </tr>
                 );

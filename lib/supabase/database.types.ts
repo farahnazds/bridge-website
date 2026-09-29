@@ -3555,6 +3555,22 @@ export type Database = {
         Args: { p_recipient_id: string }
         Returns: boolean
       }
+      create_partnership_contract: {
+        Args: {
+          p_commission_percent: number
+          p_commission_type: string
+          p_created_by: string
+          p_deal_value: number
+          p_end_date: string
+          p_notes: string
+          p_payment_frequency: string
+          p_pipeline_row_id: string
+          p_recurring_amount: number
+          p_schedule: Json
+          p_start_date: string
+        }
+        Returns: string
+      }
       current_profile_id: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
       has_independent_access_to_athlete: {

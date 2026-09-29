@@ -2005,3 +2005,58 @@ bucket — deny by default, matching the base-table RLS above.
 
 See `database/migrations/063_partnership_contracts_restructure.sql` and
 `database/migrations/064_partnership_storage_policies.sql`.
+
+## Added: create_partnership_contract() — atomic contract + schedule insert (2026-09-29)
+
+Migration 065. Found during Phase 2 UI review, before commit: the
+`createContract` server action (`app/super-admin/partnerships/actions.ts`)
+wrote `partnership_contracts` and `partnership_payment_schedule` as two
+SEPARATE PostgREST calls. Each call is atomic on its own; the pair was not.
+A failure between them (dropped connection, a validation gap, PostgREST
+timing out) could leave a real, committed contract row with zero schedule
+rows — a contract nothing is ever expected to be paid against, silently
+sitting in the list. The action surfaced this in its error message rather
+than hiding it, but disclosure is not prevention, and this is financial
+data.
+
+`create_partnership_contract(...)` wraps both inserts in one plpgsql
+function call, which Postgres runs as a single implicit transaction — any
+exception anywhere inside (a bad cast, a constraint violation, an RLS
+denial) rolls back everything the function did. **Verified live, not
+assumed**: called directly via a real Super Admin session token with a
+deliberately malformed schedule entry (`due_date: "not-a-real-date"`) —
+the call errored as expected, and a follow-up query confirmed **zero**
+contract rows were left behind. A second call with valid data confirmed
+the happy path lands both the contract and its schedule row together.
+
+```
+language plpgsql   -- SECURITY INVOKER (the default — no `security definer`)
+```
+
+Deliberately NOT `security definer`, unlike `register_push_token()`
+(migration 059): there is no privilege gap to bridge here the way an
+athlete registering a token they don't yet own has. Super Admin already
+holds an unconditional `for all using (is_super_admin())` on both
+`partnership_contracts` and `partnership_payment_schedule`, so a plain
+invoker function gets exactly the same access an ordinary insert from that
+role would — RLS enforces it, same as everywhere else in this feature. The
+`is_super_admin()` check at the top of the function body exists only to
+turn a raw RLS-violation error into a clear one; it is not an additional
+privilege boundary, RLS still is.
+
+`revoke all ... from public, anon; grant execute ... to authenticated;` —
+same shape as every other write path here: broad execute grant, RLS (and
+the explicit check above it) is what actually gates who can succeed.
+
+Document uploads are deliberately NOT part of this function — Storage
+objects are never inside a Postgres transaction, so no SQL function can
+cover them. That gap is closed differently: `uploadContractDocuments()` in
+`actions.ts` now deletes a just-uploaded storage object if the follow-up
+`partnership_contract_documents` row insert fails, so a failed document
+never leaves an orphaned file with nothing pointing to it (closing, for
+this feature, the same class of gap `lib/reportPdfDelivery.ts` documents
+as still open for report PDFs). A failed document upload can no longer
+risk the contract or schedule either way — those are already committed,
+atomically, by the time any document is attempted.
+
+See `database/migrations/065_create_partnership_contract_atomic.sql`.

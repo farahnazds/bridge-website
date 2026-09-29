@@ -362,12 +362,23 @@ export const PARTNERSHIP_STAGE_STYLE: Record<string, { label: string; color: str
   terminated: { label: "Terminated", color: "var(--danger)" },
 };
 
-/** partnerships_consultant_clubs.commission_type — chosen per (consultant,
- *  club) pairing, not partner-wide. See database/migrations/062. */
-export const COMMISSION_TYPES = ["one_time", "recurring_monthly"] as const;
+/** partnership_contracts.commission_type — chosen per CONTRACT, not per
+ *  relationship (migration 063; a relationship can hold contracts of both
+ *  types over time). Renamed from partnerships_consultant_clubs' old
+ *  `recurring_monthly` — the payment CADENCE for a recurring contract is now
+ *  its own field, payment_frequency, since it can be monthly or yearly. */
+export const COMMISSION_TYPES = ["one_time", "recurring"] as const;
 export const COMMISSION_TYPE_LABEL: Record<string, string> = {
   one_time: "One-time",
-  recurring_monthly: "Recurring (monthly)",
+  recurring: "Recurring",
+};
+
+/** partnership_contracts.payment_frequency — only meaningful when
+ *  commission_type is 'recurring' (migration 063). */
+export const PAYMENT_FREQUENCIES = ["monthly", "yearly"] as const;
+export const PAYMENT_FREQUENCY_LABEL: Record<string, string> = {
+  monthly: "Monthly",
+  yearly: "Yearly",
 };
 
 // `vald_data.test_type` is free text (schema.sql comments it "e.g. cmj,
