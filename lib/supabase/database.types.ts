@@ -3232,6 +3232,25 @@ export type Database = {
           },
         ]
       }
+      // Hand-added for the 2026-09-30 production hotfix
+      // (app/partner-consultant/[id]/page.tsx) — this ONE entry, not a full
+      // regeneration. A full `supabase gen types` run against the current
+      // live database would also pull in every other migration since this
+      // branch's 2026-08-28 base (058 through 065+), which is unrelated to
+      // this fix and explicitly out of scope for it. Row shape copied
+      // verbatim from the dev branch's already-regenerated types, which are
+      // themselves generated from this same live view (migration 063).
+      partnership_consultant_totals: {
+        Row: {
+          contract_count: number | null
+          next_due_date: string | null
+          pipeline_row_id: string | null
+          total_expected: number | null
+          total_outstanding: number | null
+          total_paid: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       athlete_has_any_team: { Args: { p_athlete_id: string }; Returns: boolean }
