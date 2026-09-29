@@ -1,6 +1,6 @@
 import "server-only";
 import { Resend } from "resend";
-import { EMAIL_LOGO_CONTENT_ID, bookingConfirmedEmail, complianceAlertEmail, newLeadEmail, reportSharedEmail } from "@/lib/emailTemplates";
+import { EMAIL_LOGO_CONTENT_ID, bookingConfirmedEmail, complianceAlertEmail, newLeadEmail, reportSharedEmail, partnershipPaymentReminderEmail } from "@/lib/emailTemplates";
 import { EMAIL_LOGO_BASE64 } from "@/lib/emailLogo";
 
 // Server-only — never expose RESEND_API_KEY to the client.
@@ -197,6 +197,42 @@ export async function sendBookingConfirmedEmail(params: {
       },
     ],
   });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Internal reminder for the partnerships payment cron
+ * (app/api/cron/partnership-payment-reminders/route.ts), a set number of
+ * days before a scheduled partnership commission payment falls due. Same
+ * admin-inbox pattern as sendLeadNotificationEmail — the caller supplies the
+ * recipient rather than this file hardcoding a second constant, since the
+ * cron route already resolves it once.
+ */
+export async function sendPartnershipPaymentReminderEmail(params: {
+  to: string;
+  clubName: string;
+  consultantName: string;
+  dueDate: string;
+  amount: string;
+  daysBefore: number;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured.");
+  }
+
+  const { subject, html } = partnershipPaymentReminderEmail({
+    clubName: params.clubName,
+    consultantName: params.consultantName,
+    dueDate: params.dueDate,
+    amount: params.amount,
+    daysBefore: params.daysBefore,
+  });
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({ from: FROM_ADDRESS, to: params.to, subject, html, attachments: [LOGO_ATTACHMENT] });
 
   if (error) {
     throw new Error(error.message);

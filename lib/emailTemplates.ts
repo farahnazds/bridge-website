@@ -470,3 +470,55 @@ export function bookingConfirmedEmail(params: {
 
   return { subject: `Your meeting with Bridgetx — ${params.dateLine}, ${params.timeLine}`, html };
 }
+
+// ---------------------------------------------------------------------------
+// 5. Partnership payment reminder (internal) — Phase 5
+// ---------------------------------------------------------------------------
+// Sent by app/api/cron/partnership-payment-reminders/route.ts, days before a
+// partnership_payment_schedule row's due_date, to admin@bridgetx.co. Same
+// compact internal-notification variant as newLeadEmail above (this is not
+// customer-facing, same as that one) rather than the standard letter shape.
+
+export function partnershipPaymentReminderEmail(params: {
+  clubName: string;
+  consultantName: string;
+  /** Pre-formatted, e.g. "2026-10-15" — the row's own due_date, verbatim. */
+  dueDate: string;
+  /** Pre-formatted, e.g. "AED 1000". */
+  amount: string;
+  daysBefore: number;
+}): { subject: string; html: string } {
+  const p = {
+    club: escapeHtml(params.clubName),
+    consultant: escapeHtml(params.consultantName),
+    due: escapeHtml(params.dueDate),
+    amount: escapeHtml(params.amount),
+  };
+  const html = shell(
+    `Payment due soon: ${p.club}`,
+    `${p.amount} is due ${p.due} for ${p.club} — referred by ${p.consultant}.`,
+    [
+      logoHeader("INTERNAL&nbsp;&middot;&nbsp;PARTNERSHIPS", true),
+      eyebrow("#F5A524", "#B8791A", "Partnership payment due soon", 26),
+      h1(`Payment due in ${params.daysBefore} days: ${p.club}`, 25, 32, 13, "-0.5px"),
+      bodyPara(
+        `A scheduled partnership commission payment for ${p.club} is due on ${p.due}. This club was referred by ${p.consultant}.`,
+        10, 14, 22
+      ),
+      factPanel(
+        factRow("Club", p.club, "first", true) +
+          factRow("Consultant", p.consultant, "mid", true) +
+          factRow("Amount due", p.amount, "mid", true) +
+          factRow("Due date", p.due, "last", true),
+        20
+      ),
+      ctaButton(`${SITE}/super-admin/partnerships`, "View in Partnerships", true),
+      divider(26),
+      `<tr><td class="pad" style="padding:16px 36px 26px;">
+        <p style="margin:0;font-family:${FONT_BODY};font-size:11.5px;line-height:18px;mso-line-height-rule:exactly;color:#8A94AC;">Internal notification — sent ${params.daysBefore} days before a scheduled partnership payment falls due. Not customer-facing.</p>
+      </td></tr>`,
+    ].join("\n"),
+    22, 29
+  );
+  return { subject: `Payment due soon: ${params.clubName} (${params.dueDate})`, html };
+}
