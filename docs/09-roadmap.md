@@ -56,7 +56,8 @@ scoped to their own rows only.
 **Confirmed with the owner before building, not guessed:** one-time
 commission only (no recurring-%-of-subscription — there's no live billing
 feed to calculate that against yet, Stripe is not active); the existing
-four-stage pipeline (contacted/pilot/signed/churned) kept as-is; paid-vs-owed
+four-stage pipeline (contacted/pilot/signed/terminated — renamed from
+"churned" in migration 063) kept as-is; paid-vs-owed
 tracked, not just displayed; Admin gets no access at all, not even
 view-only.
 

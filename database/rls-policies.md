@@ -1894,3 +1894,114 @@ as Super Admin's own reference note — never read in any commission
 calculation for a recurring row.
 
 See `database/migrations/062_partnerships_recurring_commission.sql`.
+
+## Restructure: relationship / contract / payment schedule (2026-09-29)
+
+Migration 063. Verified live immediately before writing this migration: 3
+pipeline rows (stages `contacted`/`signed`, none `churned`), 2 consultants —
+both plainly test accounts (`test.consultant@bridgetx.test`,
+`farahnazdeej+partner@gmail.com`) — and 0 rows in
+`partnerships_commission_payments`. Nothing real to preserve, so this
+restructure drops columns/tables outright rather than migrating data
+forward.
+
+**`partnerships_consultant_clubs`** slims down to the relationship only:
+`id, consultant_id, club_id, stage, created_at`. `deal_value`,
+`commission_percent`, `commission_type`, `recurring_monthly_amount`,
+`amount_paid`, `last_paid_at`, `notes` are all dropped — a relationship can
+now hold many contracts over time instead of one deal baked into the row.
+Its two existing policies (`super admin full access` / `consultant reads own
+pipeline`) are untouched; they already covered the columns that remain.
+`stage`'s `churned` value is renamed to `terminated` (constraint
+`partnerships_consultant_clubs_stage_check` dropped and re-added; no rows
+needed the data-level UPDATE, but it runs regardless of today's data).
+
+**`partnerships_commission_payments` is dropped entirely** — superseded by
+the payment-schedule table below, which already carries "was this paid" via
+`paid_at` on each expected-date row, making a separate retroactive ledger
+redundant for anything built after this migration.
+
+**Three new tables — `partnership_contracts`, `partnership_payment_schedule`,
+`partnership_contract_documents` — get ONE policy each:**
+
+```
+"super admin full access" for all using (is_super_admin())
+```
+
+No policy at all for the `partnerships_consultant` role, on any of the
+three — a deliberate departure from 061/062's shape. Those two let the
+consultant read their own row directly because the added columns were
+simple scalars on a row they already fully owned. Here, a raw "own rows"
+SELECT policy would still hand back full contract terms, commission
+percentages, and document/proof URLs — RLS is row-level, not column-level
+(migration 025 hit exactly this mistake against `clubs` and fixed it with a
+SECURITY DEFINER view; same shape applies here). So the base tables are
+closed to the consultant outright, and instead:
+
+**`partnership_consultant_totals`** (new SECURITY DEFINER view, pattern
+copied from `consultant_referred_clubs` — migrations 025/052):
+
+```sql
+create view partnership_consultant_totals with (security_barrier = true) as
+  select pcc.id as pipeline_row_id,
+         count(distinct con.id) as contract_count,
+         coalesce(sum(sched.expected_amount), 0) as total_expected,
+         coalesce(sum(...) filter (where paid_at is not null), 0) as total_paid,
+         coalesce(sum(...) filter (where paid_at is null), 0) as total_outstanding,
+         min(due_date) filter (where paid_at is null) as next_due_date
+  from partnerships_consultant_clubs pcc
+  join partnerships_consultants cons on cons.id = pcc.consultant_id
+  left join partnership_contracts con on con.pipeline_row_id = pcc.id
+  left join partnership_payment_schedule sched on sched.contract_id = con.id
+  where cons.profile_id = current_profile_id()
+  group by pcc.id;
+```
+
+`security_invoker` stays at its default (`false`) — the view runs as its
+owner and therefore bypasses RLS on the three tables above, which is
+required since none of them grant the consultant role anything directly.
+`where cons.profile_id = current_profile_id()` is the entire access
+boundary, takes no caller-supplied argument, and `security_barrier = true`
+is set at creation (rather than added later the way migration 052 had to
+retrofit it onto the four pre-existing views) — closing the same
+qual-pushdown gap 052 documented, from the start. The view exposes
+aggregates only — contract count and total/paid/outstanding amounts per
+relationship, plus the soonest unpaid due date — never individual contract
+terms or a document/proof URL.
+
+**No UI reads this view yet.** The consultant-facing page
+(`/partner-consultant/[id]`) still queries the old, now-dropped columns
+directly and will error until a follow-up updates it — deliberately out of
+scope for migration 063, which CLAUDE.md's "RLS lands with the migration"
+rule requires regardless of when the UI catches up.
+
+**`partnership_payment_schedule` has no stored status column** by design.
+`paid_at` (nullable) is the only stored signal; `paid` / `overdue` /
+`pending` are always derived at read time (`paid_at is not null` /
+`paid_at is null and due_date < current_date` / neither), never stored, so
+nothing needs a job to keep it in sync as calendar time passes. Writes to a
+schedule row (marking paid, attaching `payment_proof_url`) are never gated
+on the parent contract's `end_date` — a late payment after a contract ends
+is a legitimate, expected event, not blocked anywhere in this migration's
+RLS or check constraints.
+
+**`partnership_contracts.terminated_at`** is independent of
+`partnerships_consultant_clubs.stage` by design — no trigger or constraint
+couples them. A relationship can sit at `signed` while holding one
+terminated contract and one currently active one (e.g. a renegotiation).
+
+**Storage** — two new private buckets, created via the Storage API (not
+DDL — same convention as migration 055's `product-images` bucket):
+`partnership-contract-docs` (10MB/file, PDF/JPEG/PNG/HEIC) and
+`partnership-payment-proofs` (5MB/file, JPEG/PNG/PDF). Path convention
+`${contract_id}/${timestamp}.${ext}` and `${schedule_id}/${timestamp}.${ext}`
+respectively. Both get exactly one `storage.objects` policy, Super-Admin-only
+— **added in a follow-up migration, 064**, not 063 itself: 063's header
+described the intended access but omitted the actual `create policy`
+statements, caught by verifying live (`pg_policies` returned zero rows for
+either bucket — both existed with RLS enabled and no policy, meaning nobody,
+not even Super Admin, could read or write). No consultant policy on either
+bucket — deny by default, matching the base-table RLS above.
+
+See `database/migrations/063_partnership_contracts_restructure.sql` and
+`database/migrations/064_partnership_storage_policies.sql`.

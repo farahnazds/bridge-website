@@ -354,12 +354,12 @@ export const RTP_PHASE_LABEL: Record<string, string> = {
  *  read-only pipeline (app/partner-consultant/[id]) and Super Admin's
  *  partnerships management (app/super-admin/partnerships), so the two never
  *  drift onto different labels/colors for the same stage. */
-export const PARTNERSHIP_STAGES = ["contacted", "pilot", "signed", "churned"] as const;
+export const PARTNERSHIP_STAGES = ["contacted", "pilot", "signed", "terminated"] as const;
 export const PARTNERSHIP_STAGE_STYLE: Record<string, { label: string; color: string }> = {
   contacted: { label: "Contacted", color: "var(--text-muted)" },
   pilot: { label: "Pilot", color: "var(--brand-sky)" },
   signed: { label: "Signed", color: "var(--success)" },
-  churned: { label: "Churned", color: "var(--danger)" },
+  terminated: { label: "Terminated", color: "var(--danger)" },
 };
 
 /** partnerships_consultant_clubs.commission_type — chosen per (consultant,

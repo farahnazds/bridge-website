@@ -2183,34 +2183,125 @@ export type Database = {
           },
         ]
       }
-      partnerships_commission_payments: {
+      partnership_contract_documents: {
         Row: {
-          amount: number
-          created_at: string
+          contract_id: string
+          file_name: string
+          file_url: string
           id: string
-          paid_at: string
-          period_month: string
-          pipeline_row_id: string
+          uploaded_at: string
+          uploaded_by: string | null
         }
         Insert: {
-          amount: number
-          created_at?: string
+          contract_id: string
+          file_name: string
+          file_url: string
           id?: string
-          paid_at?: string
-          period_month: string
-          pipeline_row_id: string
+          uploaded_at?: string
+          uploaded_by?: string | null
         }
         Update: {
-          amount?: number
-          created_at?: string
+          contract_id?: string
+          file_name?: string
+          file_url?: string
           id?: string
-          paid_at?: string
-          period_month?: string
-          pipeline_row_id?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "partnerships_commission_payments_pipeline_row_id_fkey"
+            foreignKeyName: "partnership_contract_documents_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnership_contract_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnership_contract_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partnership_contracts: {
+        Row: {
+          commission_percent: number | null
+          commission_type: string
+          created_at: string
+          created_by: string | null
+          deal_value: number | null
+          end_date: string | null
+          id: string
+          notes: string | null
+          payment_frequency: string | null
+          pipeline_row_id: string
+          recurring_amount: number | null
+          start_date: string
+          terminated_at: string | null
+        }
+        Insert: {
+          commission_percent?: number | null
+          commission_type: string
+          created_at?: string
+          created_by?: string | null
+          deal_value?: number | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          payment_frequency?: string | null
+          pipeline_row_id: string
+          recurring_amount?: number | null
+          start_date: string
+          terminated_at?: string | null
+        }
+        Update: {
+          commission_percent?: number | null
+          commission_type?: string
+          created_at?: string
+          created_by?: string | null
+          deal_value?: number | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          payment_frequency?: string | null
+          pipeline_row_id?: string
+          recurring_amount?: number | null
+          start_date?: string
+          terminated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnership_contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnership_contracts_pipeline_row_id_fkey"
+            columns: ["pipeline_row_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_consultant_totals"
+            referencedColumns: ["pipeline_row_id"]
+          },
+          {
+            foreignKeyName: "partnership_contracts_pipeline_row_id_fkey"
             columns: ["pipeline_row_id"]
             isOneToOne: false
             referencedRelation: "partnerships_consultant_clubs"
@@ -2218,47 +2309,67 @@ export type Database = {
           },
         ]
       }
+      partnership_payment_schedule: {
+        Row: {
+          contract_id: string
+          created_at: string
+          due_date: string
+          expected_amount: number
+          id: string
+          notes: string | null
+          paid_at: string | null
+          payment_proof_url: string | null
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          due_date: string
+          expected_amount: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_proof_url?: string | null
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          due_date?: string
+          expected_amount?: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_proof_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_payment_schedule_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partnerships_consultant_clubs: {
         Row: {
-          amount_paid: number
           club_id: string
-          commission_percent: number | null
-          commission_type: string
           consultant_id: string
           created_at: string
-          deal_value: number | null
           id: string
-          last_paid_at: string | null
-          notes: string | null
-          recurring_monthly_amount: number | null
           stage: string | null
         }
         Insert: {
-          amount_paid?: number
           club_id: string
-          commission_percent?: number | null
-          commission_type?: string
           consultant_id: string
           created_at?: string
-          deal_value?: number | null
           id?: string
-          last_paid_at?: string | null
-          notes?: string | null
-          recurring_monthly_amount?: number | null
           stage?: string | null
         }
         Update: {
-          amount_paid?: number
           club_id?: string
-          commission_percent?: number | null
-          commission_type?: string
           consultant_id?: string
           created_at?: string
-          deal_value?: number | null
           id?: string
-          last_paid_at?: string | null
-          notes?: string | null
-          recurring_monthly_amount?: number | null
           stage?: string | null
         }
         Relationships: [
@@ -3424,6 +3535,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      partnership_consultant_totals: {
+        Row: {
+          contract_count: number | null
+          next_due_date: string | null
+          pipeline_row_id: string | null
+          total_expected: number | null
+          total_outstanding: number | null
+          total_paid: number | null
+        }
+        Relationships: []
       }
     }
     Functions: {
