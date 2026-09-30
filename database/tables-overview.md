@@ -69,3 +69,4 @@ stored id against what the person may actually open today before using it —
 falling back to the first option alphabetically. Deleting this table's contents
 would cost people their default landing spot and nothing else.
 | `club_product_priorities` | Per-club product ranking within a clinical entity (migration 057): rank 1 = the club's preferred certified product, 2+ = approved alternatives. Super Admin writes; club staff read. Decorates the Add form / Alternatives panel; never read by the planner AI. |
+| `support_rate_limit_events` | Attempt log for the public `/support` form's rate limit: a bucket (`global` or `ip:<hash>`) and a timestamp. Hashed IPs only, purged after 24h. No RLS policies — reachable only through `check_support_rate_limit()` (service role). Migration 067. |

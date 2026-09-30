@@ -32,7 +32,8 @@ function StepChip({ n, label, state }: { n: number; label: string; state: "activ
   );
 }
 
-export default function BookShell({ step, children }: { step: 1 | 2; children: ReactNode }) {
+/** `step` omitted = no stepper (reused by /support, which is not a stepped flow). */
+export default function BookShell({ step, children }: { step?: 1 | 2; children: ReactNode }) {
   return (
     <div className="relative min-h-screen overflow-x-hidden" style={{ backgroundColor: "var(--bg)", color: "var(--text)" }}>
       <div
@@ -81,6 +82,7 @@ export default function BookShell({ step, children }: { step: 1 | 2; children: R
       </div>
 
       <div className="relative z-[2] mx-auto flex w-full max-w-[1120px] flex-col items-center gap-10 px-8 pb-24 pt-16">
+        {step !== undefined && (
         <div className="flex items-center gap-3.5">
           <StepChip n={1} label="About you" state={step === 1 ? "active" : "done"} />
           <span
@@ -94,6 +96,7 @@ export default function BookShell({ step, children }: { step: 1 | 2; children: R
           />
           <StepChip n={2} label="Pick a time" state={step === 2 ? "active" : "todo"} />
         </div>
+        )}
         {children}
       </div>
     </div>
