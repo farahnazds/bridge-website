@@ -211,6 +211,13 @@ after sign-off). Open items:
 3. **Apple submission support** — see `bridgetx-mobile/docs/HANDOFF.md`. The
    website side of that is just keeping `/support` and the privacy page up, and
    the demo account intact.
+   **Progress 2026-10-01 evening:** EAS upload finished (verified); build 2 selected
+   in App Store Connect and review fields (sign-in, contact, notes) complete —
+   both owner-reported, not verified by Claude. **Still open: App Privacy
+   questionnaire (draft answers in `bridgetx-mobile/docs/app-store-listing.md`) and
+   screenshots. Ready to submit: NO, pending those two.** The privacy policy's
+   "draft" banner is a rejection risk but not a hard block; the demo account
+   (section 3) must stay intact through review.
 4. **Finish the account-closure click-through** (web checklist + the iPhone
    "Close my account" flow), then **delete the ZZ-TEST data**. Then decide if/when
    closure ships (needs its own small branch: DB already live; web UI on `dev`;
