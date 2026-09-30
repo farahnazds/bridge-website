@@ -34,6 +34,7 @@ schema.sql matches this.
 | `subscriptions` | Club subscription dates. Separate `plans` table (foundation) for future independent-tier Stripe pricing config. |
 | `messages` | Messenger — sender, recipient(s) (one or more practitioners), thread, read status. |
 | `notifications` | Compliance alerts, report-ready, subscription-expiry reminders, etc. |
+| `athlete_account_closures` | An athlete's request to close (deactivate) their own account — **never deletion**. Status runs `requested` → `processed` (login suspended via Supabase Auth ban + sessions revoked) → `reversed` (reinstated, or a declined request). At most one open row per athlete; reversed rows stay as history. Athletes write only through `request_account_closure()`; a Super Admin processes/reverses it. Club managers and practitioners see the status read-only. Migration 066. |
 | `leads`, `content`, `articles` | `leads` gained intake fields (role, country, sport, squad_size — migration 046) for the public Book-a-Meeting flow; meeting_date + meeting_booked=false together mean "time requested, awaiting confirmation". `content` and `articles` unchanged from v3. |
 | `partnerships_consultants`, `partnerships_consultant_clubs`, `brand_partners` | Unchanged from v3. |
 | `club_branding` | Super Admin-managed per club: logo, advertising banner, report template rules/color/Arabic format, Additional-Instructions guardrails. |

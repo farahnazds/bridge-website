@@ -201,6 +201,32 @@ export default async function SuperAdminOverviewPage() {
     });
   }
 
+  // Athlete account-closure requests (migration 066). Waiting on a Super
+  // Admin: until processed the athlete can still sign in, so a request the
+  // athlete thinks has taken effect has not — say so, and link to where it is
+  // actioned (the athlete's profile).
+  const { data: closureRequests } = await supabase
+    .from("athlete_account_closures")
+    .select("id, athlete_id, requested_at, athletes(first_name, last_name, club_id)")
+    .eq("status", "requested")
+    .order("requested_at");
+  for (const r of (closureRequests ?? []) as unknown as {
+    id: string; athlete_id: string; requested_at: string;
+    athletes: { first_name: string; last_name: string; club_id: string | null } | null;
+  }[]) {
+    alerts.push({
+      key: `closure-${r.id}`,
+      level: "warning",
+      text: <>
+        <strong>{r.athletes ? `${r.athletes.first_name} ${r.athletes.last_name}` : "An athlete"}</strong> asked to close
+        their account ({new Date(r.requested_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })})
+        — they can still sign in until you process it.
+      </>,
+      href: r.athletes?.club_id ? `/club/${r.athletes.club_id}/athletes/${r.athlete_id}` : "/admin/athletes",
+      cta: "Review",
+    });
+  }
+
   const critical = alerts.filter((a) => a.level === "critical");
   const warnings = alerts.filter((a) => a.level === "warning");
   const ordered = [...critical, ...warnings];

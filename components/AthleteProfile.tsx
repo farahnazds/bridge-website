@@ -1,5 +1,7 @@
 import Link from "next/link";
 import AthleteIdentityForm from "@/components/AthleteIdentityForm";
+import AccountClosurePanel from "@/components/AccountClosurePanel";
+import { closureLabel } from "@/lib/athleteClosure";
 import {
   InjuryRows,
   GpsRows,
@@ -168,6 +170,15 @@ export default function AthleteProfile({
             }}>
             {athlete.status === "read_only" ? "Read-only" : "Active"}
           </span>
+          {data.closure && (
+            <span className={BADGE}
+              style={{
+                backgroundColor: `color-mix(in srgb, ${data.closure.status === "processed" ? "var(--danger)" : "var(--warning)"} 12%, transparent)`,
+                color: data.closure.status === "processed" ? "var(--danger)" : "var(--warning)",
+              }}>
+              {data.closure.status === "processed" ? "Account closed" : "Closure requested"}
+            </span>
+          )}
           {openInjuries.length > 0 && (
             <span className={BADGE}
               style={{ backgroundColor: "color-mix(in srgb, var(--danger) 12%, transparent)", color: "var(--danger)" }}>
@@ -192,6 +203,15 @@ export default function AthleteProfile({
         </p>
         {viewerNote && <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>{viewerNote}</p>}
       </div>
+
+      {data.closure && data.closure.status !== "reversed" && (
+        <AccountClosurePanel
+          closureId={data.closure.id}
+          status={data.closure.status}
+          label={closureLabel(data.closure)}
+          canProcess={data.viewerCanProcessClosure}
+        />
+      )}
 
       <AthleteIdentityForm athlete={athlete} clubId={athlete.club_id} canEdit={canEdit} />
 
