@@ -1646,3 +1646,21 @@ pre-select. A BEFORE trigger (`club_product_priorities_entity_check`)
 asserts the ranked product actually belongs to the row's clinical
 entity, so a priority can never point across entities even under the
 service role.
+
+## Added: `support_rate_limit_events` (migration 067, 2026-09-30)
+
+Attempt log behind the public `/support` form's rate limit (3 per IP per hour,
+30 per hour across everyone). RLS is enabled with **no policies at all**, so
+anon and authenticated roles can neither read nor write it — verified
+2026-09-30: with a row present the service role sees it and the anon key sees
+0 rows, anon cannot insert (HTTP 401), and anon cannot call
+`check_support_rate_limit()` (HTTP 401). The only way in is that function,
+`SECURITY DEFINER` and executable by `service_role` alone (revoked from
+`public`, `anon`, `authenticated`); it is called from
+`app/support/actions.ts` through the admin client.
+
+Stores a SHA-256 hash of the visitor's IP, never the address, and every call
+purges rows older than 24 hours. The hash is still personal data — the privacy
+policy does not yet mention it (flagged for legal review).
+
+See `database/migrations/067_support_rate_limit.sql`.
