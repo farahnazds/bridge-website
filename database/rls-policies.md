@@ -2060,3 +2060,48 @@ risk the contract or schedule either way — those are already committed,
 atomically, by the time any document is attempted.
 
 See `database/migrations/065_create_partnership_contract_atomic.sql`.
+
+## Added: `athlete_account_closures` (migration 066, 2026-09-30)
+
+An athlete can ask to close (deactivate) their own account. This is
+DEACTIVATION, never deletion: login is suspended, every record stays where it
+is, because the club/practitioner — not the athlete — owns the data.
+
+**SELECT — `"closure status visible where athlete visible"`:**
+`exists (select 1 from athletes a where a.id = athlete_account_closures.athlete_id)`.
+The subquery runs under the caller's own RLS on `athletes`, so the closure
+status is visible to exactly the people who can already see that athlete —
+the athlete themself, club staff/managers, admins, approved independent
+practitioners and Super Admin — and to no one else. It restates none of those
+rules, so if access to an athlete ever changes this follows automatically.
+Clubs and practitioners therefore see the status **read-only**.
+
+**No INSERT / UPDATE / DELETE policy, deliberately.** There are two write
+paths and neither is a table policy:
+
+- **`request_account_closure()`** — `SECURITY DEFINER`, granted to
+  `authenticated`. Resolves the athlete from `current_profile_id()` (never a
+  parameter), refuses non-athletes, inserts one `requested` row, idempotent
+  while a request is open (partial unique index on `athlete_id` where status
+  is `requested` or `processed`). An athlete can therefore only ASK; they
+  cannot mark a request processed, edit it, or file one for anyone else.
+- **Processing / reversal** — Super Admin only, in
+  `app/super-admin/athlete-closures/actions.ts`, on the service role. Clubs
+  and practitioners cannot process a closure.
+
+**`revoke_user_sessions(uuid)`** — `SECURITY DEFINER`, executable by
+`service_role` ONLY (revoked from `public`, `anon`, `authenticated`): it can
+end any user's sessions. Verified 2026-09-30 that an athlete calling it gets
+HTTP 403.
+
+**What actually blocks the login.** Not RLS — Supabase Auth's per-user ban
+(`auth.admin.updateUserById(..., { ban_duration })`) applied by the processing
+action, plus `revoke_user_sessions()`. Verified live against the shared
+project with a marked test athlete: a banned user's password sign-in is
+refused ("User is banned"), their previously-valid refresh token is refused,
+the old access token is rejected by `/auth/v1/user`, and unbanning restores
+sign-in. **Known residual:** an access token issued *before* the ban still
+reads the data API (PostgREST) until it expires — sessions are not consulted
+on every data request. RLS does not currently consult closure status.
+
+See `database/migrations/066_athlete_account_closures.sql`.

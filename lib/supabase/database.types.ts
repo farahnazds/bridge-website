@@ -237,6 +237,75 @@ export type Database = {
           },
         ]
       }
+      athlete_account_closures: {
+        Row: {
+          athlete_id: string
+          id: string
+          processed_at: string | null
+          processed_by: string | null
+          requested_at: string
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+        }
+        Insert: {
+          athlete_id: string
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          requested_at?: string
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Update: {
+          athlete_id?: string
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          requested_at?: string
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_account_closures_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_account_closures_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_account_closures_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_account_closures_reversed_by_fkey"
+            columns: ["reversed_by"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_account_closures_reversed_by_fkey"
+            columns: ["reversed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_allergies: {
         Row: {
           allergy_code: string
@@ -3608,6 +3677,8 @@ export type Database = {
         Args: { p_device_name?: string; p_platform: string; p_token: string }
         Returns: undefined
       }
+      request_account_closure: { Args: never; Returns: undefined }
+      revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
       rtp_gate_status: {
         Args: { p_injury_id: string }
         Returns: {
