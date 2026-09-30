@@ -8,6 +8,13 @@
   Independent based on matching records — see `04-user-flows.md`)
 - `/join/practitioner` — Independent Practitioner signup
 - `/articles`, `/articles/[slug]`, `/contact`
+- `/support` — Public support form (name, email, message) → emails
+  admin@bridgetx.co and sends the visitor a plain-text acknowledgement. No
+  login. This is the App Store Connect / Play "Support URL"; it is separate
+  from the sales lead capture at `/book`. (Note: no `app/contact` route
+  exists, although the line above lists one.)
+- `/book`, `/book/schedule` — Book-a-Meeting (sales lead capture)
+- `/privacy`, `/terms` — Legal pages (first drafts, pending legal review)
 
 ## Every signed-in role — `/account`
 

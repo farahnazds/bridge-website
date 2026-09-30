@@ -39,6 +39,19 @@ reintroduced later), compliance reminders (club/independent/guided —
 see `05-business-rules.md`), report-shared notifications, subscription
 expiry reminders, product-request confirmations.
 
+Wired in `lib/resend.ts` (server-only; `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
+sending from the verified `mail.bridgetx.co` subdomain). Live senders today:
+report-shared, compliance alerts, booking confirmations and lead
+notifications, partnership payment reminders, check-in reminders, and (added
+2026-09-30) the **public support form** at `/support` — `sendSupportRequestEmail`
+(to admin@bridgetx.co, reply-to set to the visitor) and
+`sendSupportAcknowledgementEmail` (plain-text receipt to the visitor). The
+support emails are deliberately plain text, not the branded HTML templates.
+
+The production key is **send-only** (Resend "sending access"): it cannot list
+domains or read delivery status, so delivery can only be confirmed from the
+Resend dashboard or a receiving inbox, not via the API.
+
 ## Claude API — ACTIVE
 AI report generation only (see `07-ai-engine.md`). Model and output budget are
 pinned in `lib/anthropic.ts` (`REPORT_MODEL`, `REPORT_MAX_TOKENS`).

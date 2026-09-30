@@ -238,3 +238,76 @@ export async function sendPartnershipPaymentReminderEmail(params: {
     throw new Error(error.message);
   }
 }
+
+/**
+ * Public support form (/support, the App Store "Support URL"). Two plain-text
+ * emails, deliberately NOT the branded HTML templates: the brief is one or two
+ * sentences, and plain text has nothing to inject into.
+ *
+ * The admin copy sets reply-to to the visitor, so answering it in the inbox
+ * goes to them. The visitor's free text is only ever placed in a text body
+ * (never html), and name/email are stripped of line breaks before they reach a
+ * header-adjacent field (subject, reply-to).
+ */
+const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
+
+/** Throws on failure: the caller must tell the visitor their message was NOT
+ *  sent, since this email is the only copy of it. */
+export async function sendSupportRequestEmail(params: {
+  name: string;
+  email: string;
+  message: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured.");
+  }
+
+  const submittedAt = new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Dubai",
+  }).format(new Date());
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({
+    from: FROM_ADDRESS,
+    to: LEAD_INBOX,
+    replyTo: oneLine(params.email),
+    subject: `Support request from ${oneLine(params.name)}`,
+    text: [
+      `Name:  ${oneLine(params.name)}`,
+      `Email: ${oneLine(params.email)}`,
+      `Sent:  ${submittedAt} (GST) via bridgetx.co/support`,
+      "",
+      params.message,
+    ].join("\n"),
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+/** Best-effort at the call site: the request itself has already been sent. */
+export async function sendSupportAcknowledgementEmail(params: { to: string; name: string }): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured.");
+  }
+
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({
+    from: FROM_ADDRESS,
+    to: oneLine(params.to),
+    subject: "We've received your message — Bridgetx support",
+    text:
+      `Hi ${oneLine(params.name)},\n\n` +
+      "Thanks for getting in touch. We've received your message and will reply by email as soon as we can.\n\n" +
+      "— Bridgetx support",
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
