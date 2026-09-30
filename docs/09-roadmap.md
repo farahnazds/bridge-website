@@ -481,3 +481,18 @@ needs a `maxTouchPoints` check rather than a plain platform string match.
 1. UAE clubs and academies (launch)
 2. GCC region (scale)
 3. Global (long term)
+## Deferred: closed-athlete access token window (decided 2026-09-30)
+
+Athlete account closure (migration 066) bans the auth user and deletes their
+sessions, so sign-in and token refresh are refused immediately. One residual
+remains: an access token issued BEFORE the ban keeps reading the data API
+(PostgREST) until it expires (JWT lifetime; default 1h, project setting not
+checked). The mobile app closes it client-side on start-up (resolveAthlete).
+
+Closing it server-side means making RLS consult closure status — most likely
+inside `is_own_athlete_profile()`, which every athlete-facing policy uses, plus
+any policy keyed on `current_profile_id()` directly. Owner ruling: NOT during
+the live pilot and not bundled with another build; do it as its own change with
+a dedicated RLS test pass (every athlete-facing table, open and closed
+athlete, before/after). Until then the gap is documented in
+`database/rls-policies.md` (migration 066 section).
