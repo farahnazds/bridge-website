@@ -3329,6 +3329,24 @@ export type Database = {
           },
         ]
       }
+      support_rate_limit_events: {
+        Row: {
+          bucket: string
+          created_at: string
+          id: number
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          id?: never
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          id?: never
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           category: string | null
@@ -3622,6 +3640,15 @@ export type Database = {
       athlete_type: { Args: { p_athlete_id: string }; Returns: string }
       can_message_profile: {
         Args: { p_recipient_id: string }
+        Returns: boolean
+      }
+      check_support_rate_limit: {
+        Args: {
+          p_global_limit?: number
+          p_ip_hash: string
+          p_ip_limit?: number
+          p_window?: string
+        }
         Returns: boolean
       }
       create_partnership_contract: {
