@@ -30,6 +30,7 @@ Built and owned by Blessing Mushonga, Performance Nutritionist.
 
 | Need to know... | Check this file |
 |---|---|
+| **Where we left off, open items, what NOT to merge, next steps** | `docs/HANDOFF.md` — read first in a new session |
 | What Bridgetx does, business model | `docs/01-overview.md` |
 | Who can see/do what | `docs/02-roles-and-permissions.md` |
 | Every page/URL per role | `docs/03-site-map.md` |
