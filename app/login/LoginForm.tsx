@@ -113,9 +113,9 @@ export default function LoginForm() {
 
       <span style={{ alignSelf: "center", textAlign: "center", fontSize: 13.5, lineHeight: 1.6, color: "rgba(255,255,255,.44)" }}>
         Accounts are created by your club or practitioner.{" "}
-        <a href="mailto:admin@bridgetx.co?subject=Bridgetx%20access%20request" style={{ color: "#59C4F5" }}>
-          <br />Request access
-        </a>
+        <Link href="/support" style={{ color: "#59C4F5" }}>
+          <br />Need help signing in?
+        </Link>
       </span>
     </form>
   );
