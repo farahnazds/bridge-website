@@ -214,8 +214,8 @@ after sign-off). Open items:
    **Progress 2026-10-01 evening:** EAS upload finished (verified); build 2 selected
    in App Store Connect and review fields (sign-in, contact, notes) complete —
    both owner-reported, not verified by Claude. **Still open: App Privacy
-   questionnaire (draft answers in `bridgetx-mobile/docs/app-store-listing.md`) and
-   screenshots. Ready to submit: NO, pending those two.** The privacy policy's
+   questionnaire (draft answers in `bridgetx-mobile/docs/app-store-listing.md`;
+   owner filling it in). Screenshots done (owner-reported). Ready to submit: NO, pending the questionnaire only.** The privacy policy's
    "draft" banner is a rejection risk but not a hard block; the demo account
    (section 3) must stay intact through review.
 4. **Finish the account-closure click-through** (web checklist + the iPhone
