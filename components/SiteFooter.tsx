@@ -77,6 +77,7 @@ export default function SiteFooter({ anchorsToHome = false }: { anchorsToHome?: 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <span style={COL_HEAD}>Connect</span>
               <a href={`mailto:${COMPANY.contact}`} style={{ fontSize: 14 }}>{COMPANY.contact}</a>
+              <Link href="/support" style={{ fontSize: 14 }}>Support</Link>
               <Link href="/login" style={{ fontSize: 14 }}>Sign In</Link>
               <a href="/book" style={{ fontSize: 14 }}>Book a Meeting</a>
             </div>
