@@ -1664,3 +1664,23 @@ purges rows older than 24 hours. The hash is still personal data — the privacy
 policy does not yet mention it (flagged for legal review).
 
 See `database/migrations/067_support_rate_limit.sql`.
+
+## Added: `athlete_data_handling_acceptances` (migration 068, 2026-10-01)
+
+Evidence that an athlete ticked the data-handling statement at activation:
+which statement text (stored verbatim with the row), which version, and when.
+
+| Policy | Command | Rule |
+|---|---|---|
+| `acceptance visible where athlete visible` | `select` | the athlete row is visible to the caller (inherits every `athletes` policy) |
+
+No insert/update/delete policy: the table is append-only for every client role.
+The only way in is `record_athlete_data_handling_acceptance(p_version, p_text)`,
+`SECURITY DEFINER`, executable by `authenticated` only (revoked from `public`
+and `anon`). It resolves the athlete from the caller's own JWT
+(`current_profile_id()`), never a parameter, so it cannot record acceptance for
+someone else, and non-athletes are refused. One row per (athlete, version); a
+re-submission keeps the first timestamp. Verified live 2026-10-02 through a real
+activation (row written with the correct version, then test data removed).
+
+See `database/migrations/068_athlete_data_handling_acceptance.sql`.
