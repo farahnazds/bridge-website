@@ -315,6 +315,38 @@ export type Database = {
           },
         ]
       }
+      athlete_data_handling_acceptances: {
+        Row: {
+          accepted_at: string
+          athlete_id: string
+          id: string
+          statement_text: string
+          statement_version: string
+        }
+        Insert: {
+          accepted_at?: string
+          athlete_id: string
+          id?: string
+          statement_text: string
+          statement_version: string
+        }
+        Update: {
+          accepted_at?: string
+          athlete_id?: string
+          id?: string
+          statement_text?: string
+          statement_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_data_handling_acceptances_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_intolerances: {
         Row: {
           athlete_id: string
@@ -3319,6 +3351,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      record_athlete_data_handling_acceptance: {
+        Args: { p_text: string; p_version: string }
+        Returns: undefined
+      }
       shares_club_with_staff: {
         Args: { p_profile_id: string }
         Returns: boolean

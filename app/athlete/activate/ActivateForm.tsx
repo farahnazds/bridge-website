@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { BTN_PRIMARY_FULL, INPUT, INPUT_STYLE, NOTICE } from "@/lib/ui";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 import { getPostActivationPath } from "./actions";
+import {
+  ATHLETE_DATA_HANDLING_LEAD,
+  ATHLETE_DATA_HANDLING_TEXT,
+  ATHLETE_DATA_HANDLING_VERSION,
+} from "@/lib/athleteConsent";
 
 type Status = "checking" | "ready" | "invalid" | "submitting" | "done";
 
@@ -15,6 +21,7 @@ export default function ActivateForm() {
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [accepted, setAccepted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,8 +75,27 @@ export default function ActivateForm() {
       return;
     }
 
+    if (!accepted) {
+      setError("Please confirm you understand how your data is handled to continue.");
+      return;
+    }
+
     setStatus("submitting");
     const supabase = createClient();
+
+    // Record the acceptance first and refuse to continue if it cannot be
+    // recorded — the timestamp is the evidence, so no row means no activation.
+    // Idempotent per statement version, so a retry after a password error is
+    // harmless and keeps the original time.
+    const { error: consentError } = await supabase.rpc("record_athlete_data_handling_acceptance", {
+      p_version: ATHLETE_DATA_HANDLING_VERSION,
+      p_text: ATHLETE_DATA_HANDLING_TEXT,
+    });
+    if (consentError) {
+      setError("We couldn't record your confirmation. Please try again.");
+      setStatus("ready");
+      return;
+    }
     const { error: updateError } = await supabase.auth.updateUser({ password });
 
     if (updateError) {
@@ -165,9 +191,26 @@ export default function ActivateForm() {
         />
       </div>
 
+      <div className="flex items-start gap-3">
+        <input
+          id="data-handling"
+          type="checkbox"
+          required
+          checked={accepted}
+          onChange={(e) => setAccepted(e.target.checked)}
+          className="mt-1 h-4 w-4 shrink-0"
+        />
+        <label htmlFor="data-handling" className="text-sm" style={{ color: "var(--text)", lineHeight: 1.55 }}>
+          {ATHLETE_DATA_HANDLING_LEAD}{" "}
+          <Link href="/privacy" target="_blank" style={{ color: "var(--brand-blue)" }}>
+            Privacy Policy
+          </Link>
+        </label>
+      </div>
+
       <button
         type="submit"
-        disabled={status === "submitting" || status === "done"}
+        disabled={status === "submitting" || status === "done" || !accepted}
         className={BTN_PRIMARY_FULL}
         style={{ backgroundImage: "var(--brand-gradient-action)" }}
       >
