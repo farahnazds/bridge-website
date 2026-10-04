@@ -4,12 +4,17 @@ import type { Database } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Athlete account closure (migration 066). A closure is DEACTIVATION, never
-// deletion: login is suspended, every record stays visible to the club and
-// practitioners who own it. This module is the one place the web reads that
-// state; the write side (process / reverse) is app/super-admin/athlete-closures.
+// Athlete account lifecycle (migrations 066 + 069). Two kinds of row:
+//   * requested / processed — the legacy 066 flow: login SUSPENDED, nothing
+//     changed. Athletes can no longer file these; existing ones are still
+//     processed / reinstated in app/super-admin/athlete-closures.
+//   * deleted — migration 069: the athlete deleted their own account. Login is
+//     removed and name/email/photo anonymized, immediately, by the
+//     delete_my_account() RPC. History stays attached to the anonymized record.
+//     Restoring is Super Admin only: app/super-admin/closed-accounts.
+// This module is the one place the web reads that state.
 
-export type ClosureStatus = "requested" | "processed" | "reversed";
+export type ClosureStatus = "requested" | "processed" | "reversed" | "deleted";
 
 export interface AthleteClosure {
   id: string;
@@ -17,6 +22,7 @@ export interface AthleteClosure {
   status: ClosureStatus;
   requestedAt: string;
   processedAt: string | null;
+  deletedAt: string | null;
 }
 
 /** Ban applied to a closed athlete's auth user. Supabase has no "forever";
@@ -30,6 +36,7 @@ function toClosure(r: Database["public"]["Tables"]["athlete_account_closures"]["
     status: r.status as ClosureStatus,
     requestedAt: r.requested_at,
     processedAt: r.processed_at,
+    deletedAt: r.deleted_at,
   };
 }
 
@@ -47,7 +54,7 @@ export async function getOpenClosures(
     .from("athlete_account_closures")
     .select("*")
     .in("athlete_id", athleteIds)
-    .in("status", ["requested", "processed"]);
+    .in("status", ["requested", "processed", "deleted"]);
   for (const row of data ?? []) out.set(row.athlete_id, toClosure(row));
   return out;
 }
@@ -56,6 +63,7 @@ export async function getOpenClosures(
 export function closureLabel(c: AthleteClosure): string {
   const fmt = (iso: string) =>
     new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  if (c.status === "deleted") return `Account deleted by the athlete — ${fmt(c.deletedAt ?? c.requestedAt)}`;
   return c.status === "processed"
     ? `Closed by athlete request — ${fmt(c.processedAt ?? c.requestedAt)}`
     : `Closure requested — ${fmt(c.requestedAt)}`;

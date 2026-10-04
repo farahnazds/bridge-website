@@ -5,6 +5,7 @@ import { getAccountIdentity } from "./identity";
 import { isClubStaff } from "@/lib/auth";
 import NameForm from "./NameForm";
 import PasswordForm from "./PasswordForm";
+import DeleteAccountForm from "./DeleteAccountForm";
 import { ROLE_LABELS, SPECIALTIES } from "@/lib/constants";
 import { CARD, NOTICE } from "@/lib/ui";
 
@@ -162,6 +163,15 @@ export default async function AccountPage() {
       <Section title="Password" hint="Changing this signs you in with the new password next time.">
         <PasswordForm email={profile.email} />
       </Section>
+
+      {/* Athletes only: Apple 5.1.1(v) / the privacy policy. Staff accounts are
+          provisioned and owned by their club or Bridgetx, so there is no
+          self-deletion for them. */}
+      {isAthlete && (
+        <Section title="Delete my account" hint="Permanent. Your login is removed and your personal details are anonymized.">
+          <DeleteAccountForm />
+        </Section>
+      )}
     </div>
   );
 }

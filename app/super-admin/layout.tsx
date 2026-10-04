@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { BookOpen, Building2, Handshake, LayoutDashboard, Palette, Pill, Telescope } from "lucide-react";
+import { BookOpen, Building2, Handshake, LayoutDashboard, Palette, Pill, Telescope, UserX } from "lucide-react";
 import SidebarNav from "@/components/SidebarNav";
 import DashboardHeader from "@/components/DashboardHeader";
 import DashboardShell from "@/components/DashboardShell";
@@ -23,6 +23,7 @@ const NAV_GROUPS = [
   ] },
   { label: "OVERSIGHT", items: [
     { label: "All club data", href: "/admin", icon: Telescope },
+    { label: "Closed Accounts", href: "/super-admin/closed-accounts", icon: UserX },
   ] },
 ];
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { BTN_PRIMARY, BTN_SECONDARY, CARD, NOTICE } from "@/lib/ui";
 import {
@@ -40,6 +41,34 @@ export default function AccountClosurePanel({
     });
 
   const closed = status === "processed";
+
+  // Self-deleted (migration 069). Nothing to process: the deletion already
+  // happened. Everyone who can see the athlete sees why the name is anonymized;
+  // restoring is a separate Super Admin page.
+  if (status === "deleted") {
+    return (
+      <div
+        className={`flex flex-col gap-3 ${CARD} p-5`}
+        style={{ borderColor: "var(--danger)", backgroundColor: "var(--surface)" }}
+      >
+        <div>
+          <h2 className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--text)" }}>
+            {label}
+          </h2>
+          <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
+            This athlete deleted their own account. Their login was removed and their name, email and photo were
+            anonymized. Their check-ins, assessments, reports and history are unchanged and remain part of the
+            club&rsquo;s records.
+          </p>
+        </div>
+        {canProcess && (
+          <Link href="/super-admin/closed-accounts" className={`w-fit ${BTN_SECONDARY}`}>
+            Open Closed Accounts
+          </Link>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div

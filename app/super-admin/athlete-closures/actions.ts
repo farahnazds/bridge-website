@@ -72,6 +72,7 @@ export async function processAthleteClosure(formData: FormData): Promise<Closure
     .maybeSingle();
   if (!closure) return fail("Couldn't find that closure request.");
   if (closure.status !== "requested") return fail("This request has already been handled.");
+  // (A 'deleted' row also lands here: only a pending request can be processed.)
 
   const { userId, error: lookupError } = await authUserIdForAthlete(closure.athlete_id);
   if (lookupError) return fail(lookupError);
@@ -139,6 +140,10 @@ export async function reverseAthleteClosure(formData: FormData): Promise<Closure
     .maybeSingle();
   if (!closure) return fail("Couldn't find that closure request.");
   if (closure.status === "reversed") return fail("This request has already been reversed.");
+  // A self-deleted account is restored from Closed Accounts, which re-attaches
+  // the vaulted name/email. Un-banning alone would leave a "Deleted Athlete"
+  // with a placeholder email nobody can sign in with.
+  if (closure.status === "deleted") return fail("This account was deleted by the athlete — restore it from Closed Accounts.");
 
   if (closure.status === "processed") {
     const { userId, error: lookupError } = await authUserIdForAthlete(closure.athlete_id);
