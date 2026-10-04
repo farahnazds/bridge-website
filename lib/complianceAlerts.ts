@@ -118,7 +118,7 @@ export async function runComplianceAlerts(now = new Date()): Promise<AlertRunRes
     result.clubsChecked++;
 
     const [{ data: athletes, error: athletesError }, { data: recipientRows }] = await Promise.all([
-      supabase.from("athletes").select("id, first_name, last_name").eq("club_id", clubId).eq("status", "active"),
+      supabase.from("athletes").select("id, first_name, last_name").eq("club_id", clubId).eq("status", "active").is("deleted_at", null),
       supabase.from("club_notify_recipients").select("profile_id").eq("club_id", clubId),
     ]);
     if (athletesError) {

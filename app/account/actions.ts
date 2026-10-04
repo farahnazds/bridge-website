@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
 
@@ -67,4 +68,36 @@ export async function updateMyName(_prev: NameState, formData: FormData): Promis
   // tree is revalidated rather than just this page.
   revalidatePath("/", "layout");
   return { error: null, saved: true };
+}
+
+export interface DeleteAccountState {
+  error: string | null;
+}
+
+// Athlete-initiated account deletion (migration 069), the web twin of the
+// mobile "Delete my account" screen.
+//
+// Everything that matters happens inside delete_my_account(), one SECURITY
+// DEFINER transaction: login removed, name/email/photo anonymized, originals
+// vaulted for a Super Admin restore, history untouched. This action only calls
+// it under the caller's own session — it never passes an id (the function
+// resolves the athlete from the JWT) and holds no service-role key.
+//
+// By the time the RPC returns, the session's refresh token is already gone, so
+// signOut is scope "local": it just clears this browser's cookies without a
+// round-trip to a session that no longer exists.
+export async function deleteMyAccount(_prev: DeleteAccountState): Promise<DeleteAccountState> {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "athlete") {
+    return { error: "Only an athlete can delete their own account here." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_my_account");
+  if (error) {
+    return { error: "We couldn't delete your account. Nothing was changed — please try again, or contact admin@bridgetx.co." };
+  }
+
+  await supabase.auth.signOut({ scope: "local" });
+  redirect("/login");
 }

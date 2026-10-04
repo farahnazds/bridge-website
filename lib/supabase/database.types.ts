@@ -240,6 +240,7 @@ export type Database = {
       athlete_account_closures: {
         Row: {
           athlete_id: string
+          deleted_at: string | null
           id: string
           processed_at: string | null
           processed_by: string | null
@@ -250,6 +251,7 @@ export type Database = {
         }
         Insert: {
           athlete_id: string
+          deleted_at?: string | null
           id?: string
           processed_at?: string | null
           processed_by?: string | null
@@ -260,6 +262,7 @@ export type Database = {
         }
         Update: {
           athlete_id?: string
+          deleted_at?: string | null
           id?: string
           processed_at?: string | null
           processed_by?: string | null
@@ -381,6 +384,91 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "medical_conditions"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      athlete_data_handling_acceptances: {
+        Row: {
+          accepted_at: string
+          athlete_id: string
+          id: string
+          statement_text: string
+          statement_version: string
+        }
+        Insert: {
+          accepted_at?: string
+          athlete_id: string
+          id?: string
+          statement_text: string
+          statement_version: string
+        }
+        Update: {
+          accepted_at?: string
+          athlete_id?: string
+          id?: string
+          statement_text?: string
+          statement_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_data_handling_acceptances_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      athlete_deletion_vault: {
+        Row: {
+          athlete_first_name: string | null
+          athlete_id: string
+          athlete_last_name: string | null
+          auth_email: string | null
+          avatar_url: string | null
+          email: string
+          profile_first_name: string | null
+          profile_id: string
+          profile_last_name: string | null
+          profile_photo_url: string | null
+          user_id: string | null
+          vaulted_at: string
+        }
+        Insert: {
+          athlete_first_name?: string | null
+          athlete_id: string
+          athlete_last_name?: string | null
+          auth_email?: string | null
+          avatar_url?: string | null
+          email: string
+          profile_first_name?: string | null
+          profile_id: string
+          profile_last_name?: string | null
+          profile_photo_url?: string | null
+          user_id?: string | null
+          vaulted_at?: string
+        }
+        Update: {
+          athlete_first_name?: string | null
+          athlete_id?: string
+          athlete_last_name?: string | null
+          auth_email?: string | null
+          avatar_url?: string | null
+          email?: string
+          profile_first_name?: string | null
+          profile_id?: string
+          profile_last_name?: string | null
+          profile_photo_url?: string | null
+          user_id?: string | null
+          vaulted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_deletion_vault_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: true
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -638,6 +726,7 @@ export type Database = {
           code: string
           country: string | null
           created_at: string
+          deleted_at: string | null
           diet_preference: string | null
           dob: string | null
           ethnicity: string | null
@@ -671,6 +760,7 @@ export type Database = {
           code: string
           country?: string | null
           created_at?: string
+          deleted_at?: string | null
           diet_preference?: string | null
           dob?: string | null
           ethnicity?: string | null
@@ -704,6 +794,7 @@ export type Database = {
           code?: string
           country?: string | null
           created_at?: string
+          deleted_at?: string | null
           diet_preference?: string | null
           dob?: string | null
           ethnicity?: string | null
@@ -3642,6 +3733,7 @@ export type Database = {
       }
       current_profile_id: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
+      delete_my_account: { Args: never; Returns: undefined }
       has_independent_access_to_athlete: {
         Args: { p_athlete_id: string }
         Returns: boolean
@@ -3673,11 +3765,23 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      record_athlete_data_handling_acceptance: {
+        Args: { p_text: string; p_version: string }
+        Returns: undefined
+      }
       register_push_token: {
         Args: { p_device_name?: string; p_platform: string; p_token: string }
         Returns: undefined
       }
-      request_account_closure: { Args: never; Returns: undefined }
+      restore_deleted_athlete: {
+        Args: {
+          p_athlete_id: string
+          p_email?: string
+          p_first_name?: string
+          p_last_name?: string
+        }
+        Returns: undefined
+      }
       revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
       rtp_gate_status: {
         Args: { p_injury_id: string }
