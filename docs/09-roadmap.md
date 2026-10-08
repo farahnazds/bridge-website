@@ -415,6 +415,21 @@ onboards:
   The numbered migrations are the canonical history and the live database is
   correct, so this is latent rather than active, but a database split is
   precisely the moment someone reaches for `schema.sql`.
+- **Migration 059 must be applied before anything is rebuilt from `main`.**
+  The account-deletion release (migrations 066/069/070/071) references
+  `athlete_push_tokens`, which migration **059** creates — and 059 is part of
+  the check-in reminder work that has not been promoted to `main`. Two places
+  depend on it: `delete_my_account()` in migration 069 disables an athlete's
+  push tokens as it deletes them, and
+  `app/super-admin/athlete-closures/actions.ts` does the same when closing an
+  account. **Nothing is broken today** — one Supabase project serves
+  everything and 059 is applied there, so both paths work in production. The
+  exposure is a *fresh* database: run `main`'s migrations in order against an
+  empty schema and 069 fails on a missing table. Decided 2026-10-08 to leave
+  the reference as it is rather than duplicate 059's table on the release
+  branch. So when staging is split off, either promote 059 with it or create
+  `athlete_push_tokens` first; the same caution as `schema.sql` above, for the
+  same reason.
 
 ### Already closed, not part of this
 
