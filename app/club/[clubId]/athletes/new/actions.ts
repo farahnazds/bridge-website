@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasRole } from "@/lib/auth";
+import { isClosedAthleteEmail } from "@/lib/athleteClosure";
 import { getBaseUrl } from "@/lib/site";
 import { MENSTRUAL_STATUSES, IRON_STATUSES } from "@/lib/constants";
 
@@ -88,6 +89,17 @@ export async function registerAthlete(
   }
   if (periodDurationDays !== null && (!Number.isInteger(periodDurationDays) || periodDurationDays < 1 || periodDurationDays > 30)) {
     return { error: "Period duration must be a whole number between 1 and 30 days." };
+  }
+
+  // An athlete who closed their own account (migration 066) has a banned login
+  // that an invite cannot revive. Without this check the registration would
+  // create the athlete row and profile, then fail at the invite with a vague
+  // "already registered" — so say so up front, before anything is created.
+  if (await isClosedAthleteEmail(email)) {
+    return {
+      error:
+        "This athlete's Bridgetx account was closed at their own request, so they can't be registered again from here. Please contact Bridgetx at admin@bridgetx.co.",
+    };
   }
 
   const supabase = await createClient();

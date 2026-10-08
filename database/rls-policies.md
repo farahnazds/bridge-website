@@ -1684,3 +1684,187 @@ re-submission keeps the first timestamp. Verified live 2026-10-02 through a real
 activation (row written with the correct version, then test data removed).
 
 See `database/migrations/068_athlete_data_handling_acceptance.sql`.
+
+## Added: `athlete_account_closures` (migration 066, 2026-09-30)
+
+An athlete can ask to close (deactivate) their own account. This is
+DEACTIVATION, never deletion: login is suspended, every record stays where it
+is, because the club/practitioner — not the athlete — owns the data.
+
+**SELECT — `"closure status visible where athlete visible"`:**
+`exists (select 1 from athletes a where a.id = athlete_account_closures.athlete_id)`.
+The subquery runs under the caller's own RLS on `athletes`, so the closure
+status is visible to exactly the people who can already see that athlete —
+the athlete themself, club staff/managers, admins, approved independent
+practitioners and Super Admin — and to no one else. It restates none of those
+rules, so if access to an athlete ever changes this follows automatically.
+Clubs and practitioners therefore see the status **read-only**.
+
+**No INSERT / UPDATE / DELETE policy, deliberately.** There are two write
+paths and neither is a table policy:
+
+- **`request_account_closure()`** — `SECURITY DEFINER`, granted to
+  `authenticated`. Resolves the athlete from `current_profile_id()` (never a
+  parameter), refuses non-athletes, inserts one `requested` row, idempotent
+  while a request is open (partial unique index on `athlete_id` where status
+  is `requested` or `processed`). An athlete can therefore only ASK; they
+  cannot mark a request processed, edit it, or file one for anyone else.
+- **Processing / reversal** — Super Admin only, in
+  `app/super-admin/athlete-closures/actions.ts`, on the service role. Clubs
+  and practitioners cannot process a closure.
+
+**`revoke_user_sessions(uuid)`** — `SECURITY DEFINER`, executable by
+`service_role` ONLY (revoked from `public`, `anon`, `authenticated`): it can
+end any user's sessions. Verified 2026-09-30 that an athlete calling it gets
+HTTP 403.
+
+**What actually blocks the login.** Not RLS — Supabase Auth's per-user ban
+(`auth.admin.updateUserById(..., { ban_duration })`) applied by the processing
+action, plus `revoke_user_sessions()`. Verified live against the shared
+project with a marked test athlete: a banned user's password sign-in is
+refused ("User is banned"), their previously-valid refresh token is refused,
+the old access token is rejected by `/auth/v1/user`, and unbanning restores
+sign-in. **Known residual:** an access token issued *before* the ban still
+reads the data API (PostgREST) until it expires — sessions are not consulted
+on every data request. RLS does not currently consult closure status.
+
+See `database/migrations/066_athlete_account_closures.sql`.
+
+## Added: athlete account deletion + the vault (migration 069, 2026-10-04)
+
+Extends 066. An athlete can now DELETE their own account, immediately, with no
+human in the loop. Deletion is: login removed, name/email/photo anonymized,
+history untouched, originals vaulted for a Super Admin restore.
+
+**`delete_my_account()`** — `SECURITY DEFINER`, granted to `authenticated`,
+revoked from `public`/`anon`. Resolves the athlete from `current_profile_id()`
+(never a parameter), refuses non-athletes, idempotent. In ONE transaction it:
+copies the originals into `athlete_deletion_vault`; sets name → "Deleted
+Athlete", email → `deleted-<profile id>@deleted.invalid`, photo links → null on
+**both** `profiles` and `athletes`; bans the auth user for 100 years, replaces
+its email and identity email with the placeholder, clears recovery/confirmation
+tokens, deletes sessions, refresh tokens and one-time tokens; disables push
+tokens; marks the closure row `deleted`. It is atomic, so there is no state where
+the profile is anonymized but login still works.
+
+*Why the auth user is banned and NOT hard-deleted:* `profiles.user_id → auth.users`
+and `athletes.profile_id → profiles` are both `on delete cascade`, and 14 history
+tables cascade from `athletes`. Deleting the auth user erases the history.
+
+**`athlete_deletion_vault`** — RLS on. One SELECT policy,
+`"vault readable by super admin only"` (`is_super_admin()`); no INSERT/UPDATE/
+DELETE policy. Verified 2026-10-04 with real sessions: club manager, practitioner
+and the deleted athlete's own token read 0 rows; Super Admin reads the row.
+
+**`restore_deleted_athlete(athlete_id, first_name?, last_name?, email?)`** —
+`SECURITY DEFINER`, granted to `authenticated`, but it checks `is_super_admin()`
+itself and raises 42501 for anyone else (verified: club manager, practitioner and
+the deleted athlete all refused). Blank arguments use the vaulted originals. Refuses
+an email that another profile/auth user now holds (23505). Un-bans, restores
+names/email/photo links, rewrites the auth identity, marks the closure `reversed`,
+and DELETES the vault row. The athlete's old password hash was never removed, so
+the old password works again.
+
+**Change to `guard_profile_identity_columns` (migration 031).** Inside a
+SECURITY DEFINER function `auth.uid()` is still the athlete, so the guard would
+reject the anonymizing UPDATE of `profiles.email`. The guard now returns early
+when `current_user` is not `authenticated`/`anon`. A client statement through
+PostgREST is always one of those two roles and a client cannot change it, so
+self-service edits of role/email/user_id are still blocked — re-verified
+2026-10-04: a club manager changing their own email, and a deleted athlete's
+still-valid token doing the same, both get 42501.
+
+**`request_account_closure()` was dropped.** Athletes delete immediately now.
+Existing `requested`/`processed` rows (066) stay and can still be declined or
+reinstated by Super Admin; a `deleted` row can only be restored, not "reinstated".
+
+**Token residual: CLOSED for the data API by migration 070 (below).** It was: an
+access token issued before deletion kept working against PostgREST until it
+expired (measured 3600 s), because PostgREST checks only signature and expiry.
+
+See `database/migrations/069_athlete_account_deletion.sql`.
+
+## Added: closed-account token rejection (migration 070, 2026-10-04)
+
+PostgREST validates a JWT's signature and expiry only; it never consults
+sessions or bans. So after an account was closed (066) or deleted (069), a token
+issued earlier kept reading and writing for up to its lifetime (3600 s).
+
+**`reject_closed_accounts()`** is wired as PostgREST's `db_pre_request` hook
+(`alter role authenticator set pgrst.db_pre_request = 'public.reject_closed_accounts'`).
+PostgREST runs it at the start of EVERY request, inside the request transaction.
+For a caller whose athlete has `deleted_at` set or a `processed`/`deleted`
+closure it raises SQLSTATE `PT401` → HTTP 401 "This account has been closed.".
+Anon and service-role callers (no `auth.uid()`) return on the first line.
+`/rpc/delete_my_account` is exempt so a retry after a lost response stays
+idempotent (204) rather than looking like a failure. This is one function for
+every table and RPC; no athlete-facing policy was edited.
+
+Verified 2026-10-04 with ONE token captured before `delete_my_account()`:
+before the migration it read check-ins, athletes and profiles (HTTP 200, 2/1/1
+rows); after it, every table AND a write attempt returned 401 PT401, the profile
+name in the DB stayed "Deleted", and the delete retry returned 204. A
+`processed` (066) closure is rejected the same way; reversing it or restoring
+the athlete restores access with a fresh sign-in. Unaffected: anon reads,
+service role, club manager, practitioner, Super Admin. Hook cost measured
+server-side at ~0.04 ms per request.
+
+**The hook only runs for PostgREST (REST + RPC).** Storage was closed separately
+in migration 071 (below); Realtime is not used by either app (see 071).
+
+Rollback: `alter role authenticator reset pgrst.db_pre_request; notify pgrst, 'reload config';`
+
+See `database/migrations/070_reject_closed_account_tokens.sql`.
+
+## Added: Storage rejects closed-account tokens (migration 071, 2026-10-04)
+
+The 070 hook does not run for the Storage API, which evaluates `storage.objects`
+policies itself: a pre-deletion token kept downloading and listing the athlete's
+files (measured: 200 on both buckets) until it expired.
+
+**`is_closed_account()`** — the single definition of "closed": the JWT's athlete
+has `deleted_at` set (069) or a `processed`/`deleted` closure (066/069). `stable`,
+`security definer`, executable by anon/authenticated/service_role, false for
+callers with no user. `reject_closed_accounts()` (070) now calls it too, so REST
+and Storage cannot drift apart. `current_profile_id()` and the other shared
+helpers were NOT modified (owner ruling).
+
+Only the two storage policies through which an ATHLETE's token can be admitted
+gained `and not is_closed_account()` (confirmed by listing every policy that
+references `is_own_athlete_profile`/`current_profile_id`: these are the only two):
+- `profile-photos` — "linked practitioners and athlete read own photo"
+- `report-pdfs` — "shared recipient reads report pdf"
+All other policies on those buckets are staff/admin/Super Admin only. The added
+term is false for any non-athlete, so their access is unchanged.
+
+Verified 2026-10-04 with one token captured before `delete_my_account()`, a real
+photo and a real report PDF shared with the athlete: live athlete before delete
+200/200 (download) with the file listed in both buckets; same token after delete,
+BEFORE the migration, 200 and listed (the gap); AFTER the migration the lists are
+empty and an uncached download returns 404 (also for brand-new objects). Practitioner,
+club manager and Super Admin still read both buckets; after a Super Admin restore a
+fresh athlete token reads them again, and the REST hook still returns 401 PT401 for
+a deleted athlete.
+
+**Residuals, measured (none exposes data the holder had not already received):**
+- **CDN cache.** Supabase's CDN caches `/object/authenticated/...` responses
+  (`cache-control: public, max-age=3600`) and does NOT re-check policy on a HIT.
+  The cache is partitioned by token: anon, no-credential and a different user's
+  request for the same URL all bypassed it (400), and an unauthorized caller got
+  400 even after an authorized user had populated the cache. So the only HIT is the
+  SAME token re-requesting an object it already downloaded while authorized, for up
+  to 3600 s. Observed as `download 200` right after the fix; a cache-buster query
+  string exposed the real policy result (404).
+- **Signed URLs** created before the deletion stay valid until their own expiry
+  (bearer links; the apps use short TTLs — photo 300 s). Not revocable per user.
+- **Realtime: not exposed.** Neither app uses Supabase Realtime (the mobile
+  messenger is pull-based — its source says so; earlier "channel" grep hits were
+  Android notification channels), and the `supabase_realtime` publication has
+  ZERO tables, so no `postgres_changes` subscription can receive anything. Tested:
+  a pre-deletion token subscribed successfully (SUBSCRIBED) and received 0 events
+  while a message, recipient row and notification were inserted for that athlete.
+  Limitation: with an empty publication that test cannot distinguish "token
+  rejected" from "nothing published". If a table is ever added to the publication,
+  re-test this with a pre-deletion token before relying on it.
+
+See `database/migrations/071_storage_reject_closed_account_tokens.sql`.

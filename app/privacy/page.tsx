@@ -23,9 +23,16 @@ import { COMPANY } from "@/components/SiteFooter";
 //   No analytics/tracking ..... verified 2026-08-22: no Sentry/PostHog/GA/Vercel
 //                               Analytics/ad pixels anywhere in the repo
 //   Storage buckets ........... report-pdfs / profile-photos / club-branding, all private
-//   No deletion path .......... no .delete() against athletes, profiles, reports,
-//                               checkins, assessments, gps_logs, vald_data,
+//   Athlete self-deletion ..... migration 069 delete_my_account(), 2026-10-04: login
+//                               permanently removed, name/email/photo links
+//                               anonymized, history KEPT, original name/email kept
+//                               in athlete_deletion_vault (Super Admin read only,
+//                               removed on restore). Sections 10-11 describe this;
+//                               keep them in step with that function.
+//   No erasure of history ..... still no .delete() against athletes, profiles,
+//                               reports, checkins, assessments, gps_logs, vald_data,
 //                               injuries; no .remove() against Storage AT ALL
+//                               (profile-photo FILES stay in the private bucket)
 //   No retention job .......... vercel.json has one cron, compliance-check, which
 //                               only WRITES notifications
 //   Minors gap ................ docs/09-roadmap.md:33-35 (no individual guardian
@@ -303,6 +310,12 @@ export default function PrivacyPage() {
           history are designed never to be deleted, and report PDFs and profile photos are retained in storage.
         </p>
         <p style={{ margin: 0 }}>
+          The one thing an athlete can do themselves is delete their own account (section 11). That permanently removes their login and
+          anonymizes their name, email and profile-photo link, but it does not delete their records. We also keep one copy of the
+          original name and email, readable only by us as the platform operator, so the account can be restored if the athlete asks or
+          the deletion was a mistake; that copy is removed when the account is restored. Photo files remain in private storage.
+        </p>
+        <p style={{ margin: 0 }}>
           We recognise that &ldquo;indefinitely&rdquo; is not an adequate retention position under UK data protection law. Defining
           proper retention periods, and building the mechanism to enforce them, is active work. In the meantime, we will delete data on
           request — see section 11.
@@ -331,9 +344,22 @@ export default function PrivacyPage() {
           a complex request.
         </p>
         <p style={{ margin: 0 }}>
-          Being transparent about the mechanism: <strong>Bridgetx does not currently offer a self-service way to download or delete your
-          data from within the app.</strong> Requests are handled manually by our team. This is a limitation of the product today, not a
-          reason for us to decline a request, and building self-service access and deletion is on our roadmap.
+          <strong>Deleting your account.</strong> If you are an athlete you can delete your account yourself, in the app (More &rarr;
+          Delete my account) or on the web (My Account). It takes effect immediately: your login is permanently removed, so you cannot
+          sign in, reset your password or use a sign-in link; and your name, email address and profile-photo link are anonymized, with
+          your name shown as &ldquo;Deleted Athlete&rdquo;.
+        </p>
+        <p style={{ margin: 0 }}>
+          <strong>What deleting your account does not do.</strong> It does not erase your records. Your check-ins, assessments,
+          reports and other history stay with your club and practitioners as part of their professional records, attributed to
+          &ldquo;Deleted Athlete&rdquo;. We also retain one copy of your original name and email, kept apart from those records and
+          readable only by us as the platform operator, solely so your account can be restored. You can ask us to erase that copy, and
+          the records, by emailing {MAIL}; we will consider it as described below.
+        </p>
+        <p style={{ margin: 0 }}>
+          Being transparent about the rest: <strong>Bridgetx does not currently offer a self-service way to download your data from
+          within the app, and deleting your account is not the same as erasing your data.</strong> Requests to download or erase data
+          are handled manually by our team. This is a limitation of the product today, not a reason for us to decline a request.
         </p>
         <p style={{ margin: 0 }}>
           If you are a club athlete, we may need to consult your club before deleting records the club holds as controller — for example

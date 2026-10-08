@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth";
+import { getOpenClosures, type AthleteClosure } from "@/lib/athleteClosure";
 import { getThreadsForCurrentProfile } from "@/lib/messaging";
 import { readComments, commentAuthorName } from "@/lib/comments";
 import { EDIT_WINDOW_MS } from "@/lib/constants";
@@ -108,6 +109,10 @@ export interface AthleteProfileData {
   comments: CommentEntry[];
   trainingLoad: TrainingLoadEntry[];
   threads: ThreadSummary[];
+  /** The athlete's OPEN account-closure request/closure (migration 066), if
+   *  any. Read-only status for every viewer; only a Super Admin acts on it. */
+  closure: AthleteClosure | null;
+  viewerCanProcessClosure: boolean;
 }
 
 // Re-exported so a consumer of this loader never has to reach into an
@@ -257,6 +262,7 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
   // thread assembly is written around. Cached per request by lib/auth.ts, and
   // both routes already called it, so this costs nothing.
   const viewer = await getCurrentProfile();
+  const closure = (await getOpenClosures([athleteId], supabase)).get(athleteId) ?? null;
 
   const [
     conditionsRes, allergiesRes, intolerancesRes, teamsRes,
@@ -596,6 +602,8 @@ export async function getAthleteProfileData(athleteId: string): Promise<AthleteP
     comments,
     trainingLoad,
     threads,
+    closure,
+    viewerCanProcessClosure: viewer?.role === "super_admin",
   };
 }
 

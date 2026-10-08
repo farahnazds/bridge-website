@@ -415,6 +415,21 @@ onboards:
   The numbered migrations are the canonical history and the live database is
   correct, so this is latent rather than active, but a database split is
   precisely the moment someone reaches for `schema.sql`.
+- **Migration 059 must be applied before anything is rebuilt from `main`.**
+  The account-deletion release (migrations 066/069/070/071) references
+  `athlete_push_tokens`, which migration **059** creates — and 059 is part of
+  the check-in reminder work that has not been promoted to `main`. Two places
+  depend on it: `delete_my_account()` in migration 069 disables an athlete's
+  push tokens as it deletes them, and
+  `app/super-admin/athlete-closures/actions.ts` does the same when closing an
+  account. **Nothing is broken today** — one Supabase project serves
+  everything and 059 is applied there, so both paths work in production. The
+  exposure is a *fresh* database: run `main`'s migrations in order against an
+  empty schema and 069 fails on a missing table. Decided 2026-10-08 to leave
+  the reference as it is rather than duplicate 059's table on the release
+  branch. So when staging is split off, either promote 059 with it or create
+  `athlete_push_tokens` first; the same caution as `schema.sql` above, for the
+  same reason.
 
 ### Already closed, not part of this
 
@@ -481,3 +496,35 @@ needs a `maxTouchPoints` check rather than a plain platform string match.
 1. UAE clubs and academies (launch)
 2. GCC region (scale)
 3. Global (long term)
+## Closed-athlete access token window — CLOSED 2026-10-04 (migrations 070 data API, 071 Storage)
+
+Update 2026-10-04: owner asked for it now. Migration 070 installs a PostgREST
+`db_pre_request` hook that returns HTTP 401 for any token whose athlete is
+deleted or closed — one function, no per-policy changes, verified with a token
+captured before deletion. Migration 071 does the same for Storage by adding
+`not is_closed_account()` to the two athlete-reachable storage policies
+(profile-photos, report-pdfs) without touching `current_profile_id()`. Realtime is
+not used by either app and the publication is empty (nothing to expose). Remaining
+bounded residuals: Supabase's CDN can re-serve an object the SAME token already
+downloaded (max-age 3600 s), and signed URLs live out their own short TTL. Details
+and measurements: `database/rls-policies.md` (migrations 070 and 071).
+The text below is the original 2026-09-30 deferral, kept
+for the reasoning.
+
+(Original heading: Deferred: closed-athlete access token window, decided 2026-09-30)
+
+Athlete account closure (migration 066) bans the auth user and deletes their
+sessions, so sign-in and token refresh are refused immediately. One residual
+remains: an access token issued BEFORE the ban keeps reading the data API
+(PostgREST) until it expires (JWT lifetime — MEASURED 2026-10-04: 3600 s, from a real
+sign-in; the same window applies after migration 069 account DELETION, where
+the old token still read the athlete's own check-ins, and still could not read
+the vault, call restore, or change its own email). The mobile app closes it client-side on start-up (resolveAthlete).
+
+Closing it server-side means making RLS consult closure status — most likely
+inside `is_own_athlete_profile()`, which every athlete-facing policy uses, plus
+any policy keyed on `current_profile_id()` directly. Owner ruling: NOT during
+the live pilot and not bundled with another build; do it as its own change with
+a dedicated RLS test pass (every athlete-facing table, open and closed
+athlete, before/after). Until then the gap is documented in
+`database/rls-policies.md` (migration 066 section).

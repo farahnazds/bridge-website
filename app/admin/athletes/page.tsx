@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getAssignedClubs, getScopedAthletes, getScopeNoun } from "@/lib/adminScope";
 import EmptyState from "@/components/EmptyState";
 import { CARD, NOTICE } from "@/lib/ui";
+import { getOpenClosures, closureLabel } from "@/lib/athleteClosure";
 
 export const metadata: Metadata = { title: "Athletes — Admin — Bridgetx" };
 
@@ -26,6 +27,8 @@ export default async function AdminAthletesPage() {
     status?: string;
   };
   const rows = athletes as Row[];
+  // Account-closure status (migration 066), read-only.
+  const closures = await getOpenClosures(rows.map((r) => r.id));
 
   return (
     <div className="flex flex-col gap-8">
@@ -104,7 +107,11 @@ export default async function AdminAthletesPage() {
                     {a.tier ? TIER_LABEL[a.tier] ?? a.tier : "—"}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3" style={{ color: "var(--text)" }}>
-                    {a.status === "read_only" ? "Read-only" : "Active"}
+                    {closures.get(a.id) ? (
+                      <span style={{ color: closures.get(a.id)!.status === "processed" ? "var(--danger)" : "var(--warning)" }}>
+                        {closureLabel(closures.get(a.id)!)}
+                      </span>
+                    ) : a.status === "read_only" ? "Read-only" : "Active"}
                   </td>
                 </tr>
               ))}

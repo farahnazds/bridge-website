@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { BTN_PRIMARY, CARD, NOTICE } from "@/lib/ui";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getOpenClosures, closureLabel } from "@/lib/athleteClosure";
 
 export const metadata: Metadata = {
   title: "Athletes — Bridgetx",
@@ -26,6 +27,10 @@ export default async function ClubAthletesPage({
     .select("id, first_name, last_name, code, sport, position, tier, status")
     .eq("club_id", clubId)
     .order("last_name", { ascending: true });
+
+  // Account-closure status (migration 066), read-only here: "Closed by athlete
+  // request — [date]" replaces the plain Active/Read-only label.
+  const closures = await getOpenClosures((athletes ?? []).map((a) => a.id), supabase);
 
   return (
     <div className="flex flex-col gap-8">
@@ -125,7 +130,11 @@ export default async function ClubAthletesPage({
                     {athlete.tier ? TIER_LABEL[athlete.tier] ?? athlete.tier : "—"}
                   </td>
                   <td className="px-5 py-3" style={{ color: "var(--text)" }}>
-                    {athlete.status === "read_only" ? "Read-only" : "Active"}
+                    {closures.get(athlete.id) ? (
+                      <span style={{ color: closures.get(athlete.id)!.status === "processed" ? "var(--danger)" : "var(--warning)" }}>
+                        {closureLabel(closures.get(athlete.id)!)}
+                      </span>
+                    ) : athlete.status === "read_only" ? "Read-only" : "Active"}
                   </td>
                 </tr>
               ))}

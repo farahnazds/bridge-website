@@ -237,6 +237,78 @@ export type Database = {
           },
         ]
       }
+      athlete_account_closures: {
+        Row: {
+          athlete_id: string
+          deleted_at: string | null
+          id: string
+          processed_at: string | null
+          processed_by: string | null
+          requested_at: string
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+        }
+        Insert: {
+          athlete_id: string
+          deleted_at?: string | null
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          requested_at?: string
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Update: {
+          athlete_id?: string
+          deleted_at?: string | null
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          requested_at?: string
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_account_closures_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_account_closures_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_account_closures_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_account_closures_reversed_by_fkey"
+            columns: ["reversed_by"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_account_closures_reversed_by_fkey"
+            columns: ["reversed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_allergies: {
         Row: {
           allergy_code: string
@@ -347,6 +419,59 @@ export type Database = {
           },
         ]
       }
+      athlete_deletion_vault: {
+        Row: {
+          athlete_first_name: string | null
+          athlete_id: string
+          athlete_last_name: string | null
+          auth_email: string | null
+          avatar_url: string | null
+          email: string
+          profile_first_name: string | null
+          profile_id: string
+          profile_last_name: string | null
+          profile_photo_url: string | null
+          user_id: string | null
+          vaulted_at: string
+        }
+        Insert: {
+          athlete_first_name?: string | null
+          athlete_id: string
+          athlete_last_name?: string | null
+          auth_email?: string | null
+          avatar_url?: string | null
+          email: string
+          profile_first_name?: string | null
+          profile_id: string
+          profile_last_name?: string | null
+          profile_photo_url?: string | null
+          user_id?: string | null
+          vaulted_at?: string
+        }
+        Update: {
+          athlete_first_name?: string | null
+          athlete_id?: string
+          athlete_last_name?: string | null
+          auth_email?: string | null
+          avatar_url?: string | null
+          email?: string
+          profile_first_name?: string | null
+          profile_id?: string
+          profile_last_name?: string | null
+          profile_photo_url?: string | null
+          user_id?: string | null
+          vaulted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_deletion_vault_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: true
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_intolerances: {
         Row: {
           athlete_id: string
@@ -383,6 +508,88 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "intolerances"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      athlete_notification_prefs: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          missed_followup_enabled: boolean
+          prompted_at: string | null
+          reminder_enabled: boolean
+          reminder_time: string | null
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          missed_followup_enabled?: boolean
+          prompted_at?: string | null
+          reminder_enabled?: boolean
+          reminder_time?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          missed_followup_enabled?: boolean
+          prompted_at?: string | null
+          reminder_enabled?: boolean
+          reminder_time?: string | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_notification_prefs_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: true
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      athlete_push_tokens: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          device_name: string | null
+          disabled_at: string | null
+          expo_push_token: string
+          id: string
+          last_seen_at: string
+          platform: string
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          device_name?: string | null
+          disabled_at?: string | null
+          expo_push_token: string
+          id?: string
+          last_seen_at?: string
+          platform: string
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          device_name?: string | null
+          disabled_at?: string | null
+          expo_push_token?: string
+          id?: string
+          last_seen_at?: string
+          platform?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_push_tokens_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -519,6 +726,7 @@ export type Database = {
           code: string
           country: string | null
           created_at: string
+          deleted_at: string | null
           diet_preference: string | null
           dob: string | null
           ethnicity: string | null
@@ -552,6 +760,7 @@ export type Database = {
           code: string
           country?: string | null
           created_at?: string
+          deleted_at?: string | null
           diet_preference?: string | null
           dob?: string | null
           ethnicity?: string | null
@@ -585,6 +794,7 @@ export type Database = {
           code?: string
           country?: string | null
           created_at?: string
+          deleted_at?: string | null
           diet_preference?: string | null
           dob?: string | null
           ethnicity?: string | null
@@ -1772,7 +1982,9 @@ export type Database = {
           id: string
           provider_id: string
           rtp_phase: string | null
+          rtp_phase_entered_at: string | null
           status: string
+          symptom_gated: boolean
           target_return_date: string | null
           type: string
           updated_at: string | null
@@ -1788,7 +2000,9 @@ export type Database = {
           id?: string
           provider_id: string
           rtp_phase?: string | null
+          rtp_phase_entered_at?: string | null
           status?: string
+          symptom_gated?: boolean
           target_return_date?: string | null
           type: string
           updated_at?: string | null
@@ -1804,7 +2018,9 @@ export type Database = {
           id?: string
           provider_id?: string
           rtp_phase?: string | null
+          rtp_phase_entered_at?: string | null
           status?: string
+          symptom_gated?: boolean
           target_return_date?: string | null
           type?: string
           updated_at?: string | null
@@ -1843,6 +2059,61 @@ export type Database = {
           {
             foreignKeyName: "injuries_updated_by_fkey"
             columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      injury_symptom_scores: {
+        Row: {
+          athlete_id: string
+          created_at: string
+          id: string
+          injury_id: string
+          provider_id: string
+          recorded_at: string
+          severity: number
+          symptoms: string | null
+        }
+        Insert: {
+          athlete_id: string
+          created_at?: string
+          id?: string
+          injury_id: string
+          provider_id: string
+          recorded_at?: string
+          severity: number
+          symptoms?: string | null
+        }
+        Update: {
+          athlete_id?: string
+          created_at?: string
+          id?: string
+          injury_id?: string
+          provider_id?: string
+          recorded_at?: string
+          severity?: number
+          symptoms?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "injury_symptom_scores_injury_fkey"
+            columns: ["injury_id", "athlete_id"]
+            isOneToOne: false
+            referencedRelation: "injuries"
+            referencedColumns: ["id", "athlete_id"]
+          },
+          {
+            foreignKeyName: "injury_symptom_scores_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "injury_symptom_scores_provider_id_fkey"
+            columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2072,31 +2343,192 @@ export type Database = {
           },
         ]
       }
+      partnership_contract_documents: {
+        Row: {
+          contract_id: string
+          file_name: string
+          file_url: string
+          id: string
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          contract_id: string
+          file_name: string
+          file_url: string
+          id?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          contract_id?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_contract_documents_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnership_contract_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnership_contract_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partnership_contracts: {
+        Row: {
+          commission_percent: number | null
+          commission_type: string
+          created_at: string
+          created_by: string | null
+          deal_value: number | null
+          end_date: string | null
+          id: string
+          notes: string | null
+          payment_frequency: string | null
+          pipeline_row_id: string
+          recurring_amount: number | null
+          start_date: string
+          terminated_at: string | null
+        }
+        Insert: {
+          commission_percent?: number | null
+          commission_type: string
+          created_at?: string
+          created_by?: string | null
+          deal_value?: number | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          payment_frequency?: string | null
+          pipeline_row_id: string
+          recurring_amount?: number | null
+          start_date: string
+          terminated_at?: string | null
+        }
+        Update: {
+          commission_percent?: number | null
+          commission_type?: string
+          created_at?: string
+          created_by?: string | null
+          deal_value?: number | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          payment_frequency?: string | null
+          pipeline_row_id?: string
+          recurring_amount?: number | null
+          start_date?: string
+          terminated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "athlete_message_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnership_contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partnership_contracts_pipeline_row_id_fkey"
+            columns: ["pipeline_row_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_consultant_totals"
+            referencedColumns: ["pipeline_row_id"]
+          },
+          {
+            foreignKeyName: "partnership_contracts_pipeline_row_id_fkey"
+            columns: ["pipeline_row_id"]
+            isOneToOne: false
+            referencedRelation: "partnerships_consultant_clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partnership_payment_schedule: {
+        Row: {
+          contract_id: string
+          created_at: string
+          due_date: string
+          expected_amount: number
+          id: string
+          notes: string | null
+          paid_at: string | null
+          payment_proof_url: string | null
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          due_date: string
+          expected_amount: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_proof_url?: string | null
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          due_date?: string
+          expected_amount?: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_proof_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partnership_payment_schedule_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "partnership_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partnerships_consultant_clubs: {
         Row: {
           club_id: string
-          commission_percent: number | null
           consultant_id: string
           created_at: string
-          deal_value: number | null
           id: string
           stage: string | null
         }
         Insert: {
           club_id: string
-          commission_percent?: number | null
           consultant_id: string
           created_at?: string
-          deal_value?: number | null
           id?: string
           stage?: string | null
         }
         Update: {
           club_id?: string
-          commission_percent?: number | null
           consultant_id?: string
           created_at?: string
-          deal_value?: number | null
           id?: string
           stage?: string | null
         }
@@ -3282,14 +3714,6 @@ export type Database = {
           },
         ]
       }
-      // Hand-added for the 2026-09-30 production hotfix
-      // (app/partner-consultant/[id]/page.tsx) — this ONE entry, not a full
-      // regeneration. A full `supabase gen types` run against the current
-      // live database would also pull in every other migration since this
-      // branch's 2026-08-28 base (058 through 065+), which is unrelated to
-      // this fix and explicitly out of scope for it. Row shape copied
-      // verbatim from the dev branch's already-regenerated types, which are
-      // themselves generated from this same live view (migration 063).
       partnership_consultant_totals: {
         Row: {
           contract_count: number | null
@@ -3318,8 +3742,25 @@ export type Database = {
         }
         Returns: boolean
       }
+      create_partnership_contract: {
+        Args: {
+          p_commission_percent: number
+          p_commission_type: string
+          p_created_by: string
+          p_deal_value: number
+          p_end_date: string
+          p_notes: string
+          p_payment_frequency: string
+          p_pipeline_row_id: string
+          p_recurring_amount: number
+          p_schedule: Json
+          p_start_date: string
+        }
+        Returns: string
+      }
       current_profile_id: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
+      delete_my_account: { Args: never; Returns: undefined }
       has_independent_access_to_athlete: {
         Args: { p_athlete_id: string }
         Returns: boolean
@@ -3331,6 +3772,7 @@ export type Database = {
         Returns: boolean
       }
       is_assigned_to_team: { Args: { p_team_id: string }; Returns: boolean }
+      is_closed_account: { Args: never; Returns: boolean }
       is_club_manager_for_club: {
         Args: { p_club_id: string }
         Returns: boolean
@@ -3355,6 +3797,40 @@ export type Database = {
         Args: { p_text: string; p_version: string }
         Returns: undefined
       }
+      register_push_token: {
+        Args: { p_device_name?: string; p_platform: string; p_token: string }
+        Returns: undefined
+      }
+      reject_closed_accounts: { Args: never; Returns: undefined }
+      restore_deleted_athlete: {
+        Args: {
+          p_athlete_id: string
+          p_email?: string
+          p_first_name?: string
+          p_last_name?: string
+        }
+        Returns: undefined
+      }
+      revoke_user_sessions: { Args: { p_user_id: string }; Returns: number }
+      rtp_gate_status: {
+        Args: { p_injury_id: string }
+        Returns: {
+          blocked_reason: string
+          can_graduate: boolean
+          duration_met: boolean
+          gated: boolean
+          injury_id: string
+          last_symptomatic_at: string
+          latest_recorded_at: string
+          latest_severity: number
+          no_recurrence: boolean
+          phase: string
+          phase_entered_at: string
+          scores_in_phase: number
+          symptom_free: boolean
+        }[]
+      }
+      rtp_phase_rank: { Args: { p_phase: string }; Returns: number }
       shares_club_with_staff: {
         Args: { p_profile_id: string }
         Returns: boolean
@@ -3386,12 +3862,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3415,11 +3891,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3440,11 +3916,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3465,11 +3941,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3482,11 +3958,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
