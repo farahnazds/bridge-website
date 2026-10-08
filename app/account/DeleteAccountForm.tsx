@@ -5,8 +5,9 @@ import { BTN_SECONDARY, NOTICE } from "@/lib/ui";
 import { deleteMyAccount, type DeleteAccountState } from "./actions";
 
 // Athlete-only. Two deliberate steps (explain -> confirm) so it cannot fire on
-// a single click. Wording says exactly what happens — see migration 069 and the
-// public /account-deletion page, which must stay in step with this.
+// a single click. The copy here is the SHORT summary; the full detail lives on
+// the public /account-deletion page and in the privacy policy. All three plus
+// migration 069 must stay in step with each other.
 
 const initial: DeleteAccountState = { error: null };
 
@@ -17,13 +18,10 @@ export default function DeleteAccountForm() {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        Deleting your account permanently removes your login. You will be signed out straight away and will not be able to sign in,
-        reset your password or use a magic link again. Your name, email and photo are anonymized.
-      </p>
-      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        Your check-ins, assessments, reports and other history are <strong>not</strong> deleted: your club and practitioners keep
-        them as their records, now shown under &ldquo;Deleted Athlete&rdquo;. A copy of your original name and email is kept,
-        visible only to the Bridgetx platform operator, so the account can be restored if that is ever needed.
+        This permanently deletes your login and signs you out right away. Your name, email and photo are anonymized. Your club
+        keeps your check-in and training records, shown as &ldquo;Deleted Athlete&rdquo;. A secure copy of your name and email is
+        kept so your account can be restored if you ask. To have it erased, contact{" "}
+        <a href="mailto:admin@bridgetx.co" style={{ color: "var(--brand-blue)" }}>admin@bridgetx.co</a>.
       </p>
 
       {state.error && (
