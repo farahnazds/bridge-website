@@ -3420,6 +3420,24 @@ export type Database = {
           },
         ]
       }
+      support_rate_limit_events: {
+        Row: {
+          bucket: string
+          created_at: string
+          id: number
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          id?: never
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          id?: never
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           category: string | null
@@ -3715,6 +3733,15 @@ export type Database = {
         Args: { p_recipient_id: string }
         Returns: boolean
       }
+      check_support_rate_limit: {
+        Args: {
+          p_global_limit?: number
+          p_ip_hash: string
+          p_ip_limit?: number
+          p_window?: string
+        }
+        Returns: boolean
+      }
       create_partnership_contract: {
         Args: {
           p_commission_percent: number
@@ -3745,6 +3772,7 @@ export type Database = {
         Returns: boolean
       }
       is_assigned_to_team: { Args: { p_team_id: string }; Returns: boolean }
+      is_closed_account: { Args: never; Returns: boolean }
       is_club_manager_for_club: {
         Args: { p_club_id: string }
         Returns: boolean
@@ -3773,6 +3801,7 @@ export type Database = {
         Args: { p_device_name?: string; p_platform: string; p_token: string }
         Returns: undefined
       }
+      reject_closed_accounts: { Args: never; Returns: undefined }
       restore_deleted_athlete: {
         Args: {
           p_athlete_id: string
